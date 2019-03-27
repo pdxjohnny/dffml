@@ -18,6 +18,7 @@ env:
   - PLUGIN=feature/git
   - CHANGELOG=1
   - WHITESPACE=1
+  - DEMO=1
 before_install:
 - pip install coverage codecov
 - |
