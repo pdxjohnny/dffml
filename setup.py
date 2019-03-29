@@ -82,6 +82,9 @@ setup(
         'dffml.operation.implementation.network': [
             'memory = dffml.df.memory:MemoryOperationImplementationNetwork',
         ],
+        'dffml.operation.implementation.network': [
+            'graphing = dffml.df.graphing:GraphingMemoryOperationImplementationNetwork',
+        ],
         'dffml.orchestrator': [
             'memory = dffml.df.memory:MemoryOrchestrator',
         ],
