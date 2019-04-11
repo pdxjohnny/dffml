@@ -15,6 +15,7 @@ env:
   matrix:
   - PLUGIN=.
   - PLUGIN=model/tensorflow
+  - PLUGIN=model/pytorch
   - PLUGIN=feature/git
   - CHANGELOG=1
   - WHITESPACE=1

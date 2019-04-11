@@ -150,11 +150,11 @@ class DFCN(Model):
                 optimizer.step()
 
             if epoch % 100 == 0:
-                print('number of epochs', epoch, 'loss', loss.item())
+                LOGGER.debug('number of epochs %d loss %f', epoch, loss.item())
 
         model_file_path = self.model_file_path(features)
         if model_file_path is not None:
-            LOGGER.debug('Saving state dict to {}'.format(model_file_path))
+            LOGGER.debug('Saving state dict to %s', model_file_path)
             torch.save(
                 model.state_dict(),
                 model_file_path
