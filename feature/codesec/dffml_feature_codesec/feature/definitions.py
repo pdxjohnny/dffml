@@ -8,13 +8,21 @@ definitions = [
         primitive="string",
     ),
     Definition(
-        name="binary",
-        primitive="str",
+        name="RPMObject",
+        primitive="python_obj",
         lock=True
     ),
     Definition(
+        name="rpm_filename",
+        primitive="str"
+    ),
+    Definition(
+        name="binary",
+        primitive="str"
+    ),
+    Definition(
         name="binary_is_PIE",
-        primitive="bool",
+        primitive="bool"
     )
 ]
 

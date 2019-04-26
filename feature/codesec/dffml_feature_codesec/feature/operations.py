@@ -26,7 +26,7 @@ from rpmfile import RPMFile
 
 from dateutil.relativedelta import relativedelta
 
-from dffml.df import op, Stage
+from dffml.df import op, Stage, Operation, OperationImplementation, OperationImplementationContext
 
 from .definitions import *
 
@@ -38,51 +38,101 @@ if sys.platform == 'win32':
     loop = asyncio.ProactorEventLoop()
     asyncio.set_event_loop(loop)
 
-@op(inputs={
+rpm_url_to_rpmfile = Operation(
+    name='rpm_url_to_rpmfile',
+    inputs={
         'URL': URL,
+    },
+    outputs={
+        'rpm': RPMObject
+    },
+    conditions=[]
+)
+
+class RPMURLToRPMFileContext(OperationImplementationContext):
+
+    async def run(self, inputs: Dict[str, Any]) -> Dict[str, Any]:
+        URL = inputs['URL']
+        async with self.parent.session.get(URL) as resp:
+            rpm = RPMFile(name=URL,
+                          fileobj=io.BytesIO(await resp.read()))
+            return {
+                    'rpm': rpm.__enter__()
+                    }
+
+class RPMURLToRPMFile(OperationImplementation):
+
+    op = rpm_url_to_rpmfile
+
+    def __call__(self,
+                 ctx: 'BaseInputSetContext',
+                 ictx: 'BaseInputNetworkContext') \
+            -> RPMURLToRPMFileContext:
+        return RPMURLToRPMFileContext(self, ctx, ictx)
+
+    async def __aenter__(self) -> 'OperationImplementationContext':
+        self.client = aiohttp.ClientSession(trust_env=True)
+        self.session = await self.client.__aenter__()
+        return self
+
+    async def __aexit__(self, exc_type, exc_value, traceback):
+        if self.client is not None:
+            await self.client.__aexit__(exc_type, exc_value, traceback)
+            self.client = None
+        self.session = None
+
+@op(inputs={
+        'rpm': RPMObject
+        },
+    outputs={
+        'files': rpm_filename
+        },
+    expand=['files']
+)
+async def files_in_rpm(rpm: RPMFile):
+    return {
+            'files': list(map(lambda rpminfo: rpminfo.name, rpm.getmembers()))
+            }
+
+@op(inputs={
+        'rpm': RPMObject,
+        'filename': rpm_filename
         },
     outputs={
         'binary': binary
-        },
-    expand=['binary']
+        }
 )
-async def download_and_extract_rpm(URL: str):
-    # TODO Make this not an op wrapped so the session can be reused
-    async with aiohttp.ClientSession(trust_env=True) as session:
-        async with session.get(URL) as resp:
-            fileobj = io.BytesIO(await resp.read())
-            with RPMFile(name=URL, fileobj=fileobj) as rpm:
-                binaries = []
-                for filename in rpm.getmembers():
-                    tempf = tempfile.NamedTemporaryFile(delete=False)
-                    handle = rpm.extractfile(filename)
-                    sig = handle.read(4)
-                    if len(sig) != 4 or sig != b'\x7fELF':
-                        continue
-                    tempf.write(b'\x7fELF')
-                    tempf.write(handle.read())
-                    tempf.close()
-                    binaries.append(tempf.name)
-                return {
-                        'binary': binaries
-                        }
+async def binary_file(rpm: RPMFile, filename: str):
+    tempf = tempfile.NamedTemporaryFile(delete=False)
+    handle = rpm.extractfile(filename)
+    sig = handle.read(4)
+    if len(sig) != 4 or sig != b'\x7fELF':
+        return
+    tempf.write(b'\x7fELF')
+    tempf.write(handle.read())
+    tempf.close()
+    return {
+            'binary': tempf.name
+            }
 
 @op(inputs={
-        'binary_path': binary
+        'binary': binary
         },
     outputs={
         'is_pie': binary_is_PIE
         },
 )
-async def pwn_checksec(binary_path: str):
+async def pwn_checksec(binary: Dict[str, str]):
     is_pie = False
     try:
-        checksec = (await check_output('pwn', 'checksec', binary_path)).split('\n')
+        checksec = (await check_output('pwn', 'checksec', binary['ondisk']))\
+                   .split('\n')
         checksec = list(map(lambda line: line.replace(':', '')\
                                              .strip().split(maxsplit=1),
                             checksec))
         checksec = list(filter(bool, checksec))
         checksec = dict(checksec)
+        LOGGER.debug('checksec: %s', checksec)
         is_pie = bool('enabled' in checksec['PIE'])
     except Exception as error:
         LOGGER.info('pwn_checksec: %s', error)
@@ -91,11 +141,19 @@ async def pwn_checksec(binary_path: str):
             }
 
 @op(inputs={
-        'binary_path': binary
+        'rpm': RPMObject
         },
     outputs={},
     stage=Stage.CLEANUP
 )
-async def cleanup_binary(binary_path: str):
-    os.unlink(binary_path)
-    return {}
+async def cleanup_rpm(rpm: RPMFile):
+    rpm.__exit__()
+
+@op(inputs={
+        'binary': binary
+        },
+    outputs={},
+    stage=Stage.CLEANUP
+)
+async def cleanup_binary(binary: str):
+    os.unlink(binary)
