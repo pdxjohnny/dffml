@@ -19,7 +19,7 @@ from typing import AsyncIterator, Dict, List, Tuple, Any, NamedTuple, Union, \
         get_type_hints, NewType, Optional, Set, Iterator
 
 from dffml.df import *
-from dffml.operation.output import GroupBy
+from dffml.operation.output import Associate
 from dffml_feature_codesec.feature.operations import *
 
 from dffml_feature_graphing.df.graphing import \
@@ -48,6 +48,10 @@ class TestRunner(AsyncTestCase):
         urls = [Input(value=URL,
                       definition=definitions['URL'],
                       parents=False) for URL in repos]
+
+        associate_spec = Input(value=['rpm_filename', 'binary_is_PIE'],
+                               definition=definitions['associate_spec'],
+                               parents=False)
 
         opimps = {imp.op.name: imp \
                   for imp in \
@@ -84,7 +88,7 @@ class TestRunner(AsyncTestCase):
                         MemoryInputSet(
                             MemoryInputSetConfig(
                                 ctx=StringInputSetContext(url.value),
-                                inputs=[url]
+                                inputs=[url, associate_spec]
                             )
                         )
                     )

@@ -122,10 +122,10 @@ async def binary_file(rpm: RPMFile, filename: str):
         'is_pie': binary_is_PIE
         },
 )
-async def pwn_checksec(binary: Dict[str, str]):
+async def pwn_checksec(binary: str):
     is_pie = False
     try:
-        checksec = (await check_output('pwn', 'checksec', binary['ondisk']))\
+        checksec = (await check_output('pwn', 'checksec', binary))\
                    .split('\n')
         checksec = list(map(lambda line: line.replace(':', '')\
                                              .strip().split(maxsplit=1),

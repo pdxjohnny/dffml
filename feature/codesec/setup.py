@@ -50,8 +50,21 @@ setup(
 
     packages=find_packages(),
     entry_points={
-        'dffml.feature': [
-            'misc = dffml_feature_codesec.feature.misc:MiscFeature',
+        'dffml.operation': [
+            'rpm_url_to_rpmfile = dffml_feature_codesec.feature.operations:rpm_url_to_rpmfile',
+            'files_in_rpm = dffml_feature_codesec.feature.operations:files_in_rpm.op',
+            'binary_file = dffml_feature_codesec.feature.operations:binary_file.op',
+            'pwn_checksec = dffml_feature_codesec.feature.operations:pwn_checksec.op',
+            'cleanup_rpm = dffml_feature_codesec.feature.operations:cleanup_rpm.op',
+            'cleanup_binary = dffml_feature_codesec.feature.operations:cleanup_binary.op',
+        ],
+        'dffml.operation.implementation': [
+            'rpm_url_to_rpmfile = dffml_feature_codesec.feature.operations:RPMURLToRPMFile',
+            'files_in_rpm = dffml_feature_codesec.feature.operations:files_in_rpm.imp',
+            'binary_file = dffml_feature_codesec.feature.operations:binary_file.imp',
+            'pwn_checksec = dffml_feature_codesec.feature.operations:pwn_checksec.imp',
+            'cleanup_rpm = dffml_feature_codesec.feature.operations:cleanup_rpm.imp',
+            'cleanup_binary = dffml_feature_codesec.feature.operations:cleanup_binary.imp',
         ],
     },
 )
