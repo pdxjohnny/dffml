@@ -18,7 +18,7 @@ with open(os.path.join(self_path, 'README.md'), 'r', encoding='utf-8') as f:
 
 INSTALL_REQUIRES = [
     'aiohttp>=3.5.4',
-    'rpmfile>=1.0.0',
+    # 'rpmfile>=1.0.0',
     ]
 
 setup(

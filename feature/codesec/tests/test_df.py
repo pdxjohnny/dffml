@@ -1,29 +1,8 @@
-import io
-import os
-import sys
-import abc
-import glob
 import json
-import uuid
-import shutil
-import inspect
-import asyncio
-import hashlib
-import tempfile
-import unittest
-import itertools
-import collections
-from itertools import product
-from datetime import datetime
-from typing import AsyncIterator, Dict, List, Tuple, Any, NamedTuple, Union, \
-        get_type_hints, NewType, Optional, Set, Iterator
 
 from dffml.df import *
 from dffml.operation.output import Associate
 from dffml_feature_codesec.feature.operations import *
-
-from dffml_feature_graphing.df.graphing import \
-        GraphingMemoryOperationImplementationNetwork
 
 from dffml.util.asynctestcase import AsyncTestCase
 
@@ -42,8 +21,8 @@ class TestRunner(AsyncTestCase):
 
         repos = [
             'https://download.clearlinux.org/releases/10540/clear/x86_64/os/Packages/sudo-setuid-1.8.17p1-34.x86_64.rpm',
-            'https://rpmfind.net/linux/fedora/linux/updates/29/Everything/x86_64/Packages/g/gzip-1.9-9.fc29.x86_64.rpm',
-            'https://archives.fedoraproject.org/pub/archive/fedora/linux/releases/20/Everything/x86_64/os/Packages/c/curl-7.32.0-3.fc20.x86_64.rpm'
+            # 'https://rpmfind.net/linux/fedora/linux/updates/29/Everything/x86_64/Packages/g/gzip-1.9-9.fc29.x86_64.rpm',
+            # 'https://archives.fedoraproject.org/pub/archive/fedora/linux/releases/20/Everything/x86_64/os/Packages/c/curl-7.32.0-3.fc20.x86_64.rpm'
             ]
         urls = [Input(value=URL,
                       definition=definitions['URL'],
@@ -70,7 +49,7 @@ class TestRunner(AsyncTestCase):
                     key_value_store=MemoryKeyValueStore(BaseConfig())
                 )
             ),
-            opimp_network = GraphingMemoryOperationImplementationNetwork(
+            opimp_network = MemoryOperationImplementationNetwork(
                 MemoryOperationImplementationNetworkConfig(
                     operations=opimps
                 )

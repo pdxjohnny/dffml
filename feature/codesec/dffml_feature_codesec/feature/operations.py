@@ -1,42 +1,29 @@
 import io
 import os
 import sys
-import abc
-import glob
-import json
-import uuid
-import shutil
-import inspect
 import asyncio
-import hashlib
 import tempfile
-import unittest
-import itertools
-import subprocess
-import collections
-import asyncio.subprocess
-from itertools import product
-from datetime import datetime
-from contextlib import asynccontextmanager, AsyncExitStack
-from typing import AsyncIterator, Dict, List, Tuple, Any, NamedTuple, Union, \
-        get_type_hints, NewType, Optional, Set, Iterator
+from typing import Dict, Any
 
 import aiohttp
 from rpmfile import RPMFile
 
-from dateutil.relativedelta import relativedelta
+from dffml.df import op, Stage, Operation, OperationImplementation, \
+    OperationImplementationContext
 
-from dffml.df import op, Stage, Operation, OperationImplementation, OperationImplementationContext
+from dffml_feature_git.util.proc import check_output
 
-from .definitions import *
-
-from dffml_feature_git.util.proc import check_output, create, stop, inpath
+# pylint: disable=no-name-in-module
+from .definitions import URL, \
+    RPMObject, \
+    rpm_filename, \
+    binary, \
+    binary_is_PIE
 
 from .log import LOGGER
 
 if sys.platform == 'win32':
-    loop = asyncio.ProactorEventLoop()
-    asyncio.set_event_loop(loop)
+    asyncio.set_event_loop(asyncio.ProactorEventLoop())
 
 rpm_url_to_rpmfile = Operation(
     name='rpm_url_to_rpmfile',
@@ -46,23 +33,38 @@ rpm_url_to_rpmfile = Operation(
     outputs={
         'rpm': RPMObject
     },
-    conditions=[]
-)
+    conditions=[])
 
 class RPMURLToRPMFileContext(OperationImplementationContext):
 
     async def run(self, inputs: Dict[str, Any]) -> Dict[str, Any]:
-        URL = inputs['URL']
-        async with self.parent.session.get(URL) as resp:
-            rpm = RPMFile(name=URL,
-                          fileobj=io.BytesIO(await resp.read()))
+        self.logger.debug('Start resp: %s', inputs['URL'])
+        async with self.parent.session.get(inputs['URL']) as resp:
+            self.logger.debug('Reading resp (%s): %s...', inputs['URL'], resp)
+            body = await resp.read()
+            self.logger.debug('Done reading resp (%s): %d bytes',
+                              inputs['URL'], len(body))
+            rpmbody = io.BytesIO(body)
+            self.logger.debug('rpmbody: %s', rpmbody)
+            try:
+                rpm = RPMFile(name=inputs['URL'],
+                              fileobj=rpmbody)
+            except Exception as error:
+                self.logger.debug('Failed to instantiate RPMFile: %s', error)
+                return
+            self.logger.debug('Created RPM resp: %s', inputs['URL'])
             return {
-                    'rpm': rpm.__enter__()
-                    }
+                'rpm': rpm.__enter__()
+            }
 
 class RPMURLToRPMFile(OperationImplementation):
 
     op = rpm_url_to_rpmfile
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.client = None
+        self.session = None
 
     def __call__(self,
                  ctx: 'BaseInputSetContext',
@@ -83,25 +85,23 @@ class RPMURLToRPMFile(OperationImplementation):
 
 @op(inputs={
         'rpm': RPMObject
-        },
+    },
     outputs={
         'files': rpm_filename
-        },
-    expand=['files']
-)
+    },
+    expand=['files'])
 async def files_in_rpm(rpm: RPMFile):
     return {
-            'files': list(map(lambda rpminfo: rpminfo.name, rpm.getmembers()))
-            }
+        'files': list(map(lambda rpminfo: rpminfo.name, rpm.getmembers()))
+    }
 
 @op(inputs={
         'rpm': RPMObject,
         'filename': rpm_filename
-        },
+    },
     outputs={
         'binary': binary
-        }
-)
+    })
 async def binary_file(rpm: RPMFile, filename: str):
     tempf = tempfile.NamedTemporaryFile(delete=False)
     handle = rpm.extractfile(filename)
@@ -112,23 +112,22 @@ async def binary_file(rpm: RPMFile, filename: str):
     tempf.write(handle.read())
     tempf.close()
     return {
-            'binary': tempf.name
-            }
+        'binary': tempf.name
+    }
 
 @op(inputs={
-        'binary': binary
-        },
+        'binary_path': binary
+    },
     outputs={
         'is_pie': binary_is_PIE
-        },
-)
-async def pwn_checksec(binary: str):
+    })
+async def pwn_checksec(binary_path: str):
     is_pie = False
     try:
-        checksec = (await check_output('pwn', 'checksec', binary))\
-                   .split('\n')
-        checksec = list(map(lambda line: line.replace(':', '')\
-                                             .strip().split(maxsplit=1),
+        checksec = (await check_output('pwn', 'checksec', binary_path))\
+            .split('\n')
+        checksec = list(map(lambda line: line.replace(':', '')
+                            .strip().split(maxsplit=1),
                             checksec))
         checksec = list(filter(bool, checksec))
         checksec = dict(checksec)
@@ -137,23 +136,21 @@ async def pwn_checksec(binary: str):
     except Exception as error:
         LOGGER.info('pwn_checksec: %s', error)
     return {
-            'is_pie': is_pie
-            }
+        'is_pie': is_pie
+    }
 
 @op(inputs={
-        'rpm': RPMObject
-        },
+    'rpm': RPMObject
+    },
     outputs={},
-    stage=Stage.CLEANUP
-)
+    stage=Stage.CLEANUP)
 async def cleanup_rpm(rpm: RPMFile):
     rpm.__exit__()
 
 @op(inputs={
-        'binary': binary
-        },
+    'binary_path': binary
+    },
     outputs={},
-    stage=Stage.CLEANUP
-)
-async def cleanup_binary(binary: str):
-    os.unlink(binary)
+    stage=Stage.CLEANUP)
+async def cleanup_binary(binary_path: str):
+    os.unlink(binary_path)
