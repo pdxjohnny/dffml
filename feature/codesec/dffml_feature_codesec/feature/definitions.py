@@ -8,6 +8,10 @@ definitions = [
         primitive="string",
     ),
     Definition(
+        name="URLBytes",
+        primitive="python_obj"
+    ),
+    Definition(
         name="RPMObject",
         primitive="python_obj",
         lock=True

@@ -1,12 +1,14 @@
 import io
 import os
 import sys
+import tarfile
 import asyncio
 import tempfile
-from typing import Dict, Any
+from typing import Dict, Any, NamedTuple
 
 import aiohttp
 from rpmfile import RPMFile
+from rpmfile.errors import RPMError
 
 from dffml.df import op, Stage, Operation, OperationImplementation, \
     OperationImplementationContext
@@ -15,6 +17,7 @@ from dffml_feature_git.util.proc import check_output
 
 # pylint: disable=no-name-in-module
 from .definitions import URL, \
+    URLBytes, \
     RPMObject, \
     rpm_filename, \
     binary, \
@@ -25,41 +28,40 @@ from .log import LOGGER
 if sys.platform == 'win32':
     asyncio.set_event_loop(asyncio.ProactorEventLoop())
 
-rpm_url_to_rpmfile = Operation(
-    name='rpm_url_to_rpmfile',
+url_to_urlbytes = Operation(
+    name='url_to_urlbytes',
     inputs={
         'URL': URL,
     },
     outputs={
-        'rpm': RPMObject
+        'download': URLBytes
     },
     conditions=[])
 
-class RPMURLToRPMFileContext(OperationImplementationContext):
+class URLBytesObject(NamedTuple):
+    URL: str
+    body: bytes
+
+    def __repr__(self):
+        return '%s(URL=%s, body=%s...)' % (self.__class__.__qualname__,
+                                           self.URL, self.body[:10],)
+
+    def __str__(self):
+        return repr(self)
+
+class URLToURLBytesContext(OperationImplementationContext):
 
     async def run(self, inputs: Dict[str, Any]) -> Dict[str, Any]:
         self.logger.debug('Start resp: %s', inputs['URL'])
         async with self.parent.session.get(inputs['URL']) as resp:
-            self.logger.debug('Reading resp (%s): %s...', inputs['URL'], resp)
-            body = await resp.read()
-            self.logger.debug('Done reading resp (%s): %d bytes',
-                              inputs['URL'], len(body))
-            rpmbody = io.BytesIO(body)
-            self.logger.debug('rpmbody: %s', rpmbody)
-            try:
-                rpm = RPMFile(name=inputs['URL'],
-                              fileobj=rpmbody)
-            except Exception as error:
-                self.logger.debug('Failed to instantiate RPMFile: %s', error)
-                return
-            self.logger.debug('Created RPM resp: %s', inputs['URL'])
             return {
-                'rpm': rpm.__enter__()
+                'download': URLBytesObject(URL=inputs['URL'],
+                                           body=await resp.read())
             }
 
-class RPMURLToRPMFile(OperationImplementation):
+class URLToURLBytes(OperationImplementation):
 
-    op = rpm_url_to_rpmfile
+    op = url_to_urlbytes
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -69,8 +71,8 @@ class RPMURLToRPMFile(OperationImplementation):
     def __call__(self,
                  ctx: 'BaseInputSetContext',
                  ictx: 'BaseInputNetworkContext') \
-            -> RPMURLToRPMFileContext:
-        return RPMURLToRPMFileContext(self, ctx, ictx)
+            -> URLToURLBytesContext:
+        return URLToURLBytesContext(self, ctx, ictx)
 
     async def __aenter__(self) -> 'OperationImplementationContext':
         self.client = aiohttp.ClientSession(trust_env=True)
@@ -82,6 +84,41 @@ class RPMURLToRPMFile(OperationImplementation):
             await self.client.__aexit__(exc_type, exc_value, traceback)
             self.client = None
         self.session = None
+
+@op(inputs={
+        'download': URLBytes,
+    },
+    outputs={
+        'rpm': RPMObject
+    })
+async def urlbytes_to_tarfile(download: URLBytesObject):
+    try:
+        return {
+            'rpm': tarfile.open(name=download.URL,
+                                fileobj=io.BytesIO(download.body)).__enter__()
+        }
+    except Exception as error:
+        LOGGER.debug('urlbytes_to_tarfile: Failed to instantiate '
+                     'TarFile(%s): %s', download.URL, error)
+
+@op(inputs={
+        'download': URLBytes,
+    },
+    outputs={
+        'rpm': RPMObject
+    })
+async def urlbytes_to_rpmfile(download: URLBytesObject):
+    try:
+        return {
+            'rpm': RPMFile(name=download.URL,
+                           fileobj=io.BytesIO(download.body)).__enter__()
+        }
+    except AssertionError as error:
+        LOGGER.debug('urlbytes_to_rpmfile: Failed to instantiate '
+                     'RPMFile(%s): %s', download.URL, error)
+    except RPMError as error:
+        LOGGER.debug('urlbytes_to_rpmfile: Failed to instantiate '
+                     'RPMFile(%s): %s', download.URL, error)
 
 @op(inputs={
         'rpm': RPMObject
@@ -145,7 +182,10 @@ async def pwn_checksec(binary_path: str):
     outputs={},
     stage=Stage.CLEANUP)
 async def cleanup_rpm(rpm: RPMFile):
-    rpm.__exit__()
+    try:
+        rpm.__exit__(None, None, None)
+    except TypeError:
+        rpm.__exit__()
 
 @op(inputs={
     'binary_path': binary

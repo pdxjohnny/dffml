@@ -182,7 +182,6 @@ class Associate(OperationImplementationContext):
                                                                exported[convert])
         except DefinitionNotInContext:
             return {exported[1]: {}}
-        self.logger.debug('output spec: %s', exported)
         # Make exported into key, value which it will be in output
         key, value = exported
         # Acquire all definitions within the context
@@ -190,7 +189,6 @@ class Associate(OperationImplementationContext):
             # Output dict
             want = {}
             async for item in od.inputs(value):
-                self.logger.debug('item: %s, key: %s', item, key)
                 parents = item.get_parents()
                 for parent in parents:
                     if key == parent.definition:
