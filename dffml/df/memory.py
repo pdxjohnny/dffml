@@ -3,6 +3,7 @@ import asyncio
 import hashlib
 import itertools
 from functools import wraps
+from datetime import datetime
 from itertools import product
 from contextlib import asynccontextmanager, AsyncExitStack
 from typing import AsyncIterator, Dict, List, Tuple, Any, NamedTuple, Union, \
@@ -226,7 +227,16 @@ class MemoryInputNetworkContext(BaseInputNetworkContext):
         handle_string = (await watch_ctx.handle()).as_string()
         # Notify whatever is listening for new inputs in this context
         async with self.parent.input_notification_set[handle_string]() as ctx:
+            '''
             return await ctx.added()
+            '''
+            async with ctx.parent.event_added_lock:
+                await ctx.parent.event_added.wait()
+                ctx.parent.event_added.clear()
+                async with ctx.parent.lock:
+                    notification_items = ctx.parent.notification_items
+                    ctx.parent.notification_items = []
+                    return False, notification_items
 
     async def definition(self, ctx: BaseInputSetContext, definition: str) \
             -> Definition:
@@ -588,14 +598,15 @@ class MemoryOperationImplementationNetworkContext(BaseOperationImplementationNet
                 expand = operation.expand
             else:
                 expand = []
+            parents = [item async for item in \
+                       parameter_set.inputs()]
             for key, output in outputs.items():
                 if not key in expand:
                     output = [output]
                 for value in output:
                     inputs.append(Input(value=value,
                                          definition=operation.outputs[key],
-                                         parents=[item async for item in \
-                                                  parameter_set.inputs()]))
+                                         parents=parents))
         except KeyError as error:
             raise KeyError(
                     'Value %s missing from output:definition mapping %s(%s)' \
@@ -782,6 +793,7 @@ class MemoryOrchestratorContext(BaseOrchestratorContext):
                 done, _pending = await asyncio.wait(tasks,
                     return_when=asyncio.FIRST_COMPLETED)
 
+                start_time = datetime.now()
                 for task in done:
                     # Remove the task from the set of tasks we are waiting for
                     tasks.remove(task)
@@ -796,31 +808,44 @@ class MemoryOrchestratorContext(BaseOrchestratorContext):
                         self.logger.error('%s', output.getvalue().rstrip())
                         output.close()
                     elif task is input_set_enters_network:
-                        more, new_input_set = input_set_enters_network.result()
-                        self.logger.debug('[%s]: input_set_enters_network: %s',
-                                          ctx_str,
-                                          [(i.definition.name, i.value) \
-                                          async for i in new_input_set.inputs()])
-                        # Identify which operations have complete contextually
-                        # appropriate input sets which haven't been run yet
-                        async for operation, parameter_set in \
-                                self.nctx.operations_parameter_set_pairs(self.ictx,
-                                        self.octx, self.rctx, ctx,
-                                        new_input_set=new_input_set):
-                            # Add inputs and operation to redundancy checker before
-                            # dispatch
-                            await self.rctx.add(operation, parameter_set)
-                            # Dispatch the operation and input set for running
-                            tasks.add(await self.nctx.dispatch(self.ictx,
-                                    self.lctx, operation, parameter_set))
-                            self.logger.debug('[%s]: dispatch operation: %s',
-                                              ctx_str, operation.name)
+                        more, new_input_sets = input_set_enters_network.result()
+                        for new_input_set in new_input_sets:
+                            # self.logger.debug('[%s]: input_set_enters_network: %s',
+                            #                   ctx_str,
+                            #                   [(i.definition.name, i.value) \
+                            #                   async for i in new_input_set.inputs()])
+                            # Identify which operations have complete contextually
+                            # appropriate input sets which haven't been run yet
+                            async for operation, parameter_set in \
+                                    self.nctx.operations_parameter_set_pairs(self.ictx,
+                                            self.octx, self.rctx, ctx,
+                                            new_input_set=new_input_set):
+                                # Add inputs and operation to redundancy checker before
+                                # dispatch
+                                await self.rctx.add(operation, parameter_set)
+                                # Dispatch the operation and input set for running
+                                dispatch_operation = await self.nctx.dispatch(
+                                        self.ictx, self.lctx,
+                                        operation, parameter_set)
+                                dispatch_operation.operation = operation
+                                dispatch_operation.start_time = datetime.now()
+                                tasks.add(dispatch_operation)
+                                self.logger.debug('[%s]: dispatch operation: %s',
+                                                  ctx_str, operation.name)
                         # Create a another task to waits for new input sets
                         input_set_enters_network = asyncio.create_task(
                                 self.ictx.added(ctx))
                         tasks.add(input_set_enters_network)
-                    self.logger.debug('[%s]: operations outstanding: %d',
-                                      ctx_str, len(tasks) - 1)
+                    else:
+                        self.logger.debug('[%s]: operation %r took: %s',
+                                          ctx_str,
+                                          task.operation.name,
+                                          datetime.now() - task.start_time)
+                self.logger.debug('[%s]: dispatching took: %s',
+                                  ctx_str,
+                                  datetime.now() - start_time)
+                self.logger.debug('[%s]: operations outstanding: %d',
+                                  ctx_str, len(tasks) - 1)
         finally:
             # Cancel tasks which we don't need anymore now that we know we are done
             for task in tasks:

@@ -7,6 +7,8 @@ import tempfile
 from typing import Dict, Any, NamedTuple
 
 import aiohttp
+from elftools.elf.descriptions import describe_e_type
+from elftools.elf.elffile import ELFFile
 from rpmfile import RPMFile
 from rpmfile.errors import RPMError
 
@@ -137,41 +139,19 @@ async def files_in_rpm(rpm: RPMFile):
         'filename': rpm_filename
     },
     outputs={
-        'binary': binary
+        'is_pie': binary_is_PIE
     })
 async def binary_file(rpm: RPMFile, filename: str):
     tempf = tempfile.NamedTemporaryFile(delete=False)
     handle = rpm.extractfile(filename)
     sig = handle.read(4)
     if len(sig) != 4 or sig != b'\x7fELF':
+        handle.close()
         return
-    tempf.write(b'\x7fELF')
-    tempf.write(handle.read())
-    tempf.close()
-    return {
-        'binary': tempf.name
-    }
-
-@op(inputs={
-        'binary_path': binary
-    },
-    outputs={
-        'is_pie': binary_is_PIE
-    })
-async def pwn_checksec(binary_path: str):
-    is_pie = False
-    try:
-        checksec = (await check_output('pwn', 'checksec', binary_path))\
-            .split('\n')
-        checksec = list(map(lambda line: line.replace(':', '')
-                            .strip().split(maxsplit=1),
-                            checksec))
-        checksec = list(filter(bool, checksec))
-        checksec = dict(checksec)
-        LOGGER.debug('checksec: %s', checksec)
-        is_pie = bool('enabled' in checksec['PIE'])
-    except Exception as error:
-        LOGGER.info('pwn_checksec: %s', error)
+    handle.seek(0)
+    is_pie = bool(describe_e_type(ELFFile(handle)\
+                  .header.e_type).split()[0] == 'DYN')
+    handle.close()
     return {
         'is_pie': is_pie
     }
