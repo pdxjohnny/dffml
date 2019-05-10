@@ -1,8 +1,9 @@
 import json
+import random
 
 from dffml.df import *
-from dffml.operation.output import Associate
-from dffml_feature_codesec.feature.operations import *
+from dffml.operation.output import GetSingle
+from dffml_feature_auth.feature.operations import *
 
 from dffml.util.asynctestcase import AsyncTestCase
 
@@ -19,20 +20,16 @@ class TestRunner(AsyncTestCase):
         exported = linker.export(*OPERATIONS)
         definitions, operations, _outputs = linker.resolve(exported)
 
-        repos = [
-            'file:///home/johnsa1/Downloads/i.txz',
-            # 'http://pkg.freebsd.org/FreeBSD:13:amd64/latest/All/ImageMagick7-7.0.8.22_1.txz',
-            # 'https://download.clearlinux.org/releases/10540/clear/x86_64/os/Packages/sudo-setuid-1.8.17p1-34.x86_64.rpm',
-            # 'https://rpmfind.net/linux/fedora/linux/updates/29/Everything/x86_64/Packages/g/gzip-1.9-9.fc29.x86_64.rpm',
-            # 'https://archives.fedoraproject.org/pub/archive/fedora/linux/releases/20/Everything/x86_64/os/Packages/c/curl-7.32.0-3.fc20.x86_64.rpm'
+        passwords = [
+            str(random.random()) for _ in range(0, 20)
             ]
-        urls = [Input(value=URL,
-                      definition=definitions['URL'],
-                      parents=False) for URL in repos]
+        passwords = [Input(value=password,
+                           definition=definitions['UnhashedPassword'],
+                           parents=False) for password in passwords]
 
-        associate_spec = Input(value=['rpm_filename', 'binary_is_PIE'],
-                               definition=definitions['associate_spec'],
-                               parents=False)
+        output_spec = Input(value=['ScryptPassword'],
+                            definition=definitions['get_single_spec'],
+                            parents=False)
 
         opimps = {imp.op.name: imp \
                   for imp in \
@@ -64,16 +61,16 @@ class TestRunner(AsyncTestCase):
         async with dff as dff:
             async with dff() as dffctx:
                 # Add our inputs to the input network with the context being the URL
-                for url in urls:
+                for password in passwords:
                     await dffctx.ictx.add(
                         MemoryInputSet(
                             MemoryInputSetConfig(
-                                ctx=StringInputSetContext(url.value),
-                                inputs=[url, associate_spec]
+                                ctx=StringInputSetContext(password.value),
+                                inputs=[password, output_spec]
                             )
                         )
                     )
-                async for ctx, results in dffctx.evaluate():
+                async for ctx, results in dffctx.evaluate(strict=True):
                     print()
                     print((await ctx.handle()).as_string(),
                           json.dumps(results, sort_keys=True,
