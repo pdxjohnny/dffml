@@ -12,6 +12,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Documentation on the Data Flow Facilitator subsystem
 - codesec plugin containing operations which gather security related metrics on
   code and binaries.
+- auth plugin containing operations such as password hashing
 ### Fixed
 - Corrected maxsplit in util.cli.parser
 - Check that dtype is a class in Tensorlfow DNN
