@@ -127,8 +127,7 @@ class Scrypt(OperationImplementation):
         return self
 
     async def __aexit__(self, exc_type, exc_value, traceback):
-        if self.__pool is not None:
-            self.__pool.__exit__(exc_type, exc_value, traceback)
-            self.__pool = None
+        self.__pool.__exit__(exc_type, exc_value, traceback)
+        self.__pool = None
         self.pool = None
         self.loop = None
