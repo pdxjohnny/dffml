@@ -105,7 +105,6 @@ async def urlbytes_to_tarfile(download: URLBytesObject):
     fileobj = io.BytesIO(download.body)
     try:
         rpm = tarfile.open(name=download.URL, fileobj=fileobj)
-        rpm.lock = asyncio.Lock()
         return {
             'rpm': rpm.__enter__()
         }
@@ -123,7 +122,6 @@ async def urlbytes_to_rpmfile(download: URLBytesObject):
     fileobj = io.BytesIO(download.body)
     try:
         rpm = RPMFile(name=download.URL, fileobj=fileobj)
-        rpm.lock = asyncio.Lock()
         return {
             'rpm': rpm.__enter__()
         }
@@ -162,16 +160,15 @@ class IsBinaryPIEContext(OperationImplementationContext):
     async def run(self, inputs: Dict[str, Any]) -> Dict[str, Any]:
         rpm: RPMfile = inputs['rpm']
         filename: str = inputs['filename']
-        async with rpm.lock:
-            with rpm.extractfile(filename) as handle:
-                sig = handle.read(4)
-                if len(sig) != 4 or sig != b'\x7fELF':
-                    return
-                handle.seek(0)
-                return {
-                    'is_pie': bool(describe_e_type(ELFFile(handle).header.e_type)
-                                   .split()[0] == 'DYN')
-                }
+        with rpm.extractfile(filename) as handle:
+            sig = handle.read(4)
+            if len(sig) != 4 or sig != b'\x7fELF':
+                return
+            handle.seek(0)
+            return {
+                'is_pie': bool(describe_e_type(ELFFile(handle).header.e_type)
+                               .split()[0] == 'DYN')
+            }
 
 class IsBinaryPIE(OperationImplementation):
 
