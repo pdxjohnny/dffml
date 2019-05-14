@@ -9,6 +9,12 @@ from .util.entrypoint import Entrypoint
 
 from .log import LOGGER
 
+class MissingRequiredProperty(Exception):
+    '''
+    Raised when a BaseDataFlowFacilitatorObject is missing some property which
+    should have been defined in the class.
+    '''
+
 class LoggingLogger(object):
     '''
     Provide the logger property using Python's builtin logging module.
@@ -28,7 +34,6 @@ class BaseConfig(object):
     All DFFML Base Objects should take an object (likely a typing.NamedTuple) as
     as their config.
     '''
-    pass
 
 class BaseConfigurable(abc.ABC):
     '''
@@ -110,6 +115,9 @@ class BaseDataFlowFacilitatorObject(BaseDataFlowFacilitatorObjectContext, \
         self.__ensure_property('CONTEXT')
         self.__ensure_property('ENTRY_POINT')
 
+    def __repr__(self):
+        return '%s(%r)' % (self.__class__.__qualname__, self.config)
+
     @abc.abstractmethod
     def __call__(self) -> 'BaseDataFlowFacilitatorObjectContext':
         pass
@@ -117,7 +125,7 @@ class BaseDataFlowFacilitatorObject(BaseDataFlowFacilitatorObjectContext, \
     @classmethod
     def __ensure_property(cls, property_name):
         if getattr(cls, property_name, None) is None:
-            raise ValueError('BaseDataFlowFacilitatorObject\'s may not be ' + \
-                             'created without a `%s`. ' % (property_name,) + \
-                             'Missing %s.%s' \
-                             % (cls.__qualname__, property_name,))
+            raise MissingRequiredProperty(
+                    'BaseDataFlowFacilitatorObjects may not be '
+                    'created without a `%s`. Missing %s.%s' \
+                    % (property_name, cls.__qualname__, property_name,))

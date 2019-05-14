@@ -10,11 +10,12 @@ from unittest.mock import patch
 from dffml.repo import Repo
 from dffml.port import Port
 from dffml.feature import Feature, Features
-from dffml.source import Source, Sources
+from dffml.source.source import BaseSource
 from dffml.model import Model
 
-from dffml.util.cli.base import \
-        Arg, \
+from dffml.util.cli.arg import Arg
+
+from dffml.util.cli.cmd import \
         JSONEncoder, \
         CMD, \
         Parser
@@ -29,7 +30,7 @@ from dffml.util.cli.parser import \
         ParseInputsAction, \
         ParseRemapAction
 
-from dffml.util.cli.cmd import \
+from dffml.util.cli.cmds import \
         ListEntrypoint, \
         FeaturesCMD, \
         ModelCMD
@@ -46,18 +47,18 @@ def Namespace(**kwargs):
 class TestParseActions(unittest.TestCase):
 
     def test_sources(self):
-        def load_from_dict(toload):
-            return toload
+        def load_multiple(toload):
+            return dict(map(lambda value: (value, value,), toload))
         namespace = Namespace(sources=False)
-        with patch.object(Source, 'load_from_dict',
-                          new=load_from_dict) \
+        with patch.object(BaseSource, 'load_multiple',
+                          new=load_multiple) \
                           as mock_method:
             action = ParseSourcesAction(dest='sources', option_strings='')
-            action(None, namespace, ['first=src0', 'second=src1'])
+            action(None, namespace, ['first', 'second'])
             self.assertEqual(len(namespace.sources), 2)
             self.assertEqual(namespace.sources[0], 'first')
             self.assertEqual(namespace.sources[1], 'second')
-            action(None, namespace, 'second=src2')
+            action(None, namespace, 'second')
             self.assertEqual(len(namespace.sources), 1)
             self.assertEqual(namespace.sources[0], 'second')
 
@@ -230,7 +231,8 @@ class TestCMD(AsyncTestCase):
                 return True
         class Primary(CMD):
             secondary = Secondary
-        with patch.object(json, 'dump') as mock_method:
+        with patch.object(json, 'dump') as mock_method, \
+                patch('builtins.print'):
             Primary.main(loop=asyncio.new_event_loop(), argv=['t', 'secondary'])
             mock_method.assert_called_once()
 

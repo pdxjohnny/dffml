@@ -14,26 +14,20 @@ from typing import Optional
 from ...repo import Repo
 from ...port import Port
 from ...feature import Feature, Features
-from ...source import Source, Sources, JSONSource
+from ...source.source import BaseSource, Sources
 from ...model import Model
 
 from ...df.base import Operation, \
                        OperationImplementation
 
-from .base import ParseLoggingAction
-
-from .log import LOGGER
-
-LOGGER = LOGGER.getChild('cmds')
+from .cmd import ParseLoggingAction
 
 class ParseSourcesAction(argparse.Action):
 
     def __call__(self, parser, namespace, values, option_string=None):
         if not isinstance(values, list):
             values = [values]
-        parse = dict(map(lambda source: source.split('=', maxsplit=1)[::-1],
-            values))
-        values = Sources(*list(Source.load_from_dict(parse).values()))
+        values = Sources(*list(BaseSource.load_multiple(values).values()))
         setattr(namespace, self.dest, values)
 
 class ParseFeaturesAction(argparse.Action):

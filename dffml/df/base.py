@@ -12,7 +12,8 @@ from .log import LOGGER
 from ..base import BaseConfig, \
                    BaseDataFlowFacilitatorObjectContext, \
                    BaseDataFlowFacilitatorObject
-from ..util.cli.base import Arg, CMD
+from ..util.cli.arg import Arg
+from ..util.cli.cmd import CMD
 from ..util.entrypoint import Entrypoint
 
 class BaseDataFlowObjectContext(BaseDataFlowFacilitatorObjectContext):

@@ -34,7 +34,8 @@ from .base import OperationImplementation, \
                   BaseOrchestratorContext, \
                   BaseOrchestrator
 
-from ..util.cli.base import Arg, CMD
+from ..util.cli.arg import Arg
+from ..util.cli.cmd import CMD
 from ..util.cli.parser import ParseKeyValueStoreAction, \
                               ParseOperationImplementationAction
 

@@ -4,17 +4,46 @@
 WARNING: concurrent can be much slower for quick tasks. It is best used for long
 running concurrent tasks.
 '''
+import inspect
 import asyncio
+from collections import UserList
 from contextlib import AsyncExitStack
 from typing import Dict, Any, AsyncIterator, Tuple
 
 from .log import LOGGER
 
-class AsyncContextManagerList(list):
+class AsyncContextManagerListContext(UserList):
+
+    def __init__(self, parent: 'AsyncContextManagerList'):
+        UserList.__init__(self)
+        self.parent = parent
+        self.__stack = None
+
+    async def __aenter__(self):
+        self.clear()
+        self.__stack = AsyncExitStack()
+        await self.__stack.__aenter__()
+        for item in self.parent:
+            # Equivalent to entering the Object context then calling the object
+            # to get the ObjectContext and entering that context. We then
+            # return a list of all the inner contexts
+            # >>> async with BaseDataFlowObject() as obj:
+            # >>>     async with obj() as ctx:
+            # >>>         clist.append(ctx)
+            self.append(await self.__stack.enter_async_context(item()))
+        return self
+
+    async def __aexit__(self, exc_type, exc_value, traceback):
+        await self.__stack.aclose()
+
+class AsyncContextManagerList(UserList):
 
     def __init__(self, *args):
-        super().__init__(list(args))
+        UserList.__init__(self, list(args))
         self.__stack = None
+
+    def __call__(self) -> 'BaseDataFlowFacilitatorObjectContext':
+        return self.CONTEXT(self)
 
     async def __aenter__(self):
         self.__stack = AsyncExitStack()

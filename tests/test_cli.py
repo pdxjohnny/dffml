@@ -18,7 +18,8 @@ from typing import List, Dict, Any, Optional, Tuple, AsyncIterator
 
 from dffml.repo import Repo
 from dffml.feature import Feature, Features, DefFeature
-from dffml.source import Sources, RepoSource
+from dffml.source.source import Sources
+from dffml.source.memory import MemorySource, MemorySourceConfig
 from dffml.model import Model
 from dffml.accuracy import Accuracy as AccuracyType
 from dffml.util.asynctestcase import AsyncTestCase
@@ -33,7 +34,7 @@ class ReposTestCase(AsyncTestCase):
 
     def setUp(self):
         self.repos = [Repo(str(random.random())) for _ in range(0, 10)]
-        self.sources = Sources(RepoSource(*self.repos))
+        self.sources = Sources(MemorySource(MemorySourceConfig(repos=self.repos)))
         self.features = Features(FakeFeature())
 
 class FakeFeature(Feature):
@@ -83,7 +84,7 @@ class TestOperationsAll(ReposTestCase):
             'multiply 42 and 10': 420
             }
         self.repos = list(map(Repo, self.repo_keys.keys()))
-        self.sources = Sources(RepoSource(*self.repos))
+        self.sources = Sources(MemorySource(MemorySourceConfig(repos=self.repos)))
         self.features = Features(DefFeature('string_calculator', int, 1))
         self.cli = OperationsAll(
             ops=OPERATIONS,
@@ -165,7 +166,8 @@ class TestTrain(AsyncTestCase):
 
     def setUp(self):
         self.cli = Train(model=FakeModel(), model_dir=None,
-                sources=Sources(RepoSource()), features=Features())
+                sources=Sources(MemorySource(MemorySourceConfig(repos=[]))),
+                features=Features())
 
     async def test_run(self):
         await self.cli.run()
@@ -174,7 +176,8 @@ class TestAccuracy(AsyncTestCase):
 
     def setUp(self):
         self.cli = Accuracy(model=FakeModel(),
-                sources=Sources(RepoSource()), features=Features())
+                sources=Sources(MemorySource(MemorySourceConfig(repos=[]))),
+                features=Features())
 
     async def test_run(self):
         self.assertEqual(1.0, await self.cli.run())
