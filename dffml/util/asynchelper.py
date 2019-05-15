@@ -18,6 +18,8 @@ class AsyncContextManagerListContext(UserList):
         UserList.__init__(self)
         self.parent = parent
         self.__stack = None
+        self.logger = LOGGER.getChild('AsyncContextManagerListContext.%s' \
+                                      % (self.__class__.__qualname__,))
 
     async def __aenter__(self):
         self.clear()
@@ -30,7 +32,9 @@ class AsyncContextManagerListContext(UserList):
             # >>> async with BaseDataFlowObject() as obj:
             # >>>     async with obj() as ctx:
             # >>>         clist.append(ctx)
-            self.append(await self.__stack.enter_async_context(item()))
+            citem = item()
+            self.logger.debug('Entering context: %r', citem)
+            self.append(await self.__stack.enter_async_context(citem))
         return self
 
     async def __aexit__(self, exc_type, exc_value, traceback):
@@ -41,6 +45,8 @@ class AsyncContextManagerList(UserList):
     def __init__(self, *args):
         UserList.__init__(self, list(args))
         self.__stack = None
+        self.logger = LOGGER.getChild('AsyncContextManagerList.%s' \
+                                      % (self.__class__.__qualname__,))
 
     def __call__(self) -> 'BaseDataFlowFacilitatorObjectContext':
         return self.CONTEXT(self)
@@ -49,6 +55,7 @@ class AsyncContextManagerList(UserList):
         self.__stack = AsyncExitStack()
         await self.__stack.__aenter__()
         for item in self:
+            self.logger.debug('Entering: %r', item)
             await self.__stack.enter_async_context(item)
         return self
 

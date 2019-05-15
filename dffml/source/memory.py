@@ -39,9 +39,11 @@ class MemorySource(BaseSource):
         if isinstance(self.config, MemorySourceConfig):
             self.mem = {repo.src_url: repo for repo in self.config.repos}
 
+    @classmethod
     def args(self) -> Dict[str, Any]:
         return {}
 
-    def config(self, cmd) -> Dict[str, Any]:
-        return MemorySourceConfig({src_url: Repo(src_url) \
-                                   for src_url in cmd.keys})
+    @classmethod
+    def config(cls, cmd) -> Dict[str, Any]:
+        keys = getattr(cmd, 'keys', [])
+        return MemorySourceConfig(repos=list(map(Repo, keys)))

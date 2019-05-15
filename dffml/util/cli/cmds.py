@@ -101,6 +101,14 @@ class SourcesCMD(CMD):
                                       '.cache', 'dffml.json')))),
             action=ParseSourcesAction)
 
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        # Go through the list of sources and instantiate them with a config
+        # created from loading their arguments from cmd (self).
+        for i in range(0, len(self.sources)):
+            if inspect.isclass(self.sources[i]):
+                self.sources[i] = self.sources[i].withconfig(self)
+
 class ModelCMD(CMD):
     '''
     Set a models model dir.

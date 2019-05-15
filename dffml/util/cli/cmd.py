@@ -12,6 +12,8 @@ from ...feature import Feature
 
 from .arg import Arg
 
+DisplayHelp = 'Display help message'
+
 class ParseLoggingAction(argparse.Action):
 
     def __call__(self, parser, namespace, value, option_string=None):
@@ -91,12 +93,15 @@ class CMD(object):
     async def cli(cls, *args):
         self = cls()
         parser, args = await self.parse_args(*args)
+        if getattr(self, 'run', None) is not None \
+                and getattr(args, 'cmd', None) is None:
+            args.cmd = cls
         if getattr(args, 'cmd', None) is None:
             parser.print_help()
-            return None
+            return DisplayHelp
         if getattr(args.cmd, 'run', None) is None:
             args.parser.print_help()
-            return None
+            return DisplayHelp
         cmd = args.cmd(**self.sanitize_args(vars(args)))
         async with cmd:
             if inspect.isasyncgenfunction(cmd.run):
@@ -125,7 +130,7 @@ class CMD(object):
             pass # pragma: no cover
         loop.run_until_complete(loop.shutdown_asyncgens())
         loop.close()
-        if not result is None:
+        if not result is None and result is not DisplayHelp:
             json.dump(result, sys.stdout, sort_keys=True, indent=4,
                       separators=(',', ': '), cls=cls.JSONEncoder)
             print()

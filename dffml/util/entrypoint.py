@@ -5,7 +5,7 @@ Loader subclasses know how to load classes under their entry point which conform
 to their subclasses.
 '''
 import pkg_resources
-from typing import List
+from typing import List, Dict
 
 class Entrypoint(object):
     '''
@@ -38,3 +38,11 @@ class Entrypoint(object):
         Loads each class requested without instantiating it.
         '''
         return {name: cls.load(name) for name in to_load}
+
+    @classmethod
+    def load_dict(cls, to_load: Dict[str, str]):
+        '''
+        Loads each class tagged with the key it should be accessed by without
+        instantiating it.
+        '''
+        return {key: cls.load(name) for key, name in to_load.items()}

@@ -23,10 +23,12 @@ from dffml.source.memory import MemorySource, MemorySourceConfig
 from dffml.model import Model
 from dffml.accuracy import Accuracy as AccuracyType
 from dffml.util.asynctestcase import AsyncTestCase
+from dffml.util.cli.cmd import DisplayHelp
 
 from dffml.cli import OperationsAll, OperationsRepo, \
                       EvaluateAll, EvaluateRepo, \
-                      Train, Accuracy, PredictAll, PredictRepo
+                      Train, Accuracy, PredictAll, PredictRepo, \
+                      ListRepos
 
 from .test_df import OPERATIONS, OPIMPS
 
@@ -74,6 +76,13 @@ class FakeModel(Model):
                     AsyncIterator[Tuple[Repo, Any, float]]:
         async for repo in repos:
             yield repo, '', 1.0
+
+class TestListRepos(ReposTestCase):
+
+    async def test_run(self):
+        with patch('sys.stdout.write'), patch('sys.stderr.write'):
+            result = await ListRepos.cli('-sources', 'primary=memory')
+            self.assertNotEqual(result, DisplayHelp)
 
 class TestOperationsAll(ReposTestCase):
 

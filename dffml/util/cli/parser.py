@@ -27,7 +27,9 @@ class ParseSourcesAction(argparse.Action):
     def __call__(self, parser, namespace, values, option_string=None):
         if not isinstance(values, list):
             values = [values]
-        values = Sources(*list(BaseSource.load_multiple(values).values()))
+        parse = dict(map(lambda source: source.split('=', maxsplit=1)[::-1],
+            values))
+        values = Sources(*list(BaseSource.load_from_dict(parse).values()))
         setattr(namespace, self.dest, values)
 
 class ParseFeaturesAction(argparse.Action):
