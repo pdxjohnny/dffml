@@ -13,13 +13,15 @@ import unittest
 import collections
 from unittest.mock import patch
 from functools import wraps
-from contextlib import contextmanager
+from contextlib import contextmanager, ExitStack
 from typing import List, Dict, Any, Optional, Tuple, AsyncIterator
 
 from dffml.repo import Repo
 from dffml.feature import Feature, Features, DefFeature
 from dffml.source.source import Sources
 from dffml.source.memory import MemorySource, MemorySourceConfig
+from dffml.source.file  import FileSourceConfig
+from dffml.source.json  import JSONSource
 from dffml.model import Model
 from dffml.accuracy import Accuracy as AccuracyType
 from dffml.util.asynctestcase import AsyncTestCase
@@ -35,6 +37,7 @@ from .test_df import OPERATIONS, OPIMPS
 class ReposTestCase(AsyncTestCase):
 
     def setUp(self):
+        super().setUp()
         self.repos = [Repo(str(random.random())) for _ in range(0, 10)]
         self.sources = Sources(MemorySource(MemorySourceConfig(repos=self.repos)))
         self.features = Features(FakeFeature())
@@ -80,9 +83,21 @@ class FakeModel(Model):
 class TestListRepos(ReposTestCase):
 
     async def test_run(self):
-        with patch('sys.stdout.write'), patch('sys.stderr.write'):
-            result = await ListRepos.cli('-sources', 'primary=memory')
-            self.assertNotEqual(result, DisplayHelp)
+        with tempfile.NamedTemporaryFile() as fileobj:
+            fileobj.write(b'{}')
+            fileobj.seek(0)
+            config = FileSourceConfig(filename=fileobj.name)
+            async with JSONSource(config) as source:
+                async with source() as sctx:
+                    await sctx.update(Repo('test-repo'))
+            with patch('sys.stdout', new_callable=io.StringIO) as stdout:
+                result = await ListRepos.cli('-sources',
+                                             'primary=json',
+                                             '-source-primary-filename',
+                                             fileobj.name,
+                                             '-source-primary-readonly',
+                                             'false')
+                self.assertIn('test-repo', stdout.getvalue())
 
 class TestOperationsAll(ReposTestCase):
 

@@ -237,16 +237,7 @@ class BaseKeyValueStore(BaseDataFlowObject):
     '''
 
     ENTRY_POINT = 'dffml.kvstore'
-
-    def __init__(self, config: BaseConfig) -> None:
-        super().__init__(config)
-
-    @abc.abstractmethod
-    async def __aenter__(self) -> BaseKeyValueStoreContext:
-        pass
-
-    async def __aexit__(self, exc_type, exc_value, traceback):
-        pass
+    ENTRY_POINT_NAME = ['kvstore']
 
 class BaseContextHandle(abc.ABC):
 
@@ -467,6 +458,9 @@ class BaseRedundancyChecker(BaseDataFlowObject):
     '''
 
     ENTRY_POINT = 'dffml.redundancy.checker'
+    ENTRY_POINT_NAME = ['rchecker']
+    ENTRY_POINT_ORIG_LABEL = 'memory'
+    ENTRY_POINT_LABEL = ENTRY_POINT_ORIG_LABEL
 
 # TODO Provide a way to clear out all locks for inputs within a context
 class BaseLockNetworkContext(BaseDataFlowObjectContext):

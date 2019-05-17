@@ -12,11 +12,12 @@ from typing import Optional
 from ...repo import Repo
 from ...port import Port
 from ...feature import Feature, Features
-from ...source.source import Sources
+from ...source.source import BaseSource, Sources
 from ...source.json import JSONSource
 from ...source.file import FileSourceConfig
 from ...model import Model
 
+from ...df.types import Operation
 from ...df.linker import Linker
 from ...df.base import Input, \
                   BaseInputNetwork, \
@@ -38,20 +39,10 @@ from ...df.memory import MemoryInputNetwork, \
 
 from ...df.dff import DataFlowFacilitator
 
+from ..data import merge
 from .arg import Arg
 from .cmd import CMD
-from .parser import ParseFeaturesAction, \
-                    ParseSourcesAction, \
-                    ParseModelAction, \
-                    ParsePortAction, \
-                    ParseOperationAction, \
-                    ParseOperationImplementationAction, \
-                    ParseInputNetworkAction, \
-                    ParseOperationNetworkAction, \
-                    ParseLockNetworkAction, \
-                    ParseRedundancyCheckerAction, \
-                    ParseOperationImplementationNetworkAction, \
-                    ParseOrchestratorAction, \
+from .parser import list_action, \
                     ParseOutputSpecsAction, \
                     ParseInputsAction, \
                     ParseRemapAction
@@ -85,7 +76,7 @@ class FeaturesCMD(CMD):
     '''
 
     arg_features = Arg('-features', nargs='+', required=True,
-            default=Features(), action=ParseFeaturesAction)
+            default=Features(), type=Feature.load, action=list_action(Features))
     arg_timeout = Arg('-timeout', help='Feature evaluation timeout',
             required=False, default=Features.TIMEOUT, type=int)
 
@@ -96,10 +87,12 @@ class FeaturesCMD(CMD):
 class SourcesCMD(CMD):
 
     arg_sources = Arg('-sources', help='Sources for loading and saving',
-            nargs='+', default=Sources(JSONSource(FileSourceConfig(
+            nargs='+',
+            default=Sources(JSONSource(FileSourceConfig(
                 filename=os.path.join(os.path.expanduser('~'),
                                       '.cache', 'dffml.json')))),
-            action=ParseSourcesAction)
+            type=BaseSource.load_labeled,
+            action=list_action(Sources))
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -115,7 +108,7 @@ class ModelCMD(CMD):
     '''
 
     arg_model = Arg('-model', help='Model used for ML',
-            action=ParseModelAction, required=True)
+            type=Model.load, required=True)
     arg_model_dir = Arg('-model_dir', help='Model directory for ML',
             default=os.path.join(os.path.expanduser('~'), '.cache', 'dffml'))
 
@@ -125,12 +118,27 @@ class ModelCMD(CMD):
 
 class PortCMD(CMD):
 
-    arg_port = Arg('port', action=ParsePortAction)
+    arg_port = Arg('port', type=Port.load)
 
 class KeysCMD(CMD):
 
     arg_keys = Arg('-keys', help='Key used for source lookup and evaluation',
             nargs='+', required=True)
+'''
+        setattr(namespace, self.dest, Operation.load_multiple(values).values())
+        setattr(namespace, self.dest,
+                OperationImplementation.load_multiple(values).values())
+        setattr(namespace, self.dest, BaseInputNetwork.load(value))
+        setattr(namespace, self.dest, BaseOperationNetwork.load(value))
+        setattr(namespace, self.dest, BaseLockNetwork.load(value))
+        setattr(namespace, self.dest, BaseRedundancyChecker.load(value))
+        setattr(namespace, self.dest, BaseKeyValueStore.load(value))
+        setattr(namespace, self.dest,
+                BaseOperationImplementationNetwork.load(value))
+        setattr(namespace, self.dest, BaseOrchestrator.load(value))
+        setattr(namespace, self.dest, Model.load(value)())
+        setattr(namespace, self.dest, Port.load(value)())
+'''
 
 class BaseDataFlowFacilitatorCMD(CMD):
     '''
@@ -138,24 +146,28 @@ class BaseDataFlowFacilitatorCMD(CMD):
     '''
 
     arg_ops = Arg('-ops', required=True, nargs='+',
-            action=ParseOperationAction)
+            type=Operation.load)
     arg_input_network = Arg('-input-network',
-            action=ParseInputNetworkAction, default=MemoryInputNetwork)
+            type=BaseInputNetwork.load,
+            default=MemoryInputNetwork)
     arg_operation_network = Arg('-operation-network',
-            action=ParseOperationNetworkAction, default=MemoryOperationNetwork)
+            type=BaseOperationNetwork.load,
+            default=MemoryOperationNetwork)
     arg_lock_network = Arg('-lock-network',
-            action=ParseLockNetworkAction, default=MemoryLockNetwork)
+            type=BaseLockNetwork.load,
+            default=MemoryLockNetwork)
     arg_rchecker = Arg('-rchecker',
-            action=ParseRedundancyCheckerAction,
+            type=BaseRedundancyChecker.load,
             default=MemoryRedundancyChecker)
     # TODO We should be able to specify multiple operation implementation
     # networks. This would enable operations to live in different place,
     # accessed via the orchestrator transparently.
     arg_opimpn = Arg('-opimpn',
-            action=ParseOperationImplementationNetworkAction,
+            type=BaseOperationImplementationNetwork.load,
             default=MemoryOperationImplementationNetwork)
     arg_orchestrator = Arg('-orchestrator',
-            action=ParseOrchestratorAction, default=MemoryOrchestrator)
+            type=BaseOrchestrator.load,
+            default=MemoryOrchestrator)
     arg_output_specs = Arg('-output-specs', required=True, nargs='+',
             action=ParseOutputSpecsAction)
     arg_inputs = Arg('-inputs', nargs='+',
@@ -189,8 +201,7 @@ class BaseDataFlowFacilitatorCMD(CMD):
     # their arguments to the DataFlowFacilitator-tots command.
     @classmethod
     def add_bases(cls):
-        class LoadedDataFlowFacilitator(cls):
-            pass
+        cls = copy.deepcopy(cls)
         for base in [BaseInputNetwork,
                      BaseOperationNetwork,
                      BaseLockNetwork,
@@ -198,8 +209,7 @@ class BaseDataFlowFacilitatorCMD(CMD):
                      BaseOperationImplementationNetwork,
                      BaseOrchestrator]:
             for loaded in base.load():
-                for arg_name, arg in loaded.args().items():
-                    setattr(LoadedDataFlowFacilitator, arg_name, arg)
-        return LoadedDataFlowFacilitator
+                loaded.args(cls.EXTRA_CONFIG_ARGS)
+        return cls
 
 DataFlowFacilitatorCMD = BaseDataFlowFacilitatorCMD.add_bases()

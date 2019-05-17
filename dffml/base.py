@@ -3,7 +3,9 @@ Base classes for DFFML. All classes in DFFML should inherit from these so that
 they follow a similar API for instantiation and usage.
 '''
 import abc
-from typing import Dict, Any
+from typing import Dict, Any, Tuple, NamedTuple
+
+from .util.data import traverse_config_set, traverse_config_get
 
 from .util.entrypoint import Entrypoint
 
@@ -35,6 +37,9 @@ class BaseConfig(object):
     as their config.
     '''
 
+class ConfigurableParsingNamespace(NamedTuple):
+    dest: any
+
 class BaseConfigurable(abc.ABC):
     '''
     Class which produces a config for itself by providing Args to a CMD (from
@@ -53,18 +58,49 @@ class BaseConfigurable(abc.ABC):
         self.config = config
 
     @classmethod
-    @abc.abstractmethod
-    def args(cls) -> Dict[str, Any]:
-        pass
+    def add_orig_label(cls, *above):
+        return (
+            list(above) + cls.ENTRY_POINT_NAME + [cls.ENTRY_POINT_ORIG_LABEL]
+        )
+
+    @classmethod
+    def config_get(cls, args, config, *above) -> BaseConfig:
+        arg = traverse_config_get(args, *above)
+        try:
+            value = traverse_config_get(config, *above)
+        except KeyError:
+            # TODO raise MissingConfig
+            return arg['default']
+        # TODO This is a oversimplification of argparse's nargs
+        if not 'nargs' in arg:
+            value = value[0]
+        if 'type' in arg:
+            value = arg['type'](value)
+        if 'action' in arg:
+            namespace = ConfigurableParsingNamespace()
+            action = arg['action'](dest='dest', option_strings='')
+            action(None, namespace, value)
+            value = namespace.dest
+        return value
 
     @classmethod
     @abc.abstractmethod
-    def config(cls, cmd):
-        pass
+    def args(cls, *above) -> Dict[str, Any]:
+        '''
+        Return a dict containing arguments required for this class
+        '''
 
     @classmethod
-    def withconfig(cls, cmd):
-        return cls(cls.config(cmd))
+    @abc.abstractmethod
+    def config(cls, config, *above):
+        '''
+        Create the BaseConfig required to instantiate this class by parsing the
+        config dict.
+        '''
+
+    @classmethod
+    def withconfig(cls, config, *above):
+        return cls(cls.config(config, *above))
 
 class BaseDataFlowFacilitatorObjectContext(LoggingLogger):
     '''

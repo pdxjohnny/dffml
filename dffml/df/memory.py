@@ -34,10 +34,9 @@ from .base import OperationImplementation, \
                   BaseOrchestratorContext, \
                   BaseOrchestrator
 
+from ..util.data import traverse_config_set, traverse_config_get
 from ..util.cli.arg import Arg
 from ..util.cli.cmd import CMD
-from ..util.cli.parser import ParseKeyValueStoreAction, \
-                              ParseOperationImplementationAction
 
 from .log import LOGGER
 
@@ -453,23 +452,24 @@ class MemoryRedundancyChecker(BaseRedundancyChecker):
         self.key_value_store = config.key_value_store
 
     @classmethod
-    def args(cls) -> Dict[str, Arg]:
+    def args(cls, args, *above) -> Dict[str, Arg]:
+        above = cls.add_orig_label(*above)
         # Enable the user to specify a key value store
-        args = {
-                'arg_rchecker_kvstore': Arg('-rchecker-kvstore',
-                                            action=ParseKeyValueStoreAction,
-                                            default=MemoryKeyValueStore)
-                }
+        traverse_config_set(args, *above, 'kvstore',
+                Arg(type=BaseKeyValueStore.load,
+                    default=MemoryKeyValueStore))
         # Load all the key value stores and add the arguments they might require
         for cls in BaseKeyValueStore.load():
-            args.update(cls.args())
+            cls.args(args, *above)
         return args
 
     @classmethod
-    def config(cls, cmd: CMD) -> BaseConfig:
+    def config(cls, config, *above):
+        args = cls.args({}, *above)
+        above = cls.add_orig_label(*above)
+        kvstore = cls.config_get(args, config, *above, 'kvstore')
         return BaseRedundancyCheckerConfig(
-            key_value_store=cmd.rchecker_kvstore(
-                cmd.rchecker_kvstore.config(cmd))
+            key_value_store=kvstore.withconfig(config, *above)
             )
 
 class MemoryLockNetworkContext(BaseLockNetworkContext):
@@ -673,11 +673,9 @@ class MemoryOperationImplementationNetwork(BaseOperationImplementationNetwork):
     def args(cls) -> Dict[str, Arg]:
         # Enable the user to specify operation implementations to be loaded via
         # the entrypoint system (by ParseOperationImplementationAction)
-        args = {
-                'arg_opimpn_memory_opimps': Arg('-opimpn-memory-opimps',
-                    nargs='+',
-                    action=ParseOperationImplementationAction)
-                }
+        args = {}
+        cls._args(args, 'opimps',  Arg(nargs='+',
+            type=OperationImplementation.load))
         # TODO similar to MemoryRedundancyChecker, load all Operation
         # Implemenations and have them add args if they need it
         return args

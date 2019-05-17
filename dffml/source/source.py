@@ -50,28 +50,10 @@ class BaseSource(BaseDataFlowFacilitatorObject):
     '''
 
     ENTRY_POINT = 'dffml.source'
+    ENTRY_POINT_NAME = ['source']
 
     def __call__(self) -> BaseSourceContext:
         return self.CONTEXT(self)
-
-    @classmethod
-    def _arg_lower_name(cls) -> str:
-        return cls.__qualname__.lower().replace('source', '')
-
-    @classmethod
-    def _arg_prop(cls, arg: str) -> Tuple[str, str]:
-        lower_name = cls._arg_lower_name()
-        return f'arg_source_{lower_name}_{arg}'
-
-    @classmethod
-    def _arg_name(cls, arg: str) -> Tuple[str, str]:
-        lower_name = cls._arg_lower_name()
-        return f'-source-{lower_name}-{arg}'
-
-    @classmethod
-    def _arg_from(cls, cmd, arg: str) -> Any:
-        lower_name = cls._arg_lower_name()
-        return getattr(cmd, f'source_{lower_name}_{arg}')
 
 class SourcesContext(AsyncContextManagerListContext):
 

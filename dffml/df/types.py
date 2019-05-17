@@ -4,6 +4,8 @@ from enum import Enum
 import pkg_resources
 from typing import NamedTuple, Union, List, Dict, Optional, Any, Iterator
 
+from ..util.entrypoint import Entrypoint
+
 class Definition(NamedTuple):
     '''
     List[type] is how to specify a list
@@ -60,28 +62,7 @@ class Operation(NamedTuple):
 
     @classmethod
     def load(cls, loading=None):
-        '''
-        Loads all installed loading and returns them as a list. Sources to be
-        loaded should be registered to ENTRY_POINT via setuptools.
-        '''
-        raise NotImplementedError()
-
-    @classmethod
-    def load_multiple(cls, to_load: List[str]):
-        '''
-        Loads each class requested without instantiating it.
-        '''
-        loading_classes = {}
-        for i in pkg_resources.iter_entry_points(cls.ENTRY_POINT):
-            loaded = i.load()
-            if isinstance(loaded, cls) and i.name in to_load:
-                loading_classes[loaded.name] = loaded
-        for loading in to_load:
-            if not loading in loading_classes:
-                raise KeyError('%s was not found in (%s)' % \
-                        (repr(loading),
-                         ', '.join(list(map(str, loading_classes)))))
-        return loading_classes
+        return Entrypoint.load(cls, loading=loading)
 
 class Output(NamedTuple):
     name: str

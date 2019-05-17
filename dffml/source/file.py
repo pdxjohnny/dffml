@@ -106,6 +106,6 @@ class FileSource(BaseSource):
     @classmethod
     def config(cls, cmd: CMD) -> BaseConfig:
         return FileSourceConfig(
-            filename=cls._arg_from(cmd, 'filename'),
-            readonly=cls._arg_from(cmd, 'readonly'),
+            filename=cmd.config(cls, 'filename'),
+            readonly=cmd.config(cls, 'readonly')
             )
