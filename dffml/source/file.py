@@ -25,6 +25,9 @@ class FileSource(BaseSource):
     FileSource reads and write from a file on open / close.
     '''
 
+    ENTRY_POINT_ORIG_LABEL = 'file'
+    ENTRY_POINT_LABEL = ENTRY_POINT_ORIG_LABEL
+
     async def __aenter__(self) -> 'BaseSourceContext':
         await self._open()
         return self
@@ -94,18 +97,17 @@ class FileSource(BaseSource):
         pass # pragma: no cover
 
     @classmethod
-    def args(cls) -> Dict[str, Arg]:
-        return {
-            cls._arg_prop('filename'): Arg(cls._arg_name('filename')),
-            cls._arg_prop('readonly'): Arg(cls._arg_name('readonly'),
-                                           type=bool,
-                                           action='store_true',
-                                           default=False),
-            }
+    def args(cls, args, *above) -> Dict[str, Arg]:
+        cls.config_set(args, above, 'filename', Arg())
+        cls.config_set(args, above, 'readonly',
+                Arg(type=bool,
+                    action='store_true',
+                    default=False))
+        return args
 
     @classmethod
-    def config(cls, cmd: CMD) -> BaseConfig:
+    def config(cls, config, *above):
         return FileSourceConfig(
-            filename=cmd.config(cls, 'filename'),
-            readonly=cmd.config(cls, 'readonly')
+            filename=cls.config_get(config, above, 'filename'),
+            readonly=cls.config_get(config, above, 'readonly')
             )

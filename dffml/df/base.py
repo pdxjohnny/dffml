@@ -14,7 +14,7 @@ from ..base import BaseConfig, \
                    BaseDataFlowFacilitatorObject
 from ..util.cli.arg import Arg
 from ..util.cli.cmd import CMD
-from ..util.entrypoint import Entrypoint
+from ..util.entrypoint import base_entry_point
 
 class BaseDataFlowObjectContext(BaseDataFlowFacilitatorObjectContext):
     '''
@@ -231,13 +231,11 @@ class BaseKeyValueStoreContext(BaseDataFlowObjectContext):
     async def set(self, name: str, value: bytes):
         pass
 
+@base_entry_point('dffml.kvstore', 'kvstore')
 class BaseKeyValueStore(BaseDataFlowObject):
     '''
     Abstract Base Class for key value storage
     '''
-
-    ENTRY_POINT = 'dffml.kvstore'
-    ENTRY_POINT_NAME = ['kvstore']
 
 class BaseContextHandle(abc.ABC):
 

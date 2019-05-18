@@ -1,9 +1,11 @@
 import json
+from functools import wraps
 from unittest.mock import patch
 from typing import NamedTuple
 
 from dffml.util.data import traverse_config_set
-from dffml.util.cli.arg import Arg
+from dffml.util.cli.arg import Arg, parse_unknown
+from dffml.util.entrypoint import entry_point
 from dffml.df.base import BaseKeyValueStore, BaseRedundancyCheckerConfig
 from dffml.df.memory import MemoryKeyValueStore, MemoryRedundancyChecker
 from dffml.util.asynctestcase import AsyncTestCase
@@ -21,59 +23,24 @@ class KeyValueStoreWithArgumentsConfig(NamedTuple):
     filename: str
 
 
+@entry_point("withargs")
 class KeyValueStoreWithArguments(BaseKeyValueStore):
 
-    ENTRY_POINT_ORIG_LABEL = "withargs"
     CONTEXT = True
 
     @classmethod
     def args(cls, args, *above):
-        above = cls.add_orig_label(*above)
-        traverse_config_set(args, *above, "filename", Arg(type=str))
+        cls.config_set(args, above, "filename", Arg(type=str))
         return args
 
     @classmethod
     def config(cls, config, *above):
-        args = cls.args({}, *above)
-        above = cls.add_orig_label(*above)
         return KeyValueStoreWithArgumentsConfig(
-            filename=cls.config_get(args, config, *above, "filename")
+            filename=cls.config_get(config, above, "filename")
         )
 
 
 class TestMemoryRedundancyChecker(AsyncTestCase):
-    @property
-    def extra_config_args(self):
-        return {
-            "rchecker": {
-                "arg": None,
-                "config": {
-                    "memory": {
-                        "arg": None,
-                        "config": {
-                            "kvstore": {
-                                "arg": Arg(
-                                    type=BaseKeyValueStore.load,
-                                    default=MemoryKeyValueStore,
-                                ),
-                                "config": {
-                                    "withargs": {
-                                        "arg": None,
-                                        "config": {
-                                            "filename": {
-                                                "arg": Arg(type=str),
-                                                "config": {},
-                                            }
-                                        },
-                                    }
-                                },
-                            }
-                        },
-                    }
-                },
-            }
-        }
-
     def __load_kvstore_with_args(self, loading=None):
         if loading == "withargs":
             return KeyValueStoreWithArguments
@@ -83,40 +50,51 @@ class TestMemoryRedundancyChecker(AsyncTestCase):
         with patch.object(
             BaseKeyValueStore, "load", self.__load_kvstore_with_args
         ):
-            was = MemoryRedundancyChecker.args({})
-            self.assertEqual(was, self.extra_config_args)
+            self.assertEqual(
+                MemoryRedundancyChecker.args({}),
+                {
+                    "rchecker": {
+                        "arg": None,
+                        "config": {
+                            "memory": {
+                                "arg": None,
+                                "config": {
+                                    "kvstore": {
+                                        "arg": Arg(
+                                            type=BaseKeyValueStore.load,
+                                            default=MemoryKeyValueStore,
+                                        ),
+                                        "config": {
+                                            "withargs": {
+                                                "arg": None,
+                                                "config": {
+                                                    "filename": {
+                                                        "arg": Arg(type=str),
+                                                        "config": {},
+                                                    }
+                                                },
+                                            }
+                                        },
+                                    }
+                                },
+                            }
+                        },
+                    }
+                },
+            )
 
     def test_config_default_label(self):
         with patch.object(
             BaseKeyValueStore, "load", self.__load_kvstore_with_args
         ):
-            config = {
-                "rchecker": {
-                    "arg": None,
-                    "config": {
-                        "memory": {
-                            "arg": None,
-                            "config": {
-                                "kvstore": {
-                                    "arg": ["withargs"],
-                                    "config": {
-                                        "withargs": {
-                                            "arg": None,
-                                            "config": {
-                                                "filename": {
-                                                    "arg": ["somefile"],
-                                                    "config": {},
-                                                }
-                                            },
-                                        }
-                                    },
-                                }
-                            },
-                        }
-                    },
-                }
-            }
-            was = MemoryRedundancyChecker.config(config)
+            was = MemoryRedundancyChecker.config(
+                parse_unknown(
+                    "--rchecker-memory-kvstore",
+                    "withargs",
+                    "--rchecker-memory-kvstore-withargs-filename",
+                    "somefile",
+                )
+            )
             self.assertEqual(type(was), BaseRedundancyCheckerConfig)
             self.assertEqual(
                 type(was.key_value_store), KeyValueStoreWithArguments

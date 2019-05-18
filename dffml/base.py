@@ -3,6 +3,7 @@ Base classes for DFFML. All classes in DFFML should inherit from these so that
 they follow a similar API for instantiation and usage.
 '''
 import abc
+from argparse import ArgumentParser
 from typing import Dict, Any, Tuple, NamedTuple
 
 from .util.data import traverse_config_set, traverse_config_get
@@ -10,6 +11,19 @@ from .util.data import traverse_config_set, traverse_config_get
 from .util.entrypoint import Entrypoint
 
 from .log import LOGGER
+
+class MissingArg(Exception):
+    '''
+    Raised when a BaseConfigurable is missing an argument from the args dict it
+    created with args(). If this exception is raised then the config() method is
+    attempting to retrive an argument which was not set in the args() method.
+    '''
+
+class MissingConfig(Exception):
+    '''
+    Raised when a BaseConfigurable is missing an argument from the config dict.
+    Also raised if there was no default value set and the argument is missing.
+    '''
 
 class MissingRequiredProperty(Exception):
     '''
@@ -37,8 +51,10 @@ class BaseConfig(object):
     as their config.
     '''
 
-class ConfigurableParsingNamespace(NamedTuple):
-    dest: any
+class ConfigurableParsingNamespace(object):
+
+    def __init__(self):
+        self.dest = None
 
 class BaseConfigurable(abc.ABC):
     '''
@@ -47,6 +63,9 @@ class BaseConfigurable(abc.ABC):
     instantiate a config (deriving from BaseConfig) which will be used as the
     only parameter to the __init__ of a BaseDataFlowFacilitatorObject.
     '''
+
+    __argp = ArgumentParser()
+    __saved_args = None
 
     def __init__(self, config: BaseConfig) -> None:
         '''
@@ -64,24 +83,61 @@ class BaseConfigurable(abc.ABC):
         )
 
     @classmethod
-    def config_get(cls, args, config, *above) -> BaseConfig:
-        arg = traverse_config_get(args, *above)
+    def add_label(cls, *above):
+        return (
+            list(above) + cls.ENTRY_POINT_NAME + [cls.ENTRY_POINT_LABEL]
+        )
+
+    @classmethod
+    def config_set(cls, args, above, *path) -> BaseConfig:
+        return traverse_config_set(args,
+                                   *(cls.add_orig_label(*above) + list(path)))
+
+    @classmethod
+    def config_get(cls, config, above, *path) -> BaseConfig:
+        args = cls.__args()
+        args_above = cls.add_orig_label() + list(path)
+        above = cls.add_label(*above) + list(path)
+        try:
+            arg = traverse_config_get(args, *args_above)
+        except KeyError as error:
+            raise MissingArg('Arg %r missing from %s%s%s' % \
+                                (args_above[-1],
+                                 cls.__qualname__,
+                                 '.' if args_above[:-1] else '',
+                                 '.'.join(args_above[:-1]),)) from error
         try:
             value = traverse_config_get(config, *above)
-        except KeyError:
-            # TODO raise MissingConfig
-            return arg['default']
+        except KeyError as error:
+            if 'default' in arg:
+                return arg['default']
+            raise MissingConfig('%s missing %r from %s' % \
+                                (cls.__qualname__,
+                                 above[-1],
+                                 '.'.join(above[:-1]),)) from error
+
         # TODO This is a oversimplification of argparse's nargs
         if not 'nargs' in arg:
             value = value[0]
         if 'type' in arg:
             value = arg['type'](value)
         if 'action' in arg:
+            if isinstance(arg['action'], str):
+                # HACK This accesses _pop_action_class from ArgumentParser
+                # which is prefaced with an underscore indicating it not an API
+                # we can rely on
+                arg['action'] = cls.__argp._pop_action_class(arg)
             namespace = ConfigurableParsingNamespace()
             action = arg['action'](dest='dest', option_strings='')
             action(None, namespace, value)
             value = namespace.dest
         return value
+
+    @classmethod
+    def __args(cls, *above) -> Dict[str, Any]:
+        if cls.__saved_args is None:
+            cls.__saved_args = cls.args({})
+        return cls.__saved_args
 
     @classmethod
     @abc.abstractmethod

@@ -201,6 +201,8 @@ class BaseDataFlowFacilitatorCMD(CMD):
     # their arguments to the DataFlowFacilitator-tots command.
     @classmethod
     def add_bases(cls):
+        # TODO Add args() for each loaded class as argparse arguments
+        return cls
         cls = copy.deepcopy(cls)
         for base in [BaseInputNetwork,
                      BaseOperationNetwork,

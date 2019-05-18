@@ -19,6 +19,7 @@ from typing import List, Dict, Any, Optional, Tuple, AsyncIterator
 from dffml.repo import Repo
 from dffml.source.source import BaseSourceContext
 from dffml.source.file import FileSource, FileSourceConfig
+from dffml.util.cli.arg import Arg, parse_unknown
 from dffml.util.asynctestcase import AsyncTestCase
 
 class FakeFileSourceContext(BaseSourceContext):
@@ -49,19 +50,39 @@ def yield_42():
 class TestFileSource(AsyncTestCase):
 
     def test_args(self):
-        args = FileSource.args()
-        self.assertIn('arg_source_file_filename', args)
-        self.assertEqual('-source-file-filename',
-                         args['arg_source_file_filename'].name)
-        self.assertIn('arg_source_file_readonly', args)
-        self.assertEqual('-source-file-readonly',
-                         args['arg_source_file_readonly'].name)
+        self.assertEqual(FileSource.args({}), {
+            'source': {
+                'arg': None,
+                'config': {
+                    'file': {
+                        'arg': None,
+                        'config': {
+                            'filename': {
+                                'arg': Arg(),
+                                'config': {}
+                                },
+                            'readonly': {
+                                'arg': Arg(type=bool,
+                                           action='store_true',
+                                           default=False),
+                                'config': {}
+                                }
+                            }
+                        }
+                    }
+                }
+            })
 
-    def test_config(self):
-        class TestSource(object):
-            source_file_filename = 'feedface'
-            source_file_readonly = True
-        config = FileSource.config(TestSource)
+    def test_config_readonly_default(self):
+        config = FileSource.config(parse_unknown(
+            '--source-file-filename', 'feedface'))
+        self.assertEqual(config.filename, 'feedface')
+        self.assertFalse(config.readonly)
+
+    def test_config_readonly_set(self):
+        config = FileSource.config(parse_unknown(
+            '--source-file-filename', 'feedface',
+            '--source-file-readonly'))
         self.assertEqual(config.filename, 'feedface')
         self.assertTrue(config.readonly)
 

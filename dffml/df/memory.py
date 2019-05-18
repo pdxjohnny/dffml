@@ -34,7 +34,6 @@ from .base import OperationImplementation, \
                   BaseOrchestratorContext, \
                   BaseOrchestrator
 
-from ..util.data import traverse_config_set, traverse_config_get
 from ..util.cli.arg import Arg
 from ..util.cli.cmd import CMD
 
@@ -453,23 +452,20 @@ class MemoryRedundancyChecker(BaseRedundancyChecker):
 
     @classmethod
     def args(cls, args, *above) -> Dict[str, Arg]:
-        above = cls.add_orig_label(*above)
         # Enable the user to specify a key value store
-        traverse_config_set(args, *above, 'kvstore',
+        cls.config_set(args, above, 'kvstore',
                 Arg(type=BaseKeyValueStore.load,
                     default=MemoryKeyValueStore))
         # Load all the key value stores and add the arguments they might require
-        for cls in BaseKeyValueStore.load():
-            cls.args(args, *above)
+        for loaded in BaseKeyValueStore.load():
+            loaded.args(args, *cls.add_orig_label(*above))
         return args
 
     @classmethod
     def config(cls, config, *above):
-        args = cls.args({}, *above)
-        above = cls.add_orig_label(*above)
-        kvstore = cls.config_get(args, config, *above, 'kvstore')
+        kvstore = cls.config_get(config, above, 'kvstore')
         return BaseRedundancyCheckerConfig(
-            key_value_store=kvstore.withconfig(config, *above)
+            key_value_store=kvstore.withconfig(config, *cls.add_label(*above))
             )
 
 class MemoryLockNetworkContext(BaseLockNetworkContext):

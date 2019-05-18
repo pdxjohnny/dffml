@@ -14,10 +14,9 @@ from dffml.feature import Feature, Features
 from dffml.source.source import BaseSource
 from dffml.model import Model
 
-from dffml.util.cli.arg import Arg
+from dffml.util.cli.arg import Arg, parse_unknown
 
-from dffml.util.cli.cmd import MissingConfig, \
-                               JSONEncoder, \
+from dffml.util.cli.cmd import JSONEncoder, \
                                CMD, \
                                Parser
 
@@ -216,86 +215,39 @@ class TestCMD(AsyncTestCase):
             Primary.main(loop=asyncio.new_event_loop(), argv=['t', 'secondary'])
             mock_method.assert_called_once()
 
-    def test_try_literal_eval_int(self):
-        self.assertEqual(CMD.try_literal_eval('42'), 42)
+class TestArg(unittest.TestCase):
 
-    def test_try_literal_eval_string(self):
-        self.assertEqual(CMD.try_literal_eval('Hello World'), 'Hello World')
-
-    def test_parse_unknown_single_level(self):
-        parsed = CMD.parse_unknown('-label-first', '-label-second', 'two')
+    def test_parse_unknown(self):
+        parsed = parse_unknown(
+                '-rchecker-memory-kvstore', 'withargs',
+                '-rchecker-memory-kvstore-withargs-filename', 'somefile')
         self.assertEqual(parsed, {
-            'label': {
-                'first': True,
-                'second': 'two'
-                }
-            })
-
-    def test_parse_unknown_multi_level(self):
-        parsed = CMD.parse_unknown('-label-first-one', '1',
-                                   '-label-first-two', 'two',
-                                   '-label-second')
-        self.assertEqual(parsed, {
-            'label': {
-                'first': {
-                    'one': 1,
-                    'two': 'two'
+                "rchecker": {
+                    "arg": None,
+                    "config": {
+                        "memory": {
+                            "arg": None,
+                            "config": {
+                                "kvstore": {
+                                    "arg": ["withargs"],
+                                    "config": {
+                                        "withargs": {
+                                            "arg": None,
+                                            "config": {
+                                                "filename": {
+                                                    "arg": ["somefile"],
+                                                    "config": {},
+                                                }
+                                            },
+                                        }
+                                    },
+                                }
+                            },
+                        }
                     },
-                'second': True
                 }
             })
 
-    def test_config(self):
-        class SomeNamedLockNetwork(object):
-            ENTRY_POINT_NAME = ['lock', 'network']
-            ENTRY_POINT_LABEL = 'memory'
-        should_be = {
-            'first': 1,
-            'second': 2
-            }
-        extra_config = {
-            'lock': {
-                'network': {
-                    'memory': copy.deepcopy(should_be)
-                    }
-                }
-            }
-        cmd = CMD(extra_config=extra_config)
-        self.assertEqual(cmd.config(SomeNamedLockNetwork), should_be)
-
-    def test_config_deep(self):
-        class SomeNamedLockNetwork(object):
-            ENTRY_POINT_NAME = ['lock', 'network']
-            ENTRY_POINT_LABEL = 'memory'
-        should_be = {
-            'first': 1,
-            'second': 2
-            }
-        extra_config = {
-            'lock': {
-                'network': {
-                    'memory': copy.deepcopy(should_be)
-                    }
-                }
-            }
-        cmd = CMD(extra_config=extra_config)
-        self.assertEqual(cmd.config(SomeNamedLockNetwork, 'first'), 1)
-        self.assertEqual(cmd.config(SomeNamedLockNetwork, 'second'), 2)
-
-    def test_config_missing(self):
-        class SomeNamedLockNetwork(object):
-            ENTRY_POINT_NAME = ['lock', 'network']
-            ENTRY_POINT_LABEL = 'memory'
-        extra_config = {
-            'lock': {
-                'network': {
-                    'out.of.memory': False
-                    }
-                }
-            }
-        cmd = CMD(extra_config=extra_config)
-        with self.assertRaisesRegex(MissingConfig, 'memory.*lock.network'):
-            cmd.config(SomeNamedLockNetwork)
 
 class TestParser(unittest.TestCase):
 
