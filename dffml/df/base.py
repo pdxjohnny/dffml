@@ -541,11 +541,11 @@ class BaseOrchestratorConfig(BaseConfig, NamedTuple):
     operation_network: BaseOperationNetwork
     lock_network: BaseLockNetwork
     opimp_network: BaseOperationImplementationNetwork
-    redundancy_checker: BaseRedundancyChecker
+    rchecker: BaseRedundancyChecker
 
 class BaseOrchestratorContext(BaseDataFlowObjectContext):
 
-    def __init__(self, config: 'BaseOrchestrator') -> None:
+    def __init__(self, parent: 'BaseOrchestrator') -> None:
         super().__init__(parent)
         self.__stack = None
 
@@ -623,13 +623,12 @@ class BaseOrchestrator(BaseDataFlowObject):
                                           'network')
         opimp_netowrk = cls.config_get(config, above, 'opimp', 'network')
         lock_network = cls.config_get(config, above, 'lock', 'network ')
-        redundancy_checker = cls.config_get(config, above, 'redundancy',
-                                            'checker')
+        rchecker = cls.config_get(config, above, 'rchecker')
         above = cls.add_label(*above)
         return BaseOrchestratorConfig(
             input_network=input_network.withconfig(config, *above),
             operation_network=operation_network.withconfig(config, *above),
             lock_network=lock_network.withconfig(config, *above),
             opimp_netowrk=opimp_netowrk.withconfig(config, *above),
-            redundancy_checker=redundancy_checker.withconfig(config, *above)
+            rchecker=rchecker.withconfig(config, *above)
             )

@@ -31,6 +31,7 @@ from .base import OperationImplementation, \
                   BaseLockNetwork, \
                   BaseOperationImplementationNetworkContext, \
                   BaseOperationImplementationNetwork, \
+                  BaseOrchestratorConfig, \
                   BaseOrchestratorContext, \
                   BaseOrchestrator
 
@@ -704,6 +705,11 @@ class MemoryOperationImplementationNetwork(BaseOperationImplementationNetwork):
         if self.__stack is not None:
             await self.__stack.aclose()
             self.__stack = None
+
+class MemoryOrchestratorConfig(BaseOrchestratorConfig):
+    '''
+    Same as base orchestrator config
+    '''
 
 class MemoryOrchestratorContext(BaseOrchestratorContext):
 

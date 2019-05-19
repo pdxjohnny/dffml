@@ -37,10 +37,10 @@ from dffml.df.memory import MemoryInputNetwork, \
                             MemoryKeyValueStore, \
                             MemoryOperationImplementationNetwork, \
                             MemoryOperationImplementationNetworkConfig, \
+                            MemoryOrchestratorConfig, \
                             MemoryOrchestrator, \
                             MemoryInputSet, \
                             MemoryInputSetConfig
-from dffml.df.dff import DataFlowFacilitator
 
 from dffml.operation.output import GetSingle
 from dffml.util.asynctestcase import AsyncTestCase
@@ -225,35 +225,32 @@ class TestRunner(AsyncTestCase):
             definition=definitions['get_single_spec'],
             parents=False)
 
-        dff = DataFlowFacilitator(
-            input_network = MemoryInputNetwork(BaseConfig()),
-            operation_network = MemoryOperationNetwork(
+        # Orchestrate the running of these operations
+        async with MemoryOrchestrator(MemoryOrchestratorConfig(
+            input_network=MemoryInputNetwork(BaseConfig()),
+            operation_network=MemoryOperationNetwork(
                 MemoryOperationNetworkConfig(
                     operations=list(operations.values())
                 )
             ),
-            lock_network = MemoryLockNetwork(BaseConfig()),
-            rchecker = MemoryRedundancyChecker(
+            lock_network=MemoryLockNetwork(BaseConfig()),
+            rchecker=MemoryRedundancyChecker(
                 BaseRedundancyCheckerConfig(
                     key_value_store=MemoryKeyValueStore(BaseConfig())
                 )
             ),
-            opimp_network = MemoryOperationImplementationNetwork(
+            opimp_network=MemoryOperationImplementationNetwork(
                 MemoryOperationImplementationNetworkConfig(
                     operations={imp.op.name: imp \
                                 for imp in \
                                 [Imp(BaseConfig()) for Imp in OPIMPS]}
                 )
-            ),
-            orchestrator = MemoryOrchestrator(BaseConfig())
-        )
-
-        # Orchestrate the running of these operations
-        async with dff as dff:
-            async with dff() as dffctx:
+            )
+        )) as orchestrator:
+            async with orchestrator() as octx:
                 # Add our inputs to the input network with the context being the URL
                 for to_calc in calc_strings_check.keys():
-                    await dffctx.ictx.add(
+                    await octx.ictx.add(
                         MemoryInputSet(
                             MemoryInputSetConfig(
                                 ctx=StringInputSetContext(to_calc),
@@ -262,7 +259,7 @@ class TestRunner(AsyncTestCase):
                             )
                         )
                     )
-                async for ctx, results in dffctx.evaluate(strict=True):
+                async for ctx, results in octx.run_operations(strict=True):
                     ctx_str = (await ctx.handle()).as_string()
                     print()
                     print(ctx_str,
