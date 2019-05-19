@@ -1,6 +1,7 @@
 import abc
 import inspect
 import pkg_resources
+from contextlib import AsyncExitStack
 from typing import AsyncIterator, Dict, List, Tuple, Any, NamedTuple, Union, \
                    Optional, Set
 
@@ -46,7 +47,11 @@ class OperationImplementationContext(BaseDataFlowObjectContext):
 
     @abc.abstractmethod
     async def run(self, inputs: Dict[str, Any]) -> Union[bool, Dict[str, Any]]:
-        pass
+        '''
+        Implementation of the operation goes here. Should take and return a dict
+        with keys matching the input and output parameters of the Operation
+        object associated with this operation implementation context.
+        '''
 
     @classmethod
     def implementation(cls, operation: Operation):
@@ -62,9 +67,8 @@ class OperationImplementationContext(BaseDataFlowObjectContext):
     def imp(cls, config: 'BaseConfig'):
         return cls.implementation(cls.op)(config)
 
+@base_entry_point('dffml.operation.implementation', 'opimp')
 class OperationImplementation(BaseDataFlowObject):
-
-    ENTRY_POINT = 'dffml.operation.implementation'
 
     def __init__(self, config: 'BaseConfig') -> None:
         super().__init__(config)
@@ -95,14 +99,6 @@ class OperationImplementation(BaseDataFlowObject):
         the config method here. Returns an empty config (BaseConfig).
         '''
         return BaseConfig()
-
-    @classmethod
-    def load(cls, loading=None):
-        '''
-        Loads all installed loading and returns them as a list. Sources to be
-        loaded should be registered to ENTRY_POINT via setuptools.
-        '''
-        raise NotImplementedError()
 
     @classmethod
     def load_multiple(cls, to_load: List[str]):
@@ -225,11 +221,15 @@ class BaseKeyValueStoreContext(BaseDataFlowObjectContext):
 
     @abc.abstractmethod
     async def get(self, key: str) -> Union[bytes, None]:
-        pass
+        '''
+        Get a value from the key value store
+        '''
 
     @abc.abstractmethod
     async def set(self, name: str, value: bytes):
-        pass
+        '''
+        Get a value in the key value store
+        '''
 
 @base_entry_point('dffml.kvstore', 'kvstore')
 class BaseKeyValueStore(BaseDataFlowObject):
@@ -336,7 +336,6 @@ class BaseDefinitionSetContext(BaseDataFlowObjectContext):
         Asynchronous iterator of all inputs within a context, which are of a
         definition.
         '''
-        pass
 
 class BaseInputNetworkContext(BaseDataFlowObjectContext):
     '''
@@ -348,21 +347,18 @@ class BaseInputNetworkContext(BaseDataFlowObjectContext):
         '''
         Adds new input set to the network
         '''
-        pass
 
     @abc.abstractmethod
     async def ctx(self) -> BaseInputSetContext:
         '''
         Returns when a new input set context has entered the network
         '''
-        pass
 
     @abc.abstractmethod
     async def added(self, ctx: BaseInputSetContext) -> BaseInputSet:
         '''
         Returns when a new input set has entered the network within a context
         '''
-        pass
 
     @abc.abstractmethod
     async def definition(self, ctx: BaseInputSetContext, definition: str) \
@@ -372,7 +368,6 @@ class BaseInputNetworkContext(BaseDataFlowObjectContext):
         Return the definition. Otherwise raise a DefinitionNotInContext
         error. If the context is not present, raise a ContextNotPresent error.
         '''
-        pass
 
     @abc.abstractmethod
     def definition(self, ctx: BaseInputSetContext) -> BaseDefinitionSetContext:
@@ -380,7 +375,6 @@ class BaseInputNetworkContext(BaseDataFlowObjectContext):
         Return a DefinitionSet context that can be used to access the inputs
         within the given context, by definition.
         '''
-        pass
 
     @abc.abstractmethod
     async def gather_inputs(self,
@@ -392,14 +386,13 @@ class BaseInputNetworkContext(BaseDataFlowObjectContext):
         Generate all possible permutations of applicable inputs for an operation
         that, according to the redundancy checker, haven't been run yet.
         '''
-        pass
 
+@base_entry_point('dffml.input.network', 'input', 'network')
 class BaseInputNetwork(BaseDataFlowObject):
     '''
-    Abstract Base Class for managing input_set
+    Input networks store all of the input data and output data of operations,
+    which in turn becomes input data to other operations.
     '''
-
-    ENTRY_POINT = 'dffml.input.network'
 
 class BaseOperationNetworkContext(BaseDataFlowObjectContext):
     '''
@@ -418,12 +411,12 @@ class BaseOperationNetworkContext(BaseDataFlowObjectContext):
 
 # TODO Make this operate like a BaseInputNetwork were operations can
 # be added dynamically
+@base_entry_point('dffml.operation.network', 'operation', 'network')
 class BaseOperationNetwork(BaseDataFlowObject):
     '''
-    Abstract Base Class for managing operations
+    Operation networks hold Operation objects to allow for looking up of their
+    inputs, outputs, and conditions.
     '''
-
-    ENTRY_POINT = 'dffml.operation.network'
 
 class BaseRedundancyCheckerConfig(NamedTuple):
     key_value_store: BaseKeyValueStore
@@ -449,57 +442,66 @@ class BaseRedundancyCheckerContext(BaseDataFlowObjectContext):
             parameter_set: BaseParameterSet):
         pass
 
+@base_entry_point('dffml.redundancy.checker', 'rchecker')
 class BaseRedundancyChecker(BaseDataFlowObject):
     '''
     Redundancy Checkers ensure that each operation within a context only gets
     run with a give permutation of inputs once.
     '''
 
-    ENTRY_POINT = 'dffml.redundancy.checker'
-    ENTRY_POINT_NAME = ['rchecker']
-    ENTRY_POINT_ORIG_LABEL = 'memory'
-    ENTRY_POINT_LABEL = ENTRY_POINT_ORIG_LABEL
-
 # TODO Provide a way to clear out all locks for inputs within a context
 class BaseLockNetworkContext(BaseDataFlowObjectContext):
 
     @abc.abstractmethod
     async def acquire(self, parameter_set: BaseParameterSet) -> bool:
-        pass
+        '''
+        An async context manager which will acquire locks of all inputs within
+        the parameter set.
+        '''
 
+@base_entry_point('dffml.lock.network', 'lock', 'network')
 class BaseLockNetwork(BaseDataFlowObject):
     '''
     Acquires locks on inputs which may not be used simultaneously
     '''
 
-    ENTRY_POINT = 'dffml.lock.network'
-
 class BaseOperationImplementationNetworkContext(BaseDataFlowObjectContext):
 
     @abc.abstractmethod
     async def contains(self, operation: Operation) -> bool:
-        pass
+        '''
+        Checks if the network contains / has the ability to run a given
+        operation.
+        '''
 
     @abc.abstractmethod
     async def instantiable(self, operation: Operation) -> bool:
-        pass
+        '''
+        Prior to figuring out which operation implementation networks contain
+        an operation, if none do, they will need to instantiate it on the fly.
+        '''
 
     @abc.abstractmethod
     async def instantiate(self, operation: Operation,
             config: BaseConfig) -> bool:
-        pass
+        '''
+        Instantiate a given operation so that it can be run within this network.
+        '''
 
     @abc.abstractmethod
     async def run(self, operation: Operation,
             inputs: Dict[str, Any]) -> Union[bool, Dict[str, Any]]:
-        pass
+        '''
+        Find the operation implementation for the given operation and create an
+        operation implementation context, call the run method of the context and
+        return the results.
+        '''
 
     @abc.abstractmethod
     async def operation_completed(self):
         '''
         Returns when an operation finishes
         '''
-        pass
 
     @abc.abstractmethod
     async def dispatch(self,
@@ -510,7 +512,6 @@ class BaseOperationImplementationNetworkContext(BaseDataFlowObjectContext):
         '''
         Schedule the running of an operation
         '''
-        pass
 
     @abc.abstractmethod
     async def operations_parameter_set_pairs(self,
@@ -528,28 +529,47 @@ class BaseOperationImplementationNetworkContext(BaseDataFlowObjectContext):
         input set context novel input pairings. Yield novel input pairings
         along with their operations as they are generated.
         '''
-        pass
 
+@base_entry_point('dffml.operation.implementation.network', 'opimp', 'network')
 class BaseOperationImplementationNetwork(BaseDataFlowObject):
     '''
     Knows where operations are or if they can be made
     '''
 
-    ENTRY_POINT = 'dffml.operation.implementation.network'
+class BaseOrchestratorConfig(BaseConfig, NamedTuple):
+    input_network: BaseInputNetwork
+    operation_network: BaseOperationNetwork
+    lock_network: BaseLockNetwork
+    opimp_network: BaseOperationImplementationNetwork
+    redundancy_checker: BaseRedundancyChecker
 
 class BaseOrchestratorContext(BaseDataFlowObjectContext):
 
-    def __init__(self,
-            ictx: BaseInputNetworkContext,
-            octx: BaseOperationNetworkContext,
-            lctx: BaseLockNetworkContext,
-            nctx: BaseOperationImplementationNetworkContext,
-            rctx: BaseRedundancyCheckerContext) -> None:
-        self.ictx = ictx
-        self.octx = octx
-        self.lctx = lctx
-        self.nctx = nctx
-        self.rctx = rctx
+    def __init__(self, config: 'BaseOrchestrator') -> None:
+        super().__init__(parent)
+        self.__stack = None
+
+    async def __aenter__(self) -> 'BaseOrchestratorContext':
+        '''
+        Ahoy matey, enter if ye dare into the management of the contexts. Eh
+        well not sure if there's really any context being managed here...
+        '''
+        self.__stack = AsyncExitStack()
+        await self.__stack.__aenter__()
+        self.rctx = await self.__stack.enter_async_context(
+                self.parent.rchecker())
+        self.ictx = await self.__stack.enter_async_context(
+                self.parent.input_network())
+        self.octx = await self.__stack.enter_async_context(
+                self.parent.operation_network())
+        self.lctx = await self.__stack.enter_async_context(
+                self.parent.lock_network())
+        self.nctx = await self.__stack.enter_async_context(
+                self.parent.opimp_network())
+        return self
+
+    async def __aexit__(self, exc_type, exc_value, traceback):
+        await self.__stack.aclose()
 
     @abc.abstractmethod
     async def run_operations(self, strict: bool = False) \
@@ -557,17 +577,59 @@ class BaseOrchestratorContext(BaseDataFlowObjectContext):
         '''
         Run all the operations then run cleanup and output operations
         '''
-        pass
 
+@base_entry_point('dffml.orchestrator', 'orchestrator')
 class BaseOrchestrator(BaseDataFlowObject):
 
-    ENTRY_POINT = 'dffml.orchestrator'
+    def __init__(self, config: 'BaseConfig') -> None:
+        super().__init__(config)
+        self.__stack = None
 
-    def __call__(self,
-            ictx: BaseInputNetworkContext,
-            octx: BaseOperationNetworkContext,
-            lctx: BaseLockNetworkContext,
-            nctx: BaseOperationImplementationNetworkContext,
-            rctx: BaseRedundancyCheckerContext) -> 'BaseOrchestratorContext':
-        return self.CONTEXT(ictx=ictx, octx=octx, lctx=lctx, nctx=nctx,
-                            rctx=rctx)
+    async def __aenter__(self) -> 'DataFlowFacilitator':
+        self.__stack = AsyncExitStack()
+        await self.__stack.__aenter__()
+        self.rchecker = await self.__stack.enter_async_context(
+                self.config.rchecker)
+        self.input_network = await self.__stack.enter_async_context(
+                self.config.input_network)
+        self.operation_network = await self.__stack.enter_async_context(
+                self.config.operation_network)
+        self.lock_network = await self.__stack.enter_async_context(
+                self.config.lock_network)
+        self.opimp_network = await self.__stack.enter_async_context(
+                self.config.opimp_network)
+        return self
+
+    async def __aexit__(self, exc_type, exc_value, traceback):
+        await self.__stack.aclose()
+
+    @classmethod
+    def args(cls, args, *above) -> Dict[str, Arg]:
+        # Extending above is done right before loading args of subclasses
+        above = cls.add_orig_label(*above)
+        for sub in [BaseInputNetwork,
+                    BaseOperationNetwork,
+                    BaseLockNetwork,
+                    BaseOperationImplementationNetwork,
+                    BaseRedundancyChecker]:
+            for loaded in sub.load():
+                loaded.args(args, *above)
+        return args
+
+    @classmethod
+    def config(cls, config, *above):
+        input_network = cls.config_get(config, above, 'input', 'network')
+        operation_network = cls.config_get(config, above, 'operation',
+                                          'network')
+        opimp_netowrk = cls.config_get(config, above, 'opimp', 'network')
+        lock_network = cls.config_get(config, above, 'lock', 'network ')
+        redundancy_checker = cls.config_get(config, above, 'redundancy',
+                                            'checker')
+        above = cls.add_label(*above)
+        return BaseOrchestratorConfig(
+            input_network=input_network.withconfig(config, *above),
+            operation_network=operation_network.withconfig(config, *above),
+            lock_network=lock_network.withconfig(config, *above),
+            opimp_netowrk=opimp_netowrk.withconfig(config, *above),
+            redundancy_checker=redundancy_checker.withconfig(config, *above)
+            )

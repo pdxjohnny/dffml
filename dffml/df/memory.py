@@ -34,6 +34,7 @@ from .base import OperationImplementation, \
                   BaseOrchestratorContext, \
                   BaseOrchestrator
 
+from ..util.entrypoint import entry_point
 from ..util.cli.arg import Arg
 from ..util.cli.cmd import CMD
 
@@ -49,6 +50,7 @@ class MemoryKeyValueStoreContext(BaseKeyValueStoreContext):
         async with self.parent.lock:
             self.parent.memory[key] = value
 
+@entry_point('memory')
 class MemoryKeyValueStore(BaseKeyValueStore):
     '''
     Key Value store backed by dict
@@ -319,6 +321,7 @@ class MemoryInputNetworkContext(BaseInputNetworkContext):
                 # If not then return the permutation
                 yield parameter_set
 
+@entry_point('memory')
 class MemoryInputNetwork(BaseInputNetwork):
     '''
     Inputs backed by a set
@@ -372,6 +375,7 @@ class MemoryOperationNetworkContext(BaseOperationNetworkContext):
                     continue
             yield operation
 
+@entry_point('memory')
 class MemoryOperationNetwork(BaseOperationNetwork):
     '''
     Operations backed by a set
@@ -439,6 +443,7 @@ class MemoryRedundancyCheckerContext(BaseRedundancyCheckerContext):
     async def __aexit__(self, exc_type, exc_value, traceback):
         await self.__stack.aclose()
 
+@entry_point('memory')
 class MemoryRedundancyChecker(BaseRedundancyChecker):
     '''
     Redundancy Checker backed by Memory Key Value Store
@@ -499,6 +504,7 @@ class MemoryLockNetworkContext(BaseLockNetworkContext):
             # All locks for these parameters have been acquired
             yield
 
+@entry_point('memory')
 class MemoryLockNetwork(BaseLockNetwork):
 
     CONTEXT = MemoryLockNetworkContext
@@ -655,6 +661,7 @@ class MemoryOperationImplementationNetworkContext(BaseOperationImplementationNet
                                                           ctx=ctx):
                 yield operation, parameter_set
 
+@entry_point('memory')
 class MemoryOperationImplementationNetwork(BaseOperationImplementationNetwork):
 
     CONTEXT = MemoryOperationImplementationNetworkContext
@@ -853,14 +860,7 @@ class MemoryOrchestratorContext(BaseOrchestratorContext):
             yield operation, await self.nctx.run(ctx, self.ictx, operation,
                                                  await parameter_set._asdict())
 
+@entry_point('memory')
 class MemoryOrchestrator(BaseOrchestrator):
 
     CONTEXT = MemoryOrchestratorContext
-
-    @classmethod
-    def args(cls) -> Dict[str, Arg]:
-        return {}
-
-    @classmethod
-    def config(cls, cmd: CMD) -> BaseConfig:
-        return BaseConfig()
