@@ -80,24 +80,45 @@ class FakeModel(Model):
         async for repo in repos:
             yield repo, '', 1.0
 
+@contextmanager
+def empty_json_file():
+    '''
+    JSONSource will try to parse a file if it exists and so it needs to be
+    given a file with an empty JSON object in it, {}.
+    '''
+    with tempfile.NamedTemporaryFile() as fileobj:
+        fileobj.write(b'{}')
+        fileobj.seek(0)
+        yield fileobj
+
+def tempjson(func):
+    '''
+    A decorator to call empty_json_file for testcases that need it. The
+    decorator will call the function it decorates with the keyword argument
+    jsonfile set to the tempfile.NamedTemporaryFile object it has created.
+    '''
+    @wraps(func)
+    async def wrapper(*args, **kwargs):
+        with empty_json_file() as jsonfile:
+            return await func(*args, jsonfile=jsonfile, **kwargs)
+    return wrapper
+
 class TestListRepos(ReposTestCase):
 
-    async def test_run(self):
-        with tempfile.NamedTemporaryFile() as fileobj:
-            fileobj.write(b'{}')
-            fileobj.seek(0)
-            config = FileSourceConfig(filename=fileobj.name)
-            async with JSONSource(config) as source:
-                async with source() as sctx:
-                    await sctx.update(Repo('test-repo'))
-            with patch('sys.stdout', new_callable=io.StringIO) as stdout:
-                result = await ListRepos.cli('-sources',
-                                             'primary=json',
-                                             '-source-primary-filename',
-                                             fileobj.name,
-                                             '-source-primary-readonly',
-                                             'false')
-                self.assertIn('test-repo', stdout.getvalue())
+    @tempjson
+    async def test_run(self, jsonfile=None):
+        config = FileSourceConfig(filename=jsonfile.name)
+        async with JSONSource(config) as source:
+            async with source() as sctx:
+                await sctx.update(Repo('test-repo'))
+        with patch('sys.stdout', new_callable=io.StringIO) as stdout:
+            result = await ListRepos.cli('-sources',
+                                         'primary=json',
+                                         '-source-primary-filename',
+                                         jsonfile.name,
+                                         '-source-primary-readonly',
+                                         'false')
+            self.assertIn('test-repo', stdout.getvalue())
 
 class TestOperationsAll(ReposTestCase):
 

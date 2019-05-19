@@ -1,4 +1,3 @@
-import json
 from functools import wraps
 from unittest.mock import patch
 from typing import NamedTuple
@@ -9,14 +8,6 @@ from dffml.util.entrypoint import entry_point
 from dffml.df.base import BaseKeyValueStore, BaseRedundancyCheckerConfig
 from dffml.df.memory import MemoryKeyValueStore, MemoryRedundancyChecker
 from dffml.util.asynctestcase import AsyncTestCase
-
-
-class JSONEncoder(json.JSONEncoder):
-    def default(self, obj):
-        try:
-            return json.JSONEncoder.default(self, obj)
-        except:
-            return repr(obj)
 
 
 class KeyValueStoreWithArgumentsConfig(NamedTuple):

@@ -25,9 +25,8 @@ from .df.memory import MemoryInputSet, \
                        MemoryInputSetConfig
 from .util.cli.arg import Arg
 from .util.cli.cmd import CMD
-from .util.cli.parser import ParseSourcesAction
 from .util.cli.cmds import SourcesCMD, FeaturesCMD, ModelCMD, PortCMD, \
-                           KeysCMD, ListEntrypoint, DataFlowFacilitatorCMD
+                           KeysCMD, ListEntrypoint, OrchestratorCMD
 
 class Version(CMD):
     '''
@@ -136,17 +135,18 @@ class Merge(CMD):
     '''
 
     arg_dest = Arg(name='dest', help='Sources merge repos into',
-            action=ParseSourcesAction)
+            type=BaseSource.load)
     arg_src = Arg('src', help='Sources to pull repos from',
-            action=ParseSourcesAction)
+            type=BaseSource.load)
 
     async def run(self):
-        async with self.src, self.dest:
-            async for repo in self.src.repos():
-                repo.merge(await self.dest.repo(repo.src_url))
-                await self.dest.update(repo)
+        async with self.src as src, self.dest as dest:
+            async with self.src() as sctx, dest() as dctx:
+                async for repo in sctx.repos():
+                    repo.merge(await dctx.repo(repo.src_url))
+                    await dctx.update(repo)
 
-class OperationsCMD(DataFlowFacilitatorCMD, SourcesCMD):
+class OperationsCMD(OrchestratorCMD, SourcesCMD):
 
     arg_sources = SourcesCMD.arg_sources.modify(required=False)
     arg_caching = Arg('-caching', help='Re-run operations or use last',

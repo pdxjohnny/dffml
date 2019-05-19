@@ -37,8 +37,6 @@ from ...df.memory import MemoryInputNetwork, \
                   MemoryInputSet, \
                   MemoryInputSetConfig
 
-from ...df.dff import DataFlowFacilitator
-
 from ..data import merge
 from .arg import Arg
 from .cmd import CMD
@@ -100,7 +98,7 @@ class SourcesCMD(CMD):
         # created from loading their arguments from cmd (self).
         for i in range(0, len(self.sources)):
             if inspect.isclass(self.sources[i]):
-                self.sources[i] = self.sources[i].withconfig(self)
+                self.sources[i] = self.sources[i].withconfig(self.extra_config)
 
 class ModelCMD(CMD):
     '''
@@ -124,47 +122,12 @@ class KeysCMD(CMD):
 
     arg_keys = Arg('-keys', help='Key used for source lookup and evaluation',
             nargs='+', required=True)
-'''
-        setattr(namespace, self.dest, Operation.load_multiple(values).values())
-        setattr(namespace, self.dest,
-                OperationImplementation.load_multiple(values).values())
-        setattr(namespace, self.dest, BaseInputNetwork.load(value))
-        setattr(namespace, self.dest, BaseOperationNetwork.load(value))
-        setattr(namespace, self.dest, BaseLockNetwork.load(value))
-        setattr(namespace, self.dest, BaseRedundancyChecker.load(value))
-        setattr(namespace, self.dest, BaseKeyValueStore.load(value))
-        setattr(namespace, self.dest,
-                BaseOperationImplementationNetwork.load(value))
-        setattr(namespace, self.dest, BaseOrchestrator.load(value))
-        setattr(namespace, self.dest, Model.load(value)())
-        setattr(namespace, self.dest, Port.load(value)())
-'''
 
-class BaseDataFlowFacilitatorCMD(CMD):
+class BaseOrchestratorCMD(CMD):
     '''
-    Set timeout for features
+    Data Flow commands
     '''
 
-    arg_ops = Arg('-ops', required=True, nargs='+',
-            type=Operation.load)
-    arg_input_network = Arg('-input-network',
-            type=BaseInputNetwork.load,
-            default=MemoryInputNetwork)
-    arg_operation_network = Arg('-operation-network',
-            type=BaseOperationNetwork.load,
-            default=MemoryOperationNetwork)
-    arg_lock_network = Arg('-lock-network',
-            type=BaseLockNetwork.load,
-            default=MemoryLockNetwork)
-    arg_rchecker = Arg('-rchecker',
-            type=BaseRedundancyChecker.load,
-            default=MemoryRedundancyChecker)
-    # TODO We should be able to specify multiple operation implementation
-    # networks. This would enable operations to live in different place,
-    # accessed via the orchestrator transparently.
-    arg_opimpn = Arg('-opimpn',
-            type=BaseOperationImplementationNetwork.load,
-            default=MemoryOperationImplementationNetwork)
     arg_orchestrator = Arg('-orchestrator',
             type=BaseOrchestrator.load,
             default=MemoryOrchestrator)
@@ -184,14 +147,7 @@ class BaseDataFlowFacilitatorCMD(CMD):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self.dff = DataFlowFacilitator(
-            input_network=self.input_network.withconfig(self),
-            operation_network=self.operation_network.withconfig(self),
-            lock_network=self.lock_network.withconfig(self),
-            rchecker=self.rchecker.withconfig(self),
-            opimp_network=self.opimpn.withconfig(self),
-            orchestrator=self.orchestrator.withconfig(self)
-        )
+        self.orchestrator = self.orchestrator.withconfig(self.extra_config)
         self.linker = Linker()
         self.exported = self.linker.export(*self.ops)
         self.definitions, self.operations, _outputs = \
@@ -214,4 +170,4 @@ class BaseDataFlowFacilitatorCMD(CMD):
                 loaded.args(cls.EXTRA_CONFIG_ARGS)
         return cls
 
-DataFlowFacilitatorCMD = BaseDataFlowFacilitatorCMD.add_bases()
+OrchestratorCMD = BaseOrchestratorCMD.add_bases()

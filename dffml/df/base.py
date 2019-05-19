@@ -530,6 +530,10 @@ class BaseOperationImplementationNetworkContext(BaseDataFlowObjectContext):
         along with their operations as they are generated.
         '''
 
+# TODO We should be able to specify multiple operation implementation  networks.
+# This would enable operations to live in different place, accessed via the
+# orchestrator transparently. This will probably invlove
+# dffml.util.asynchelper.AsyncContextManagerList
 @base_entry_point('dffml.operation.implementation.network', 'opimp', 'network')
 class BaseOperationImplementationNetwork(BaseDataFlowObject):
     '''
