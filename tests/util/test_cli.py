@@ -299,7 +299,7 @@ class TestListEntrypoint(AsyncTestCase):
 class TestFeaturesCMD(unittest.TestCase):
 
     def test_set_timeout(self):
-        cmd = FeaturesCMD(timeout=5)
+        cmd = FeaturesCMD(timeout=5, features=Features())
         self.assertEqual(cmd.features.timeout, 5)
 
 class TestModelCMD(unittest.TestCase):

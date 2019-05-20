@@ -73,7 +73,7 @@ class FeaturesCMD(CMD):
     '''
 
     arg_features = Arg('-features', nargs='+', required=True,
-            default=Features(), type=Feature.load, action=list_action(Features))
+            type=Feature.load, action=list_action(Features))
     arg_timeout = Arg('-timeout', help='Feature evaluation timeout',
             required=False, default=Features.TIMEOUT, type=int)
 

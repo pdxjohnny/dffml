@@ -52,7 +52,6 @@ class ReposTestCase(AsyncTestCase):
     async def setUp(self):
         super().setUp()
         self.repos = [Repo(str(random.random())) for _ in range(0, 10)]
-        self.features = Features(FakeFeature())
         self.__temp_json_fileobj = empty_json_file()
         self.temp_json_fileobj = self.__temp_json_fileobj.__enter__()
         self.sconfig = FileSourceConfig(filename=self.temp_json_fileobj.name)
@@ -198,25 +197,44 @@ class TestOperationsRepo(TestOperationsAll):
 
 class TestEvaluateAll(ReposTestCase):
 
-    async def test_run(self):
-        repos = {repo.src_url: repo async for repo in self.cli.run()}
-        self.assertEqual(len(repos), len(self.repos))
-        for repo in self.repos:
-            self.assertIn(repo.src_url, repos)
-            self.assertIn('fake', repos[repo.src_url].features())
-            self.assertEqual(float(repo.src_url),
-                    repos[repo.src_url].features(['fake'])['fake'])
-
-class TestEvaluateRepo(ReposTestCase):
+    def _feature_load(self, loading=None):
+        if loading == 'fake':
+            return FakeFeature()
+        return [FakeFeature()]
 
     async def test_run(self):
-        repos = {repo.src_url: repo async for repo in self.cli.run()}
-        self.assertEqual(len(repos), len(self.subset))
-        for repo in self.subset:
-            self.assertIn(repo.src_url, repos)
-            self.assertIn('fake', repos[repo.src_url].features())
-            self.assertEqual(float(repo.src_url),
-                    repos[repo.src_url].features(['fake'])['fake'])
+        with patch.object(EvaluateAll, 'arg_features',
+                EvaluateRepo.arg_features.modify(type=self._feature_load)):
+            results = await EvaluateAll.cli('-sources', 'primary=json',
+                    '-source-filename', self.temp_json_fileobj.name,
+                    '-features', 'fake')
+            results = {result.src_url: \
+                       result.features(['fake'])['fake'] \
+                       for result in results}
+            for repo in self.repos:
+                self.assertIn(repo.src_url, results)
+                self.assertEqual(float(repo.src_url),
+                                 results[repo.src_url])
+
+class TestEvaluateRepo(TestEvaluateAll):
+
+    async def test_run(self):
+        subset = self.repos[:(int(len(self.repos) / 2))]
+        with patch.object(EvaluateRepo, 'arg_features',
+                EvaluateRepo.arg_features.modify(type=self._feature_load)):
+            subset_urls = list(map(lambda repo: repo.src_url, subset))
+            results = await EvaluateRepo.cli('-sources', 'primary=json',
+                    '-source-filename', self.temp_json_fileobj.name,
+                    '-features', 'fake',
+                    '-keys', *subset_urls)
+            self.assertEqual(len(results), len(subset))
+            results = {result.src_url: \
+                       result.features(['fake'])['fake'] \
+                       for result in results}
+            for repo in subset:
+                self.assertIn(repo.src_url, results)
+                self.assertEqual(float(repo.src_url),
+                                 results[repo.src_url])
 
 class TestTrain(AsyncTestCase):
 
