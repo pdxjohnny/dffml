@@ -89,17 +89,19 @@ class Entrypoint(object):
         Loads all installed loading and returns them as a list. Sources to be
         loaded should be registered to ENTRY_POINT via setuptools.
         '''
+        loaded_names = []
         loading_classes = []
         for i in pkg_resources.iter_entry_points(cls.ENTRY_POINT):
             loaded = i.load()
             loaded.ENTRY_POINT_LABEL = i.name
             if issubclass(loaded, cls):
+                loaded_names.append(i.name)
                 loading_classes.append(loaded)
                 if loading is not None and i.name == loading:
                     return loaded
         if loading is not None:
             raise KeyError('%s was not found in (%s)' % \
-                    (repr(loading), ', '.join(list(map(str, loading_classes)))))
+                    (repr(loading), ', '.join(loaded_names),))
         return loading_classes
 
     @classmethod

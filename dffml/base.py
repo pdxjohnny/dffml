@@ -65,7 +65,6 @@ class BaseConfigurable(abc.ABC):
     '''
 
     __argp = ArgumentParser()
-    __saved_args = None
 
     def __init__(self, config: BaseConfig) -> None:
         '''
@@ -95,7 +94,8 @@ class BaseConfigurable(abc.ABC):
 
     @classmethod
     def config_get(cls, config, above, *path) -> BaseConfig:
-        args = cls.__args()
+        # unittest.mock.patch doesn't work if we cache args() output.
+        args = cls.args({})
         args_above = cls.add_orig_label() + list(path)
         label_above = cls.add_label(*above) + list(path)
         no_label_above = cls.add_label(*above)[:-1] + list(path)
@@ -143,12 +143,6 @@ class BaseConfigurable(abc.ABC):
             action(None, namespace, value)
             value = namespace.dest
         return value
-
-    @classmethod
-    def __args(cls, *above) -> Dict[str, Any]:
-        if cls.__saved_args is None:
-            cls.__saved_args = cls.args({})
-        return cls.__saved_args
 
     @classmethod
     @abc.abstractmethod
