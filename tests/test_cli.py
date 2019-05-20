@@ -61,7 +61,7 @@ class ReposTestCase(AsyncTestCase):
                     await sctx.update(repo)
 
     def tearDown(self):
-        super().setUp()
+        super().tearDown()
         self.__temp_json_fileobj.__exit__(None, None, None)
 
 class FakeFeature(Feature):
@@ -130,26 +130,15 @@ class TestOperationsAll(ReposTestCase):
                 '-repo-def', 'calc_string',
                 '-remap', 'get_single.result=string_calculator',
                 '-output-specs',  '["result"]=get_single_spec',
-                '-ops', *map(lambda op: op.name, OPERATIONS),
-                '-opimpn-memory-opimps', *map(lambda imp: imp.op.name, OPIMPS))
+                '-dff-memory-operation-network-memory-ops',
+                *map(lambda op: op.name, OPERATIONS),
+                '-dff-memory-opimpn-memory-opimps',
+                *map(lambda imp: imp.op.name, OPIMPS))
         return
         for repo in self.repos:
             self.assertIn(repo.src_url, stdout.getvalue())
 
 class TestOperationsRepo(TestOperationsAll):
-
-    def setUp(self):
-        super().setUp()
-        self.subset = self.repos[int(len(self.repos) / 2):]
-        self.cli = OperationsRepo(
-            keys=[repo.src_url for repo in self.subset],
-            ops=OPERATIONS,
-            opimpn_memory_opimps=OPIMPS,
-            repo_def='calc_string',
-            output_specs=[(['result'], 'get_single_spec',)],
-            remap=[('get_single', 'result', 'string_calculator')],
-            sources=self.sources,
-            features=self.features)
 
     async def test_run(self):
         repos = {repo.src_url: repo async for repo in self.cli.run()}
@@ -163,10 +152,6 @@ class TestOperationsRepo(TestOperationsAll):
 
 class TestEvaluateAll(ReposTestCase):
 
-    def setUp(self):
-        super().setUp()
-        self.cli = EvaluateAll(sources=self.sources, features=self.features)
-
     async def test_run(self):
         repos = {repo.src_url: repo async for repo in self.cli.run()}
         self.assertEqual(len(repos), len(self.repos))
@@ -177,12 +162,6 @@ class TestEvaluateAll(ReposTestCase):
                     repos[repo.src_url].features(['fake'])['fake'])
 
 class TestEvaluateRepo(ReposTestCase):
-
-    def setUp(self):
-        super().setUp()
-        self.subset = self.repos[int(len(self.repos) / 2):]
-        self.cli = EvaluateRepo(sources=self.sources, features=self.features,
-                keys=[repo.src_url for repo in self.subset])
 
     async def test_run(self):
         repos = {repo.src_url: repo async for repo in self.cli.run()}
@@ -195,30 +174,15 @@ class TestEvaluateRepo(ReposTestCase):
 
 class TestTrain(AsyncTestCase):
 
-    def setUp(self):
-        self.cli = Train(model=FakeModel(), model_dir=None,
-                sources=Sources(MemorySource(MemorySourceConfig(repos=[]))),
-                features=Features())
-
     async def test_run(self):
         await self.cli.run()
 
 class TestAccuracy(AsyncTestCase):
 
-    def setUp(self):
-        self.cli = Accuracy(model=FakeModel(),
-                sources=Sources(MemorySource(MemorySourceConfig(repos=[]))),
-                features=Features())
-
     async def test_run(self):
         self.assertEqual(1.0, await self.cli.run())
 
 class TestPredictAll(ReposTestCase):
-
-    def setUp(self):
-        super().setUp()
-        self.cli = PredictAll(model=FakeModel(), sources=self.sources,
-                features=self.features)
 
     async def test_run(self):
         repos = {repo.src_url: repo async for repo in self.cli.run()}
@@ -227,13 +191,6 @@ class TestPredictAll(ReposTestCase):
             self.assertIn(repo.src_url, repos)
 
 class TestPredictRepo(ReposTestCase):
-
-    def setUp(self):
-        super().setUp()
-        self.subset = self.repos[int(len(self.repos) / 2):]
-        self.cli = PredictRepo(model=FakeModel(), sources=self.sources,
-                features=self.features,
-                keys=[repo.src_url for repo in self.subset])
 
     async def test_run(self):
         repos = {repo.src_url: repo async for repo in self.cli.run()}

@@ -4,7 +4,7 @@ from enum import Enum
 import pkg_resources
 from typing import NamedTuple, Union, List, Dict, Optional, Any, Iterator
 
-from ..util.entrypoint import Entrypoint
+from ..util.entrypoint import Entrypoint, base_entry_point
 
 class Definition(NamedTuple):
     '''
@@ -32,15 +32,23 @@ class Stage(Enum):
     CLEANUP = 'cleanup'
     OUTPUT = 'output'
 
-class Operation(NamedTuple):
-    name: str
-    inputs: Dict[str, Definition]
-    outputs: Dict[str, Definition]
-    conditions: List[Definition]
-    stage: Stage = Stage.PROCESSING
-    expand: Union[bool, List[str]] = False
+@base_entry_point('dffml.operation', 'operation')
+class Operation(Entrypoint):
 
-    ENTRY_POINT = 'dffml.operation'
+    def __init__(self,
+                 name: str,
+                 inputs: Dict[str, Definition],
+                 outputs: Dict[str, Definition],
+                 conditions: List[Definition],
+                 stage: Stage = Stage.PROCESSING,
+                 expand: Union[bool, List[str]] = False):
+        super().__init__()
+        self.name = name
+        self.inputs = inputs
+        self.outputs = outputs
+        self.conditions = conditions
+        self.stage = stage
+        self.expand = expand
 
     def export(self):
         exported = dict(self._asdict())
@@ -59,10 +67,6 @@ class Operation(NamedTuple):
         if not self.expand:
             del exported['expand']
         return exported
-
-    @classmethod
-    def load(cls, loading=None):
-        return Entrypoint.load(cls, loading=loading)
 
 class Output(NamedTuple):
     name: str

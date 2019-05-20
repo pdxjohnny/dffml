@@ -116,11 +116,19 @@ class BaseConfigurable(abc.ABC):
                                  above[-1],
                                  '.'.join(above[:-1]),)) from error
 
+        if value is None \
+                and 'default' in arg:
+            return arg['default']
         # TODO This is a oversimplification of argparse's nargs
         if not 'nargs' in arg:
             value = value[0]
         if 'type' in arg:
-            value = arg['type'](value)
+            # TODO This is a oversimplification of argparse's nargs
+            if 'nargs' in arg:
+                print(above, value)
+                value = list(map(arg['type'], value))
+            else:
+                value = arg['type'](value)
         if 'action' in arg:
             if isinstance(arg['action'], str):
                 # HACK This accesses _pop_action_class from ArgumentParser

@@ -851,18 +851,29 @@ class MemoryOrchestrator(BaseOrchestrator):
     @classmethod
     def args(cls, args, *above) -> Dict[str, Arg]:
         # Extending above is done right before loading args of subclasses
+        cls.config_set(args, above, 'input', 'network',
+                Arg(type=BaseInputNetwork.load,
+                    default=MemoryInputNetwork))
+        cls.config_set(args, above, 'operation', 'network',
+                Arg(type=BaseOperationNetwork.load,
+                    default=MemoryOperationNetwork))
+        cls.config_set(args, above, 'opimp', 'network',
+                Arg(type=BaseOperationImplementationNetwork.load,
+                    default=MemoryOperationImplementationNetwork))
+        cls.config_set(args, above, 'lock', 'network',
+                Arg(type=BaseLockNetwork.load,
+                    default=MemoryLockNetwork))
+        cls.config_set(args, above, 'rchecker',
+                Arg(type=BaseRedundancyChecker.load,
+                    default=MemoryRedundancyChecker))
         above = cls.add_orig_label(*above)
         for sub in [BaseInputNetwork,
                     BaseOperationNetwork,
-                    BaseLockNetwork,
                     BaseOperationImplementationNetwork,
+                    BaseLockNetwork,
                     BaseRedundancyChecker]:
             for loaded in sub.load():
-                try:
-                    loaded.args(args, *above)
-                except TypeError as error:
-                    raise Exception('%s had issue loading' % (loaded,)) \
-                            from error
+                loaded.args(args, *above)
         return args
 
     @classmethod
@@ -871,7 +882,7 @@ class MemoryOrchestrator(BaseOrchestrator):
         operation_network = cls.config_get(config, above, 'operation',
                                           'network')
         opimp_netowrk = cls.config_get(config, above, 'opimp', 'network')
-        lock_network = cls.config_get(config, above, 'lock', 'network ')
+        lock_network = cls.config_get(config, above, 'lock', 'network')
         rchecker = cls.config_get(config, above, 'rchecker')
         above = cls.add_label(*above)
         return BaseOrchestratorConfig(

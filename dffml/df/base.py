@@ -554,7 +554,7 @@ class BaseOrchestratorContext(BaseDataFlowObjectContext):
         Run all the operations then run cleanup and output operations
         '''
 
-@base_entry_point('dffml.orchestrator', 'orchestrator')
+@base_entry_point('dffml.orchestrator', 'dff')
 class BaseOrchestrator(BaseDataFlowObject):
 
     def __init__(self, config: 'BaseConfig') -> None:
