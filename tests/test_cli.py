@@ -23,6 +23,7 @@ from dffml.source.memory import MemorySource, MemorySourceConfig
 from dffml.source.file  import FileSourceConfig
 from dffml.source.json  import JSONSource
 from dffml.model import Model
+from dffml.df.base import OperationImplementation
 from dffml.accuracy import Accuracy as AccuracyType
 from dffml.util.asynctestcase import AsyncTestCase
 from dffml.util.cli.cmd import DisplayHelp
@@ -116,33 +117,24 @@ class TestListRepos(ReposTestCase):
 
 class TestOperationsAll(ReposTestCase):
 
-    def setUp(self):
-        super().setUp()
-        self.repo_keys = {
-            'add 40 and 2': 42,
-            'multiply 42 and 10': 420
-            }
-        self.repos = list(map(Repo, self.repo_keys.keys()))
-        self.sources = Sources(MemorySource(MemorySourceConfig(repos=self.repos)))
-        self.features = Features(DefFeature('string_calculator', int, 1))
-        self.cli = OperationsAll(
-            ops=OPERATIONS,
-            opimpn_memory_opimps=OPIMPS,
-            repo_def='calc_string',
-            output_specs=[(['result'], 'get_single_spec',)],
-            remap=[('get_single', 'result', 'string_calculator')],
-            sources=self.sources,
-            features=self.features)
+    def __opimp_load(self, loading=None):
+        if loading is not None:
+            return filter(lambda loading: loading == imp.op.name,
+                          OPIMPS)
+        return OperationImplementation.load()
 
     async def test_run(self):
-        repos = {repo.src_url: repo async for repo in self.cli.run()}
-        self.assertEqual(len(repos), len(self.repos))
+        # with patch('sys.stdout', new_callable=io.StringIO) as stdout:
+        result = await OperationsAll.cli('-sources', 'primary=json',
+                '-source-primary-filename', self.temp_json_fileobj.name,
+                '-repo-def', 'calc_string',
+                '-remap', 'get_single.result=string_calculator',
+                '-output-specs',  '["result"]=get_single_spec',
+                '-ops', *map(lambda op: op.name, OPERATIONS),
+                '-opimpn-memory-opimps', *map(lambda imp: imp.op.name, OPIMPS))
+        return
         for repo in self.repos:
-            self.assertIn(repo.src_url, repos)
-            self.assertIn('string_calculator', repos[repo.src_url].features())
-            self.assertEqual(self.repo_keys[repo.src_url],
-                    repos[repo.src_url]\
-                    .features(['string_calculator'])['string_calculator'])
+            self.assertIn(repo.src_url, stdout.getvalue())
 
 class TestOperationsRepo(TestOperationsAll):
 
