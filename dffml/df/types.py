@@ -68,6 +68,22 @@ class Operation(Entrypoint):
             del exported['expand']
         return exported
 
+    @classmethod
+    def load(cls, loading=None):
+        loading_classes = []
+        for i in pkg_resources.iter_entry_points(cls.ENTRY_POINT):
+            loaded = i.load()
+            loaded.ENTRY_POINT_LABEL = i.name
+            if isinstance(loaded, cls):
+                loading_classes.append(loaded)
+                if loading is not None and loaded.name == loading:
+                    return loaded
+        if loading is not None:
+            raise KeyError('%s was not found in (%s)' % \
+                    (repr(loading), ', '.join(
+                     list(map(lambda op: op.name, loading_classes)))))
+        return loading_classes
+
 class Output(NamedTuple):
     name: str
     select: List[Definition]
