@@ -23,6 +23,7 @@ from dffml.source.memory import MemorySource, MemorySourceConfig
 from dffml.source.file  import FileSourceConfig
 from dffml.source.json  import JSONSource
 from dffml.model import Model
+from dffml.df.types import Operation
 from dffml.df.base import OperationImplementation
 from dffml.accuracy import Accuracy as AccuracyType
 from dffml.util.asynctestcase import AsyncTestCase
@@ -117,26 +118,47 @@ class TestListRepos(ReposTestCase):
 
 class TestOperationsAll(ReposTestCase):
 
+    def __op_load(self, loading=None):
+        if loading is not None:
+            return list(filter(lambda op: loading == op.name,
+                               OPERATIONS))[0]
+        return OPERATIONS
+
     def __opimp_load(self, loading=None):
         if loading is not None:
-            return filter(lambda loading: loading == imp.op.name,
-                          OPIMPS)
-        return OperationImplementation.load()
+            return list(filter(lambda imp: loading == imp.op.name,
+                               OPIMPS))[0]
+        return OPIMPS
 
     async def test_run(self):
+        self.repo_keys = {
+            'add 40 and 2': 42,
+            'multiply 42 and 10': 420
+            }
+        self.repos = list(map(Repo, self.repo_keys.keys()))
+        self.temp_json_fileobj.seek(0)
+        self.temp_json_fileobj.truncate(0)
+        self.temp_json_fileobj.write(b'{}')
+        self.temp_json_fileobj.flush()
+        async with JSONSource(self.sconfig) as source:
+            async with source() as sctx:
+                for repo in self.repos:
+                    await sctx.update(repo)
         # with patch('sys.stdout', new_callable=io.StringIO) as stdout:
-        result = await OperationsAll.cli('-sources', 'primary=json',
-                '-source-primary-filename', self.temp_json_fileobj.name,
-                '-repo-def', 'calc_string',
-                '-remap', 'get_single.result=string_calculator',
-                '-output-specs',  '["result"]=get_single_spec',
-                '-dff-memory-operation-network-memory-ops',
-                *map(lambda op: op.name, OPERATIONS),
-                '-dff-memory-opimpn-memory-opimps',
-                *map(lambda imp: imp.op.name, OPIMPS))
-        return
-        for repo in self.repos:
-            self.assertIn(repo.src_url, stdout.getvalue())
+        with patch.object(OperationImplementation, 'load', self.__opimp_load), \
+                patch.object(Operation, 'load', self.__op_load):
+            result = await OperationsAll.cli('-sources', 'primary=json',
+                    '-source-filename', self.temp_json_fileobj.name,
+                    '-repo-def', 'calc_string',
+                    '-remap', 'get_single.result=string_calculator',
+                    '-output-specs',  '["result"]=get_single_spec',
+                    '-dff-memory-operation-network-ops',
+                    *map(lambda op: op.name, OPERATIONS),
+                    '-dff-memory-opimp-network-opimps',
+                    *map(lambda imp: imp.op.name, OPIMPS))
+            return
+            for repo in self.repos:
+                self.assertIn(repo.src_url, stdout.getvalue())
 
 class TestOperationsRepo(TestOperationsAll):
 

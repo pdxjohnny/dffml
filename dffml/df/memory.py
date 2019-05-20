@@ -881,7 +881,7 @@ class MemoryOrchestrator(BaseOrchestrator):
         input_network = cls.config_get(config, above, 'input', 'network')
         operation_network = cls.config_get(config, above, 'operation',
                                           'network')
-        opimp_netowrk = cls.config_get(config, above, 'opimp', 'network')
+        opimp_network = cls.config_get(config, above, 'opimp', 'network')
         lock_network = cls.config_get(config, above, 'lock', 'network')
         rchecker = cls.config_get(config, above, 'rchecker')
         above = cls.add_label(*above)
@@ -889,6 +889,6 @@ class MemoryOrchestrator(BaseOrchestrator):
             input_network=input_network.withconfig(config, *above),
             operation_network=operation_network.withconfig(config, *above),
             lock_network=lock_network.withconfig(config, *above),
-            opimp_netowrk=opimp_netowrk.withconfig(config, *above),
+            opimp_network=opimp_network.withconfig(config, *above),
             rchecker=rchecker.withconfig(config, *above)
             )

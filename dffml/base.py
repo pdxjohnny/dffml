@@ -97,7 +97,8 @@ class BaseConfigurable(abc.ABC):
     def config_get(cls, config, above, *path) -> BaseConfig:
         args = cls.__args()
         args_above = cls.add_orig_label() + list(path)
-        above = cls.add_label(*above) + list(path)
+        label_above = cls.add_label(*above) + list(path)
+        no_label_above = cls.add_label(*above)[:-1] + list(path)
         try:
             arg = traverse_config_get(args, *args_above)
         except KeyError as error:
@@ -107,14 +108,17 @@ class BaseConfigurable(abc.ABC):
                                  '.' if args_above[:-1] else '',
                                  '.'.join(args_above[:-1]),)) from error
         try:
-            value = traverse_config_get(config, *above)
+            value = traverse_config_get(config, *label_above)
         except KeyError as error:
-            if 'default' in arg:
-                return arg['default']
-            raise MissingConfig('%s missing %r from %s' % \
-                                (cls.__qualname__,
-                                 above[-1],
-                                 '.'.join(above[:-1]),)) from error
+            try:
+                value = traverse_config_get(config, *no_label_above)
+            except KeyError as error:
+                if 'default' in arg:
+                    return arg['default']
+                raise MissingConfig('%s missing %r from %s' % \
+                                    (cls.__qualname__,
+                                     label_above[-1],
+                                     '.'.join(label_above[:-1]),)) from error
 
         if value is None \
                 and 'default' in arg:
@@ -125,7 +129,6 @@ class BaseConfigurable(abc.ABC):
         if 'type' in arg:
             # TODO This is a oversimplification of argparse's nargs
             if 'nargs' in arg:
-                print(above, value)
                 value = list(map(arg['type'], value))
             else:
                 value = arg['type'](value)

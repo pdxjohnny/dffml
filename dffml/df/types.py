@@ -41,18 +41,25 @@ class Operation(Entrypoint):
                  outputs: Dict[str, Definition],
                  conditions: List[Definition],
                  stage: Stage = Stage.PROCESSING,
-                 expand: Union[bool, List[str]] = False):
+                 expand: Optional[List[str]] = None):
         super().__init__()
         self.name = name
         self.inputs = inputs
         self.outputs = outputs
         self.conditions = conditions
         self.stage = stage
+        if expand is None:
+            expand = []
         self.expand = expand
 
     def export(self):
-        exported = dict(self._asdict())
-        del exported['name']
+        exported = {
+            'inputs': self.inputs.copy(),
+            'outputs': self.outputs.copy(),
+            'conditions': self.conditions.copy(),
+            'stage': self.stage,
+            'expand': self.expand.copy(),
+            }
         for to_string in ['conditions']:
             exported[to_string] = list(map(lambda definition: definition.name,
                                            exported[to_string]))
@@ -60,11 +67,9 @@ class Operation(Entrypoint):
             exported[to_string] = dict(map(lambda key_def: \
                                            (key_def[0], key_def[1].name),
                                            exported[to_string].items()))
-        if not self.conditions:
+        if not exported['conditions']:
             del exported['conditions']
-        if not self.stage:
-            del exported['stage']
-        if not self.expand:
+        if not exported['expand']:
             del exported['expand']
         return exported
 

@@ -191,7 +191,7 @@ class OperationsAll(OperationsCMD):
                     )
                 )
 
-            async for ctx, results in dffctx.evaluate(strict=True):
+            async for ctx, results in dffctx.run_operations(strict=True):
                 ctx_str = (await ctx.handle()).as_string()
                 # TODO Make a RepoInputSetContext which would let us store the
                 # repo instead of recalling it by the URL

@@ -127,7 +127,7 @@ class BaseOrchestratorCMD(CMD):
     Data Flow commands
     '''
 
-    arg_orchestrator = Arg('-orchestrator',
+    arg_dff = Arg('-dff',
             type=BaseOrchestrator.load,
             default=MemoryOrchestrator)
     arg_output_specs = Arg('-output-specs', required=True, nargs='+',
@@ -146,9 +146,9 @@ class BaseOrchestratorCMD(CMD):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self.orchestrator = self.orchestrator.withconfig(self.extra_config)
+        self.dff = self.dff.withconfig(self.extra_config)
         self.linker = Linker()
-        self.exported = self.linker.export(*self.ops)
+        self.exported = self.linker.export(*self.dff.config.operation_network.config.operations)
         self.definitions, self.operations, _outputs = \
                 self.linker.resolve(self.exported)
 
