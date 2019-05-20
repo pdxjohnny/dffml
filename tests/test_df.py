@@ -115,14 +115,16 @@ class TestMemoryKeyValueStore(AsyncTestCase):
         self.kvStore = MemoryKeyValueStore(BaseConfig())
 
     async def test_set(self):
-        async with self.kvStore as ctx:
-            await ctx.set('feed', b'face')
+        async with self.kvStore as kvstore:
+            async with kvstore() as ctx:
+                await ctx.set('feed', b'face')
         self.assertEqual(self.kvStore.memory.get('feed'), b'face')
 
     async def test_get(self):
         self.kvStore.memory['feed'] = b'face'
-        async with self.kvStore as ctx:
-            self.assertEqual(await ctx.get('feed'), b'face')
+        async with self.kvStore as kvstore:
+            async with kvstore() as ctx:
+                self.assertEqual(await ctx.get('feed'), b'face')
 
 class TestMemoryOperationImplementationNetwork(AsyncTestCase):
 

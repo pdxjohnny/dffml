@@ -37,7 +37,6 @@ from ...df.memory import MemoryInputNetwork, \
                   MemoryInputSet, \
                   MemoryInputSetConfig
 
-from ..data import merge
 from .arg import Arg
 from .cmd import CMD
 from .parser import list_action, \

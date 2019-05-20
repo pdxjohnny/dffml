@@ -2,7 +2,6 @@ import io
 import asyncio
 import hashlib
 import itertools
-from functools import wraps
 from datetime import datetime
 from itertools import product
 from contextlib import asynccontextmanager, AsyncExitStack
@@ -38,6 +37,7 @@ from .base import OperationImplementation, \
 from ..util.entrypoint import entry_point
 from ..util.cli.arg import Arg
 from ..util.cli.cmd import CMD
+from ..util.data import ignore_args
 
 from .log import LOGGER
 
@@ -63,17 +63,6 @@ class MemoryKeyValueStore(BaseKeyValueStore):
         super().__init__(config)
         self.memory: Dict[str, bytes] = {}
         self.lock = asyncio.Lock()
-
-    async def __aenter__(self) -> MemoryKeyValueStoreContext:
-        return MemoryKeyValueStoreContext(self)
-
-    @classmethod
-    def args(cls) -> Dict[str, Arg]:
-        return {}
-
-    @classmethod
-    def config(cls, cmd: CMD) -> BaseConfig:
-        return BaseConfig()
 
 class MemoryInputSetConfig(NamedTuple):
     ctx: BaseInputSetContext
@@ -339,14 +328,6 @@ class MemoryInputNetwork(BaseInputNetwork):
         # TODO Create ctxhd_locks dict to manage a per context lock
         self.ctxhd_lock = asyncio.Lock()
 
-    @classmethod
-    def args(cls) -> Dict[str, Arg]:
-        return {}
-
-    @classmethod
-    def config(cls, cmd: CMD) -> BaseConfig:
-        return BaseConfig()
-
 class MemoryOperationNetworkConfig(NamedTuple):
     # Starting set of operations
     operations: List[Operation]
@@ -386,20 +367,32 @@ class MemoryOperationNetwork(BaseOperationNetwork):
 
     def __init__(self, config: BaseConfig) -> None:
         super().__init__(config)
-        self.memory = config.operations
+        self.memory = config.operations.copy()
         self.lock = asyncio.Lock()
 
     @classmethod
-    def args(cls) -> Dict[str, Arg]:
-        return {}
+    def args(cls, args, *above) -> Dict[str, Arg]:
+        cls.config_set(args, above, 'ops',
+                Arg(type=Operation.load, nargs='+'))
+        return args
 
     @classmethod
-    def config(cls, cmd: CMD) -> BaseConfig:
+    def config(cls, config, *above) -> MemoryOperationNetworkConfig:
         return MemoryOperationNetworkConfig(
-            operations=cmd.ops
+            operations=cls.config_get(config, above, 'ops')
             )
 
 class MemoryRedundancyCheckerContext(BaseRedundancyCheckerContext):
+
+    async def __aenter__(self) -> 'MemoryRedundancyCheckerContext':
+        self.__stack = AsyncExitStack()
+        await self.__stack.__aenter__()
+        self.kvctx = await self.__stack.enter_async_context(
+                self.parent.key_value_store())
+        return self
+
+    async def __aexit__(self, exc_type, exc_value, traceback):
+        await self.__stack.aclose()
 
     async def unique(self,
             operation: Operation,
@@ -434,16 +427,6 @@ class MemoryRedundancyCheckerContext(BaseRedundancyCheckerContext):
         await self.kvctx.set(await self.unique(operation, parameter_set),
                              '\x01')
 
-    async def __aenter__(self) -> 'MemoryRedundancyCheckerContext':
-        self.__stack = AsyncExitStack()
-        await self.__stack.__aenter__()
-        self.kvctx = await self.__stack.enter_async_context(
-                self.parent.key_value_store)
-        return self
-
-    async def __aexit__(self, exc_type, exc_value, traceback):
-        await self.__stack.aclose()
-
 @entry_point('memory')
 class MemoryRedundancyChecker(BaseRedundancyChecker):
     '''
@@ -452,9 +435,15 @@ class MemoryRedundancyChecker(BaseRedundancyChecker):
 
     CONTEXT = MemoryRedundancyCheckerContext
 
-    def __init__(self, config: BaseRedundancyCheckerConfig) -> None:
-        super().__init__(config)
-        self.key_value_store = config.key_value_store
+    async def __aenter__(self) -> 'MemoryRedundancyCheckerContext':
+        self.__stack = AsyncExitStack()
+        await self.__stack.__aenter__()
+        self.key_value_store = await self.__stack.enter_async_context(
+                self.config.key_value_store)
+        return self
+
+    async def __aexit__(self, exc_type, exc_value, traceback):
+        await self.__stack.aclose()
 
     @classmethod
     def args(cls, args, *above) -> Dict[str, Arg]:
@@ -514,20 +503,6 @@ class MemoryLockNetwork(BaseLockNetwork):
         super().__init__(config)
         self.lock = asyncio.Lock()
         self.locks: Dict[str, asyncio.Lock] = {}
-
-    @classmethod
-    def args(cls) -> Dict[str, Arg]:
-        return {}
-
-    @classmethod
-    def config(cls, cmd: CMD) -> BaseConfig:
-        return BaseConfig()
-
-def ignore_args(func):
-    @wraps(func)
-    def wrapper(*_args, **_kwargs):
-        return func()
-    return wrapper
 
 class MemoryOperationImplementationNetworkConfig(NamedTuple):
     operations: Dict[str, OperationImplementation]
@@ -673,26 +648,6 @@ class MemoryOperationImplementationNetwork(BaseOperationImplementationNetwork):
         self.operations = {}
         self.completed_event = asyncio.Event()
 
-    @classmethod
-    def args(cls) -> Dict[str, Arg]:
-        # Enable the user to specify operation implementations to be loaded via
-        # the entrypoint system (by ParseOperationImplementationAction)
-        args = {}
-        cls._args(args, 'opimps',  Arg(nargs='+',
-            type=OperationImplementation.load))
-        # TODO similar to MemoryRedundancyChecker, load all Operation
-        # Implemenations and have them add args if they need it
-        return args
-
-    @classmethod
-    def config(cls, cmd: CMD) -> BaseConfig:
-        return MemoryOperationImplementationNetworkConfig(
-                operations={imp.op.name: imp \
-                            for imp in \
-                            [Imp(BaseConfig()) \
-                            for Imp in cmd.opimpn_memory_opimps]}
-            )
-
     async def __aenter__(self) -> 'MemoryOperationImplementationNetworkContext':
         self.__stack = AsyncExitStack()
         await self.__stack.__aenter__()
@@ -705,6 +660,28 @@ class MemoryOperationImplementationNetwork(BaseOperationImplementationNetwork):
         if self.__stack is not None:
             await self.__stack.aclose()
             self.__stack = None
+
+    @classmethod
+    def args(cls, args, *above) -> Dict[str, Arg]:
+        # Enable the user to specify operation implementations to be loaded via
+        # the entrypoint system (by ParseOperationImplementationAction)
+        cls.config_set(args, above, 'opimps',
+                Arg(type=OperationImplementation.load, nargs='+'))
+        # Add orig label to above since we are done loading
+        above = cls.add_orig_label(*above)
+        # Load all the opimps and add the arguments they might require
+        for loaded in OperationImplementation.load():
+            loaded.args(args, *above)
+        return args
+
+    @classmethod
+    def config(cls, config, *above) -> BaseConfig:
+        return MemoryOperationImplementationNetworkConfig(
+                operations={imp.op.name: imp \
+                            for imp in \
+                            [Imp(BaseConfig()) \
+                            for Imp in cls.config_get(config, above, 'opimps')]}
+            )
 
 class MemoryOrchestratorConfig(BaseOrchestratorConfig):
     '''
@@ -870,3 +847,37 @@ class MemoryOrchestratorContext(BaseOrchestratorContext):
 class MemoryOrchestrator(BaseOrchestrator):
 
     CONTEXT = MemoryOrchestratorContext
+
+    @classmethod
+    def args(cls, args, *above) -> Dict[str, Arg]:
+        # Extending above is done right before loading args of subclasses
+        above = cls.add_orig_label(*above)
+        for sub in [BaseInputNetwork,
+                    BaseOperationNetwork,
+                    BaseLockNetwork,
+                    BaseOperationImplementationNetwork,
+                    BaseRedundancyChecker]:
+            for loaded in sub.load():
+                try:
+                    loaded.args(args, *above)
+                except TypeError as error:
+                    raise Exception('%s had issue loading' % (loaded,)) \
+                            from error
+        return args
+
+    @classmethod
+    def config(cls, config, *above):
+        input_network = cls.config_get(config, above, 'input', 'network')
+        operation_network = cls.config_get(config, above, 'operation',
+                                          'network')
+        opimp_netowrk = cls.config_get(config, above, 'opimp', 'network')
+        lock_network = cls.config_get(config, above, 'lock', 'network ')
+        rchecker = cls.config_get(config, above, 'rchecker')
+        above = cls.add_label(*above)
+        return BaseOrchestratorConfig(
+            input_network=input_network.withconfig(config, *above),
+            operation_network=operation_network.withconfig(config, *above),
+            lock_network=lock_network.withconfig(config, *above),
+            opimp_netowrk=opimp_netowrk.withconfig(config, *above),
+            rchecker=rchecker.withconfig(config, *above)
+            )

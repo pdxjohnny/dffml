@@ -34,13 +34,34 @@ from dffml.cli import OperationsAll, OperationsRepo, \
 
 from .test_df import OPERATIONS, OPIMPS
 
+@contextmanager
+def empty_json_file():
+    '''
+    JSONSource will try to parse a file if it exists and so it needs to be
+    given a file with an empty JSON object in it, {}.
+    '''
+    with tempfile.NamedTemporaryFile() as fileobj:
+        fileobj.write(b'{}')
+        fileobj.seek(0)
+        yield fileobj
+
 class ReposTestCase(AsyncTestCase):
 
-    def setUp(self):
+    async def setUp(self):
         super().setUp()
         self.repos = [Repo(str(random.random())) for _ in range(0, 10)]
-        self.sources = Sources(MemorySource(MemorySourceConfig(repos=self.repos)))
         self.features = Features(FakeFeature())
+        self.__temp_json_fileobj = empty_json_file()
+        self.temp_json_fileobj = self.__temp_json_fileobj.__enter__()
+        self.sconfig = FileSourceConfig(filename=self.temp_json_fileobj.name)
+        async with JSONSource(self.sconfig) as source:
+            async with source() as sctx:
+                for repo in self.repos:
+                    await sctx.update(repo)
+
+    def tearDown(self):
+        super().setUp()
+        self.__temp_json_fileobj.__exit__(None, None, None)
 
 class FakeFeature(Feature):
 
@@ -80,45 +101,18 @@ class FakeModel(Model):
         async for repo in repos:
             yield repo, '', 1.0
 
-@contextmanager
-def empty_json_file():
-    '''
-    JSONSource will try to parse a file if it exists and so it needs to be
-    given a file with an empty JSON object in it, {}.
-    '''
-    with tempfile.NamedTemporaryFile() as fileobj:
-        fileobj.write(b'{}')
-        fileobj.seek(0)
-        yield fileobj
-
-def tempjson(func):
-    '''
-    A decorator to call empty_json_file for testcases that need it. The
-    decorator will call the function it decorates with the keyword argument
-    jsonfile set to the tempfile.NamedTemporaryFile object it has created.
-    '''
-    @wraps(func)
-    async def wrapper(*args, **kwargs):
-        with empty_json_file() as jsonfile:
-            return await func(*args, jsonfile=jsonfile, **kwargs)
-    return wrapper
-
 class TestListRepos(ReposTestCase):
 
-    @tempjson
-    async def test_run(self, jsonfile=None):
-        config = FileSourceConfig(filename=jsonfile.name)
-        async with JSONSource(config) as source:
-            async with source() as sctx:
-                await sctx.update(Repo('test-repo'))
+    async def test_run(self):
         with patch('sys.stdout', new_callable=io.StringIO) as stdout:
             result = await ListRepos.cli('-sources',
                                          'primary=json',
                                          '-source-primary-filename',
-                                         jsonfile.name,
+                                         self.temp_json_fileobj.name,
                                          '-source-primary-readonly',
                                          'false')
-            self.assertIn('test-repo', stdout.getvalue())
+            for repo in self.repos:
+                self.assertIn(repo.src_url, stdout.getvalue())
 
 class TestOperationsAll(ReposTestCase):
 

@@ -35,6 +35,14 @@ class BaseDataFlowObject(BaseDataFlowFacilitatorObject):
     def __call__(self) -> BaseDataFlowObjectContext:
         return self.CONTEXT(self)
 
+    @classmethod
+    def args(cls, args, *above) -> Dict[str, Arg]:
+        return args
+
+    @classmethod
+    def config(cls, config, *above) -> BaseConfig:
+        return BaseConfig()
+
 class OperationImplementationContext(BaseDataFlowObjectContext):
 
     def __init__(self,
@@ -81,24 +89,6 @@ class OperationImplementation(BaseDataFlowObject):
                  ictx: 'BaseInputNetworkContext') \
             -> OperationImplementationContext:
         return self.CONTEXT(self, ctx, ictx)
-
-    @classmethod
-    def args(cls) -> Dict[str, Any]:
-        '''
-        Most Operation Implementations won't require any special config. So
-        remove the abstract method requirement from descendants by filling in
-        the args method here. Returns an empty dict.
-        '''
-        return {}
-
-    @classmethod
-    def config(cls, cmd):
-        '''
-        Most Operation Implementations won't require any special config. So
-        remove the abstract method requirement from descendants by filling in
-        the config method here. Returns an empty config (BaseConfig).
-        '''
-        return BaseConfig()
 
     @classmethod
     def load_multiple(cls, to_load: List[str]):
@@ -606,33 +596,3 @@ class BaseOrchestrator(BaseDataFlowObject):
 
     async def __aexit__(self, exc_type, exc_value, traceback):
         await self.__stack.aclose()
-
-    @classmethod
-    def args(cls, args, *above) -> Dict[str, Arg]:
-        # Extending above is done right before loading args of subclasses
-        above = cls.add_orig_label(*above)
-        for sub in [BaseInputNetwork,
-                    BaseOperationNetwork,
-                    BaseLockNetwork,
-                    BaseOperationImplementationNetwork,
-                    BaseRedundancyChecker]:
-            for loaded in sub.load():
-                loaded.args(args, *above)
-        return args
-
-    @classmethod
-    def config(cls, config, *above):
-        input_network = cls.config_get(config, above, 'input', 'network')
-        operation_network = cls.config_get(config, above, 'operation',
-                                          'network')
-        opimp_netowrk = cls.config_get(config, above, 'opimp', 'network')
-        lock_network = cls.config_get(config, above, 'lock', 'network ')
-        rchecker = cls.config_get(config, above, 'rchecker')
-        above = cls.add_label(*above)
-        return BaseOrchestratorConfig(
-            input_network=input_network.withconfig(config, *above),
-            operation_network=operation_network.withconfig(config, *above),
-            lock_network=lock_network.withconfig(config, *above),
-            opimp_netowrk=opimp_netowrk.withconfig(config, *above),
-            rchecker=rchecker.withconfig(config, *above)
-            )
