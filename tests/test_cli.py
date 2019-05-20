@@ -118,13 +118,13 @@ class TestListRepos(ReposTestCase):
 
 class TestOperationsAll(ReposTestCase):
 
-    def __op_load(self, loading=None):
+    def _op_load(self, loading=None):
         if loading is not None:
             return list(filter(lambda op: loading == op.name,
                                OPERATIONS))[0]
         return OPERATIONS
 
-    def __opimp_load(self, loading=None):
+    def _opimp_load(self, loading=None):
         if loading is not None:
             return list(filter(lambda imp: loading == imp.op.name,
                                OPIMPS))[0]
@@ -144,10 +144,9 @@ class TestOperationsAll(ReposTestCase):
             async with source() as sctx:
                 for repo in self.repos:
                     await sctx.update(repo)
-        # with patch('sys.stdout', new_callable=io.StringIO) as stdout:
-        with patch.object(OperationImplementation, 'load', self.__opimp_load), \
-                patch.object(Operation, 'load', self.__op_load):
-            result = await OperationsAll.cli('-sources', 'primary=json',
+        with patch.object(OperationImplementation, 'load', self._opimp_load), \
+                patch.object(Operation, 'load', self._op_load):
+            results = await OperationsAll.cli('-sources', 'primary=json',
                     '-source-filename', self.temp_json_fileobj.name,
                     '-repo-def', 'calc_string',
                     '-remap', 'get_single.result=string_calculator',
@@ -156,21 +155,46 @@ class TestOperationsAll(ReposTestCase):
                     *map(lambda op: op.name, OPERATIONS),
                     '-dff-memory-opimp-network-opimps',
                     *map(lambda imp: imp.op.name, OPIMPS))
-            return
+            results = {result.src_url: \
+                       result.features(['string_calculator'])['string_calculator'] \
+                       for result in results}
             for repo in self.repos:
-                self.assertIn(repo.src_url, stdout.getvalue())
+                self.assertIn(repo.src_url, results)
+                self.assertEqual(self.repo_keys[repo.src_url],
+                                 results[repo.src_url])
 
 class TestOperationsRepo(TestOperationsAll):
 
     async def test_run(self):
-        repos = {repo.src_url: repo async for repo in self.cli.run()}
-        self.assertEqual(len(repos), len(self.subset))
-        for repo in self.subset:
-            self.assertIn(repo.src_url, repos)
-            self.assertIn('string_calculator', repos[repo.src_url].features())
-            self.assertEqual(self.repo_keys[repo.src_url],
-                    repos[repo.src_url]\
-                    .features(['string_calculator'])['string_calculator'])
+        test_key = 'multiply 42 and 10'
+        self.repo_keys = {
+            'add 40 and 2': 42,
+            'multiply 42 and 10': 420
+            }
+        self.repos = list(map(Repo, self.repo_keys.keys()))
+        self.temp_json_fileobj.seek(0)
+        self.temp_json_fileobj.truncate(0)
+        self.temp_json_fileobj.write(b'{}')
+        self.temp_json_fileobj.flush()
+        async with JSONSource(self.sconfig) as source:
+            async with source() as sctx:
+                for repo in self.repos:
+                    await sctx.update(repo)
+        with patch.object(OperationImplementation, 'load', self._opimp_load), \
+                patch.object(Operation, 'load', self._op_load):
+            results = await OperationsRepo.cli('-sources', 'primary=json',
+                    '-source-filename', self.temp_json_fileobj.name,
+                    '-keys', test_key,
+                    '-repo-def', 'calc_string',
+                    '-remap', 'get_single.result=string_calculator',
+                    '-output-specs',  '["result"]=get_single_spec',
+                    '-dff-memory-operation-network-ops',
+                    *map(lambda op: op.name, OPERATIONS),
+                    '-dff-memory-opimp-network-opimps',
+                    *map(lambda imp: imp.op.name, OPIMPS))
+            self.assertEqual(len(results), 1)
+            self.assertEqual(self.repo_keys[test_key],
+                             results[0].features(['string_calculator'])['string_calculator'])
 
 class TestEvaluateAll(ReposTestCase):
 
