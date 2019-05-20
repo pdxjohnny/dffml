@@ -61,20 +61,6 @@ class OperationImplementationContext(BaseDataFlowObjectContext):
         object associated with this operation implementation context.
         '''
 
-    @classmethod
-    def implementation(cls, operation: Operation):
-
-        class Implementation(OperationImplementation):
-
-            op = operation
-            CONTEXT = cls
-
-        return Implementation
-
-    @classmethod
-    def imp(cls, config: 'BaseConfig'):
-        return cls.implementation(cls.op)(config)
-
 @base_entry_point('dffml.operation.implementation', 'opimp')
 class OperationImplementation(BaseDataFlowObject):
 
@@ -90,26 +76,8 @@ class OperationImplementation(BaseDataFlowObject):
             -> OperationImplementationContext:
         return self.CONTEXT(self, ctx, ictx)
 
-    @classmethod
-    def load_multiple(cls, to_load: List[str]):
-        '''
-        Loads each class requested without instantiating it.
-        '''
-        loading_classes = {}
-        for i in pkg_resources.iter_entry_points(cls.ENTRY_POINT):
-            loaded = i.load()
-            if isopimp(loaded):
-                loading_classes[opimp_name(loaded)] = loaded
-        for loading in to_load:
-            if not loading in loading_classes:
-                raise KeyError('%s was not found in (%s)' % \
-                        (repr(loading),
-                         ', '.join(list(map(str, loading_classes)))))
-        return loading_classes
-
 def op(**kwargs):
     def wrap(func):
-
         if not 'name' in kwargs:
             kwargs['name'] = func.__name__
         # TODO Make this grab from the defaults for Operation
@@ -118,16 +86,30 @@ def op(**kwargs):
 
         func.op = Operation(**kwargs)
 
-        class ImplementationContext(OperationImplementationContext):
+        if inspect.isclass(func) \
+                and issubclass(func, OperationImplementationContext):
+            class Implementation(OperationImplementation):
 
-            async def run(self, inputs: Dict[str, Any]) \
-                    -> Union[bool, Dict[str, Any]]:
-                return await func(**inputs)
+                op = func.op
+                CONTEXT = func
 
-        func.imp = ImplementationContext.implementation(func.op)
+            func.imp = Implementation
+            return func
+        else:
+            class ImplementationContext(OperationImplementationContext):
 
-        return func
+                async def run(self, inputs: Dict[str, Any]) \
+                        -> Union[bool, Dict[str, Any]]:
+                    # TODO Add auto thread pooling of non-async functions
+                    return await func(**inputs)
 
+            class Implementation(OperationImplementation):
+
+                op = func.op
+                CONTEXT = ImplementationContext
+
+            func.imp = Implementation
+            return func
     return wrap
 
 def opimp_name(item):
