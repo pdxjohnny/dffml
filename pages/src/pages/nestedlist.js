@@ -25,12 +25,6 @@ const styles = theme => ({
 class NestedList extends React.Component {
   state = {
     open: false,
-    selected: false,
-  };
-
-  selectItem = () => {
-    this.props.onSelect(this.props.key);
-    this.setState(state => ({ selected: true }));
   };
 
   expandList = () => {
@@ -38,31 +32,57 @@ class NestedList extends React.Component {
   };
 
   render() {
-    const { children, classes, title, resource } = this.props;
-    const { open, selected } = this.state;
+    const { children, classes, title, selectedPath, canonical, data, onSelect } = this.props;
+    const { open } = this.state;
 
-    return (
-      <span>
-        <ListItem button selected={selected}>
-          <ListItemText onClick={this.selectItem} inset primary="Inbox" />
-          <div onClick={this.expandList}>
-            {open ? <ExpandLess /> : <ExpandMore />}
-          </div>
-        </ListItem>
-        <Collapse in={open} timeout="auto" unmountOnExit>
-          <List component="div" disablePadding>
-            {children}
-          </List>
-        </Collapse>
-      </span>
-    );
+    var subs = Object.keys(data)
+               .filter(key => !key.startsWith('__'))
+               .map((key, index) => (
+                 <NestedList
+                   key={key}
+                   title={data[key].__canonical}
+                   data={data[key]}
+                   canonical={data[key].__canonical}
+                   selectedPath={selectedPath}
+                   onSelect={onSelect}
+                   classes={classes} />
+               ));
+
+    if (subs.length > 0) {
+      return (
+        <React.Fragment>
+          <ListItem button selected={selectedPath.startsWith(canonical)}>
+            <ListItemText onClick={() => {onSelect(canonical)}} inset primary={title} />
+            <div onClick={this.expandList}>
+              {open ? <ExpandLess /> : <ExpandMore />}
+            </div>
+          </ListItem>
+          <Collapse in={open} timeout="auto" unmountOnExit>
+            <List component="div">
+              {subs}
+            </List>
+          </Collapse>
+        </React.Fragment>
+      );
+    } else {
+      return (
+        <React.Fragment>
+          <ListItem button selected={selectedPath.startsWith(canonical)}>
+            <ListItemText onClick={() => {onSelect(canonical)}} inset primary={title} />
+          </ListItem>
+        </React.Fragment>
+      );
+    }
   }
 }
 
 NestedList.propTypes = {
   classes: PropTypes.object.isRequired,
-  resource: PropTypes.string.isRequired,
+  title: PropTypes.string.isRequired,
+  canonical: PropTypes.string.isRequired,
+  selectedPath: PropTypes.string.isRequired,
   onSelect: PropTypes.func.isRequired,
+  data: PropTypes.object.isRequired,
 };
 
 export default withStyles(styles)(NestedList);

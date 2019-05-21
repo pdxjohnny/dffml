@@ -1,6 +1,7 @@
 import React from 'react';
 import { withStyles } from '@material-ui/core/styles';
 import withRoot from '../withRoot';
+import { HashRouter as Router } from "react-router-dom";
 
 import ClippedDrawer from './clippeddrawer';
 
@@ -32,10 +33,6 @@ class Dashboard extends React.Component {
     });
   };
 
-  async onSelect(key) {
-    console.log(key)
-  }
-
   render() {
     const { classes } = this.props;
     const { data } = this.state;
@@ -43,11 +40,12 @@ class Dashboard extends React.Component {
     console.log(data)
 
     return (
-      <ClippedDrawer
-          title={"DFFML Documentation"}
-          classes={classes}
-          data={data}
-          onSelect={this.onSelect} />
+      <Router>
+        <ClippedDrawer
+            title={"DFFML Documentation"}
+            classes={classes}
+            data={data} />
+      </Router>
     );
   }
 }

@@ -8,12 +8,15 @@ import Toolbar from '@material-ui/core/Toolbar';
 import List from '@material-ui/core/List';
 import Typography from '@material-ui/core/Typography';
 import Divider from '@material-ui/core/Divider';
+import Collapse from '@material-ui/core/Collapse';
 import ListItem from '@material-ui/core/ListItem';
 import ListSubheader from '@material-ui/core/ListSubheader';
 import ListItemIcon from '@material-ui/core/ListItemIcon';
 import ListItemText from '@material-ui/core/ListItemText';
-import InboxIcon from '@material-ui/icons/MoveToInbox';
-import MailIcon from '@material-ui/icons/Mail';
+import ExpandLess from '@material-ui/icons/ExpandLess';
+import ExpandMore from '@material-ui/icons/ExpandMore';
+import StarBorder from '@material-ui/icons/StarBorder';
+import { Route, Link } from "react-router-dom";
 
 import NestedList from './nestedlist';
 
@@ -40,93 +43,191 @@ const styles = theme => ({
   toolbar: theme.mixins.toolbar,
 });
 
-    /*
-        <List>
-          {['Inbox', 'Starred', 'Send email', 'Drafts'].map((text, index) => (
-            <ListItem button key={text}>
-              <ListItemIcon>{index % 2 === 0 ? <InboxIcon /> : <MailIcon />}</ListItemIcon>
-              <ListItemText primary={text} />
-            </ListItem>
-          ))}
-        </List>
-        */
+function Home() {
+  return <h2>Home</h2>;
+}
 
-function ClippedDrawer(props) {
-  const { children, classes, title, onSelect } = props;
+function About() {
+  return <h2>About</h2>;
+}
 
+function Topic({ match }) {
+  return <h3>Requested Param: {match.params.id}</h3>;
+}
+
+function Topics({ match }) {
   return (
-    <div className={classes.root}>
-      <CssBaseline />
-      <AppBar position="fixed" className={classes.appBar}>
-        <Toolbar>
-          <Typography variant="h6" color="inherit" noWrap>
-            {title}
-          </Typography>
-        </Toolbar>
-      </AppBar>
-      <Drawer
-        className={classes.drawer}
-        variant="permanent"
-        classes={{
-          paper: classes.drawerPaper,
-        }}
-      >
-        <div className={classes.toolbar} />
-        <List>
-          {['Inbox', 'Starred', 'Send email', 'Drafts'].map((text, index) => (
-            <ListItem button key={text}>
-              <ListItemIcon>{index % 2 === 0 ? <InboxIcon /> : <MailIcon />}</ListItemIcon>
-              <ListItemText primary={text} />
-            </ListItem>
-          ))}
-        </List>
-        <Divider />
-        <List
-          component="nav"
-          subheader={<ListSubheader component="div">API Reference</ListSubheader>}
-          className={classes.root} >
-            <NestedList title={"asdflkj"} resource={"sdflkj"} onSelect={onSelect} />
-        </List>
-        <Divider />
-      </Drawer>
-      <main className={classes.content}>
-        <div className={classes.toolbar} />
-        {children}
-      </main>
+    <div>
+      <h2>Topics</h2>
+
+      <ul>
+        <li>
+          <Link to={`${match.url}/components`}>Components</Link>
+        </li>
+        <li>
+          <Link to={`${match.url}/props-v-state`}>Props v. State</Link>
+        </li>
+      </ul>
+
+      <Route path={`${match.path}/:id`} component={Topic} />
+      <Route
+        exact
+        path={match.path}
+        render={() => <h3>Please select a topic.</h3>}
+      />
     </div>
   );
 }
 
-/*
-        <Typography paragraph>
-          Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt
-          ut labore et dolore magna aliqua. Rhoncus dolor purus non enim praesent elementum
-          facilisis leo vel. Risus at ultrices mi tempus imperdiet. Semper risus in hendrerit
-          gravida rutrum quisque non tellus. Convallis convallis tellus id interdum velit laoreet id
-          donec ultrices. Odio morbi quis commodo odio aenean sed adipiscing. Amet nisl suscipit
-          adipiscing bibendum est ultricies integer quis. Cursus euismod quis viverra nibh cras.
-          Metus vulputate eu scelerisque felis imperdiet proin fermentum leo. Mauris commodo quis
-          imperdiet massa tincidunt. Cras tincidunt lobortis feugiat vivamus at augue. At augue eget
-          arcu dictum varius duis at consectetur lorem. Velit sed ullamcorper morbi tincidunt. Lorem
-          donec massa sapien faucibus et molestie ac.
-        </Typography>
-        <Typography paragraph>
-          Consequat mauris nunc congue nisi vitae suscipit. Fringilla est ullamcorper eget nulla
-          facilisi etiam dignissim diam. Pulvinar elementum integer enim neque volutpat ac
-          tincidunt. Ornare suspendisse sed nisi lacus sed viverra tellus. Purus sit amet volutpat
-          consequat mauris. Elementum eu facilisis sed odio morbi. Euismod lacinia at quis risus sed
-          vulputate odio. Morbi tincidunt ornare massa eget egestas purus viverra accumsan in. In
-          hendrerit gravida rutrum quisque non tellus orci ac. Pellentesque nec nam aliquam sem et
-          tortor. Habitant morbi tristique senectus et. Adipiscing elit duis tristique sollicitudin
-          nibh sit. Ornare aenean euismod elementum nisi quis eleifend. Commodo viverra maecenas
-          accumsan lacus vel facilisis. Nulla posuere sollicitudin aliquam ultrices sagittis orci a.
-        </Typography>
-*/
+function Header() {
+  return (
+    <ul>
+      <li>
+        <Link to="/">Home</Link>
+      </li>
+      <li>
+        <Link to="/about">About</Link>
+      </li>
+      <li>
+        <Link to="/topics">Topics</Link>
+      </li>
+    </ul>
+  );
+}
+
+function FunctionDoc(props) {
+  const { doc } = props;
+
+  if (typeof doc.docstring !== 'string' ||
+      doc.docstring === null) {
+    doc.docstring = '';
+  }
+
+  return (
+    <React.Fragment>
+      <h4>{doc.name}{doc.args}</h4>
+      <Typography paragraph>
+      {doc.docstring.split('\n').map((line, index) => {
+        return <span key={index}>{line}<br/></span>
+      })}
+      </Typography>
+    </React.Fragment>
+  );
+}
+
+function ClassDoc(props) {
+  const { doc } = props;
+
+  if (typeof doc.docstring !== 'string' ||
+      doc.docstring === null) {
+    doc.docstring = '';
+  }
+
+  return (
+    <React.Fragment>
+      <h3>{doc.name}</h3>
+      <Typography paragraph>
+      {doc.docstring.split('\n').map((line, index) => {
+        return <span key={index}>{line}<br/></span>
+      })}
+      </Typography>
+      {Object.keys(doc.methods).map((name, index) => {
+        return <FunctionDoc key={index} doc={doc.methods[name]}></FunctionDoc>
+      })}
+    </React.Fragment>
+  );
+}
+
+class ClippedDrawer extends React.Component {
+  constructor(props) {
+    super(props);
+    this.state = {
+      selectedPath: '',
+    };
+  }
+
+  selectItem = (canonical) => {
+    this.setState({ selectedPath: canonical });
+  };
+
+  render() {
+    const { classes, title, data, onSelect } = this.props;
+    const { selectedPath } = this.state;
+
+    var display = <h1>DFFML API Documentation</h1>;
+
+    if (selectedPath.length) {
+      var current = data;
+      var split = selectedPath.split('.');
+      for (var i in split) {
+        i = split[i];
+        if (!current.hasOwnProperty(i)) {
+          display = <h1>Documentation Not Found</h1>;
+          break;
+        }
+        current = current[i];
+      }
+      display = (
+        <React.Fragment>
+          <h1>{current.__canonical}</h1>
+          <p>{current.__filename}</p>
+          {Object.keys(current.__classes)
+           .map((key, index) => (
+            <ClassDoc
+              key={key}
+              doc={current.__classes[key]} />
+          ))}
+        </React.Fragment>
+      );
+    }
+
+    return (
+      <div className={classes.root}>
+        <CssBaseline />
+        <AppBar position="fixed" className={classes.appBar}>
+          <Toolbar>
+            <Typography variant="h6" color="inherit" noWrap>
+              {title}
+            </Typography>
+          </Toolbar>
+        </AppBar>
+        <Drawer
+          className={classes.drawer}
+          variant="permanent"
+          classes={{
+            paper: classes.drawerPaper,
+          }}
+        >
+          <div className={classes.toolbar} />
+          <List
+            component="nav"
+            subheader={<ListSubheader component="div">API Reference</ListSubheader>} >
+            {Object.keys(data)
+              .filter(key => !key.startsWith('__'))
+              .map((key, index) => (
+              <NestedList
+                key={key}
+                title={data[key].__canonical}
+                data={data[key]}
+                canonical={data[key].__canonical}
+                selectedPath={selectedPath}
+                onSelect={this.selectItem} />
+            ))}
+          </List>
+          <Divider />
+        </Drawer>
+        <main className={classes.content}>
+          <div className={classes.toolbar} />
+          {display}
+        </main>
+      </div>
+    );
+  }
+}
 
 ClippedDrawer.propTypes = {
   classes: PropTypes.object.isRequired,
   title: PropTypes.string.isRequired,
-  onSelect: PropTypes.func.isRequired,
   data: PropTypes.object.isRequired,
 };
 

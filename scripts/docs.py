@@ -50,8 +50,8 @@ class Documentation(NamedTuple):
 class ClassDocumentation(NamedTuple):
     name: str
     module: str
-    values: List[Documentation]
-    methods: List[Documentation]
+    values: Dict[str, Documentation]
+    methods: Dict[str, Documentation]
     filename: str
     docstring: str
 
@@ -82,15 +82,15 @@ def doc_func(top_module, module, loaded):
         args=str(inspect.signature(loaded)))
 
 def doc_class(top_module, module, loaded):
-    methods = [doc_func(top_module, module, func) \
+    methods = {name: doc_func(top_module, module, func) \
                for name, func in inspect.getmembers(loaded,
                lambda func: (inspect.isfunction(func) \
                                 or inspect.ismethod(func)) \
-                                and is_from_module(top_module, func))]
+                                and is_from_module(top_module, func))}
     return ClassDocumentation(
         name=loaded.__name__,
         module=module.__name__,
-        values=[],
+        values={},
         methods=methods,
         filename=filename(top_module, loaded),
         docstring=inspect.getdoc(loaded))
@@ -106,6 +106,8 @@ def doc_value(top_module, module, loaded):
 
 def module_doc(top_module, module, items):
     doc = {
+        '__canonical': module.__name__,
+        '__filename': filename(top_module, module),
         '__values': {},
         '__functions': {},
         '__classes': {}
@@ -129,13 +131,13 @@ def original_to_module(module, item):
 
 def get_docs(module_name):
     top_module = importlib.import_module(module_name)
-    modules = import_module(module_name)
-    for module in modules:
-        docs = module_doc(top_module, module,
-                          {item: getattr(module, item) \
-                           for item in module.__dir__() \
-                           if original_to_module(module, item)})
-        yield module.__name__, docs
+    return {
+        module.__name__: module_doc(top_module, module,
+                                    {item: getattr(module, item) \
+                                     for item in module.__dir__() \
+                                     if original_to_module(module, item)}) \
+        for module in import_module(module_name)
+        }
 
 def main():
     pretty_json = dict(sort_keys=True, indent=4,
@@ -146,9 +148,16 @@ def main():
     args = parser.parse_args()
 
     result = {}
-    for key, value in namedtuple_asdict(dict(get_docs(args.module))).items():
+    for key, value in namedtuple_asdict(get_docs(args.module)).items():
         key = key.split('.')
         traverse_set(result, *key, value)
+    result[args.module].update({
+        '__canonical': args.module,
+        '__filename': args.module + '/',
+        '__values': {},
+        '__functions': {},
+        '__classes': {}
+        })
     print(json.dumps(result, **pretty_json))
 
 if __name__ == '__main__':
