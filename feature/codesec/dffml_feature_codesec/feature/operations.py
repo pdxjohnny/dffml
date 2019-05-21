@@ -17,8 +17,6 @@ from dffml.df.base import op, \
                           OperationImplementationContext, \
                           OperationImplementation
 
-from dffml_feature_git.util.proc import check_output
-
 # pylint: disable=no-name-in-module
 from .definitions import URL, \
     URLBytes, \
