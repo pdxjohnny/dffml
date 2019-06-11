@@ -353,8 +353,8 @@ No description
 
 - work: work_spread(type: int)
 
-dffml_feature_codesec
----------------------
+dffml_operations_binsec
+-----------------------
 
 cleanup_rpm
 ~~~~~~~~~~~

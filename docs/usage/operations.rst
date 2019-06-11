@@ -101,6 +101,20 @@ issues in the package for that version.
 
 To use safety, we have to have the version of the package we want to check.
 
+.. blockdiag::
+
+    blockdiag admin {
+      orientation = portrait
+
+      package_name [label = "Package Name"];
+      package_version [label = "Package Version"];
+      pypi_latest_package_version [label = "Get Latest Version", shape = ellipse];
+      safety_check [label = "safety check", shape = ellipse];
+
+      package_name -> pypi_latest_package_version -> package_version;
+      package_name, package_version -> safety_check;
+    }
+
 Let's write an operation to grab the version of a package.
 
 .. literalinclude:: /../examples/shouldi/shouldi/pypi.py
@@ -118,8 +132,8 @@ Run the tests
 Safety Operation
 ----------------
 
-The output of the last operation will automatticly be combined with the package
-name to create a call you our new operation, ``SafetyCheck``.
+The output of the last operation will automatically be combined with the package
+name to create a call you our new operation, ``safety_check``.
 
 This is how running safety on the command line works.
 

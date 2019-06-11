@@ -38,6 +38,7 @@ extensions = [
     "sphinx.ext.intersphinx",
     "sphinx.ext.autodoc",
     "sphinx.ext.viewcode",
+    "sphinxcontrib.blockdiag",
     "sphinxcontrib.asyncio",
 ]
 
@@ -74,3 +75,5 @@ html_theme_options = {
 html_static_path = ["_static"]
 
 # -- Extension configuration -------------------------------------------------
+
+blockdiag_html_image_format = "SVG"
