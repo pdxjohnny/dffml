@@ -88,8 +88,8 @@ class BaseConfigurable(abc.ABC):
         )
 
     @classmethod
-    def add_label(cls, *above):
-        return list(above) + cls.ENTRY_POINT_NAME + [cls.ENTRY_POINT_LABEL]
+    def add_label(cls, above, label):
+        return list(above) + cls.ENTRY_POINT_NAME + [label]
 
     @classmethod
     def config_set(cls, args, above, *path) -> BaseConfig:
@@ -98,12 +98,12 @@ class BaseConfigurable(abc.ABC):
         )
 
     @classmethod
-    def config_get(cls, config, above, *path) -> BaseConfig:
+    def config_get(cls, config, label, above, *path) -> BaseConfig:
         # unittest.mock.patch doesn't work if we cache args() output.
         args = cls.args({})
         args_above = cls.add_orig_label() + list(path)
-        label_above = cls.add_label(*above) + list(path)
-        no_label_above = cls.add_label(*above)[:-1] + list(path)
+        label_above = cls.add_label(above, label) + list(path)
+        no_label_above = cls.add_label(above, label)[:-1] + list(path)
         try:
             arg = traverse_config_get(args, *args_above)
         except KeyError as error:
@@ -158,22 +158,22 @@ class BaseConfigurable(abc.ABC):
 
     @classmethod
     @abc.abstractmethod
-    def args(cls, *above) -> Dict[str, Any]:
+    def args(cls, *above, label=None) -> Dict[str, Any]:
         """
         Return a dict containing arguments required for this class
         """
 
     @classmethod
     @abc.abstractmethod
-    def config(cls, config, *above):
+    def config(cls, config, *above, label=None):
         """
         Create the BaseConfig required to instantiate this class by parsing the
         config dict.
         """
 
     @classmethod
-    def withconfig(cls, config, *above):
-        return cls(cls.config(config, *above))
+    def withconfig(cls, config, *above, label=None):
+        return cls(cls.config(config, *above, label=label))
 
 
 class BaseDataFlowFacilitatorObjectContext(LoggingLogger):

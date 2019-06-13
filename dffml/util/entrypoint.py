@@ -6,11 +6,16 @@ to their subclasses.
 """
 import copy
 import pkg_resources
-from typing import List, Dict
+from typing import List, Dict, Type, NamedTuple
 
 
 class MissingLabel(Exception):
     pass  # pragma: no cover
+
+
+class LabeledEntrypoint(NamedTuple):
+    cls: Type["Entrypoint"]
+    label: str
 
 
 def entry_point(label):
@@ -139,6 +144,4 @@ class Entrypoint(object):
                 "Correct syntax: label=%s"
                 % (label_and_loading, label_and_loading)
             )
-        loaded = copy.deepcopy(cls.load(loading))
-        loaded.ENTRY_POINT_LABEL = label
-        return loaded
+        return LabeledEntrypoint(cls=cls.load(loading), label=label)

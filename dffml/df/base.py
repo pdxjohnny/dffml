@@ -54,7 +54,7 @@ class BaseDataFlowObject(BaseDataFlowFacilitatorObject):
         return args
 
     @classmethod
-    def config(cls, config, *above) -> BaseConfig:
+    def config(cls, config, *above, label=None) -> BaseConfig:
         return BaseConfig()
 
 
@@ -98,8 +98,8 @@ class OperationImplementation(BaseDataFlowObject):
         return list(above) + cls.op.name.split("_")
 
     @classmethod
-    def add_label(cls, *above):
-        return list(above) + cls.op.name.split("_")
+    def add_label(cls, above, label):
+        return list(above) + cls.op.name.split("_") + [label]
 
 
 def op(imp_enter=None, ctx_enter=None, **kwargs):

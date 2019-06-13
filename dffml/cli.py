@@ -163,9 +163,11 @@ class Merge(CMD):
     )
 
     async def run(self):
-        async with self.src.withconfig(
-            self.extra_config
-        ) as src, self.dest.withconfig(self.extra_config) as dest:
+        async with self.src.cls.withconfig(
+            self.extra_config, label=self.src.label
+        ) as src, self.dest.cls.withconfig(
+            self.extra_config, label=self.dest.label
+        ) as dest:
             async with src() as sctx, dest() as dctx:
                 async for src in sctx.repos():
                     repo = Repo(src.src_url)

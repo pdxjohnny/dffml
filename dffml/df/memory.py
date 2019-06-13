@@ -455,7 +455,7 @@ class MemoryOperationNetwork(BaseOperationNetwork):
         return args
 
     @classmethod
-    def config(cls, config, *above) -> MemoryOperationNetworkConfig:
+    def config(cls, config, *above, label=None) -> MemoryOperationNetworkConfig:
         return MemoryOperationNetworkConfig(
             operations=cls.config_get(config, above, "ops")
         )
@@ -546,10 +546,12 @@ class MemoryRedundancyChecker(BaseRedundancyChecker):
         return args
 
     @classmethod
-    def config(cls, config, *above):
+    def config(cls, config, *above, label=None):
         kvstore = cls.config_get(config, above, "kvstore")
         return BaseRedundancyCheckerConfig(
-            key_value_store=kvstore.withconfig(config, *cls.add_label(*above))
+            key_value_store=kvstore.withconfig(
+                config, *cls.add_label(above, label)
+            )
         )
 
 
@@ -809,13 +811,13 @@ class MemoryOperationImplementationNetwork(BaseOperationImplementationNetwork):
         return args
 
     @classmethod
-    def config(cls, config, *above) -> BaseConfig:
+    def config(cls, config, *above, label=None) -> BaseConfig:
         return MemoryOperationImplementationNetworkConfig(
             operations={
                 imp.op.name: imp
                 for imp in [
-                    Imp.withconfig(config, "opimp")
-                    for Imp in cls.config_get(config, above, "opimps")
+                    Imp.withconfig(config, "opimp", label=label)
+                    for Imp in cls.config_get(config, label, above, "opimps")
                 ]
             }
         )
@@ -1119,7 +1121,7 @@ class MemoryOrchestrator(BaseOrchestrator):
         return args
 
     @classmethod
-    def config(cls, config, *above):
+    def config(cls, config, *above, label=None):
         input_network = cls.config_get(config, above, "input", "network")
         operation_network = cls.config_get(
             config, above, "operation", "network"
@@ -1127,7 +1129,7 @@ class MemoryOrchestrator(BaseOrchestrator):
         opimp_network = cls.config_get(config, above, "opimp", "network")
         lock_network = cls.config_get(config, above, "lock", "network")
         rchecker = cls.config_get(config, above, "rchecker")
-        above = cls.add_label(*above)
+        above = cls.add_label(above, label)
         return MemoryOrchestratorConfig(
             input_network=input_network.withconfig(config, *above),
             operation_network=operation_network.withconfig(config, *above),

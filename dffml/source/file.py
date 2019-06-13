@@ -124,9 +124,9 @@ class FileSource(BaseSource):
         return args
 
     @classmethod
-    def config(cls, config, *above):
+    def config(cls, config, *above, label=None):
         return FileSourceConfig(
-            filename=cls.config_get(config, above, "filename"),
-            readonly=cls.config_get(config, above, "readonly"),
-            label=cls.config_get(config, above, "label"),
+            filename=cls.config_get(config, label, above, "filename"),
+            readonly=cls.config_get(config, label, above, "readonly"),
+            label=cls.config_get(config, label, above, "label"),
         )
