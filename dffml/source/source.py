@@ -6,6 +6,7 @@ source project's source URL.
 """
 import abc
 import asyncio
+from collections import OrderedDict
 from typing import AsyncIterator, Dict, List, Optional, Callable, Tuple, Any
 
 from ..base import (
@@ -98,6 +99,26 @@ class SourcesContext(AsyncContextManagerListContext):
             lambda repo: bool(repo.features(features))
         ):
             yield repo
+
+    async def with_feature_data(
+        self, features: List[str]
+    ) -> AsyncIterator[Repo]:
+        async for repo in self.with_features(features):
+            feature_data = repo.features(features)
+            yield repo, OrderedDict(
+                {name: feature_data[name] for name in features}
+            )
+
+    async def feature_data(
+        self, features: List[str]
+    ) -> OrderedDict:
+        all_feature_data = OrderedDict(
+            {name: [] for name in features}
+        )
+        async for repo, feature_data in self.with_feature_data(features):
+            for name in all_feature_data.keys():
+                all_feature_data[name].append(feature_data[name])
+        return all_feature_data
 
 
 class Sources(AsyncContextManagerList):
