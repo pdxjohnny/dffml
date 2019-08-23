@@ -132,6 +132,110 @@ class Entrypoints(CMD):
     _list = ListEntrypoints
 
 
+import sys
+import subprocess
+
+from ..df.types import Input, Definition
+from ..df.base import operation_in, opimp_in, Operation, op
+from ..df.memory import MemoryOrchestrator
+from ..operation.output import Associate
+from ..util.cli.cmd import CMD
+from ..util.cli.arg import Arg
+
+
+@op(
+    inputs={
+        "repo": Definition(name="repo", primitive="str", lock=True),
+        "user": Definition(name="user", primitive="str"),
+    },
+    outputs={"commits": Definition(name="commit", primitive="str")},
+    expand=["commits"],
+)
+async def select_commits(repo: str, user: str):
+    return {
+        "commits": subprocess.check_output(
+            ["git", "log", f"--author={user}", "--pretty=format:%H"], cwd=repo
+        )
+        .decode()
+        .split("\n")
+    }
+
+
+@op(
+    inputs={
+        "repo": select_commits.op.inputs["repo"],
+        "commit": select_commits.op.outputs["commits"],
+    },
+    outputs={"description": Definition(name="description", primitive="str")},
+)
+async def commit_description(commit: str, repo: str):
+    changelog = subprocess.check_output(
+        ["git", "diff", f"{commit}~1", commit, "--", "CHANGELOG.md"], cwd=repo
+    ).decode()
+    if not "@@" in changelog:
+        changelog = " ".join(
+            subprocess.check_output(
+                ["git", "log", f"{commit}", "-1", "--oneline"], cwd=repo
+            )
+            .decode()
+            .split("\n")[0]
+            .split()[1:]
+        )
+    else:
+        changelog = changelog[changelog.index("@@") :]
+        changelog = ". ".join(
+            [
+                line[3:]
+                for line in changelog.split("\n")
+                if line.startswith("+")
+            ]
+        )
+    return {"description": changelog}
+
+
+OPIMPS = opimp_in(sys.modules[__name__])
+
+
+class Commits(CMD):
+    """
+    List a users commits with ether the message or the contribution to the
+    changelog.
+    """
+
+    arg_repo = Arg(
+        "-repo",
+        help="Repo to list",
+        default=os.path.abspath(
+            os.path.join(os.path.dirname(__file__), "..", "..")
+        ),
+    )
+    arg_user = Arg("user", help="User to query")
+
+    async def run(self):
+        async with MemoryOrchestrator.basic_config(*OPIMPS) as orchestrator:
+            async with orchestrator() as octx:
+                await octx.ictx.sadd(
+                    self.user,
+                    Input(
+                        value=self.user,
+                        definition=select_commits.op.inputs["user"],
+                    ),
+                    Input(
+                        value=self.repo,
+                        definition=select_commits.op.inputs["repo"],
+                    ),
+                    Input(
+                        value=[
+                            select_commits.op.outputs["commits"].name,
+                            commit_description.op.outputs["description"].name,
+                        ],
+                        definition=Associate.op.inputs["spec"],
+                    ),
+                )
+                async for ctx, results in octx.run_operations():
+                    yield results[Associate.op.name]
+
+
 class Develop(CMD):
     """
     Development utilities for hacking on DFFML itself
@@ -140,3 +244,4 @@ class Develop(CMD):
     create = Create
     skel = Skeleton
     entrypoints = Entrypoints
+    commits = Commits
