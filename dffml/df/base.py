@@ -32,11 +32,14 @@ from ..util.entrypoint import base_entry_point
 
 class BaseDataFlowObjectContext(BaseDataFlowFacilitatorObjectContext):
     """
-    Data Flow Object Contexts are instantiated by only being passed their
-    parent, a BaseDataFlowObject.
+    Data Flow Object Contexts are instantiated by being passed their
+    config, and their parent, a BaseDataFlowObject.
     """
 
-    def __init__(self, parent: "BaseDataFlowObject") -> None:
+    def __init__(
+        self, config: BaseConfig, parent: "BaseDataFlowObject"
+    ) -> None:
+        self.config = config
         self.parent = parent
 
 
@@ -45,9 +48,6 @@ class BaseDataFlowObject(BaseDataFlowFacilitatorObject):
     Data Flow Objects create their child contexts' by passing only itself as an
     argument to the child's __init__ (of type BaseDataFlowObjectContext).
     """
-
-    def __call__(self) -> BaseDataFlowObjectContext:
-        return self.CONTEXT(self)
 
     @classmethod
     def args(cls, args, *above) -> Dict[str, Arg]:
@@ -63,11 +63,18 @@ class OperationImplementationContext(BaseDataFlowObjectContext):
         self,
         parent: "OperationImplementation",
         ctx: "BaseInputSetContext",
-        ictx: "BaseInputNetworkContext",
+        octx: "BaseOrchestratorContext",
     ) -> None:
         self.parent = parent
         self.ctx = ctx
-        self.ictx = ictx
+        self.octx = octx
+
+    @property
+    def config(self):
+        """
+        Alias for self.parent.config
+        """
+        return self.parent.config
 
     @abc.abstractmethod
     async def run(self, inputs: Dict[str, Any]) -> Union[bool, Dict[str, Any]]:
@@ -89,9 +96,9 @@ class OperationImplementation(BaseDataFlowObject):
             )
 
     def __call__(
-        self, ctx: "BaseInputSetContext", ictx: "BaseInputNetworkContext"
+        self, ctx: "BaseInputSetContext", octx: "BaseOrchestratorContext"
     ) -> OperationImplementationContext:
-        return self.CONTEXT(self, ctx, ictx)
+        return self.CONTEXT(self, ctx, octx)
 
     @classmethod
     def add_orig_label(cls, *above):
@@ -102,7 +109,7 @@ class OperationImplementation(BaseDataFlowObject):
         return list(above) + cls.op.name.split("_")
 
 
-def op(imp_enter=None, ctx_enter=None, **kwargs):
+def op(imp_enter=None, ctx_enter=None, config_cls=None, **kwargs):
     def wrap(func):
         if not "name" in kwargs:
             kwargs["name"] = func.__name__
@@ -111,19 +118,49 @@ def op(imp_enter=None, ctx_enter=None, **kwargs):
             kwargs["conditions"] = []
 
         func.op = Operation(**kwargs)
+        cls_name = func.op.name.replace("_", " ").title().replace(" ", "")
+
+        sig = inspect.signature(func)
+        # Check if the function uses the operation implementation context
+        uses_self = bool(
+            imp_enter is not None
+            or ctx_enter is not None
+            or (
+                [
+                    name
+                    for name, param in sig.parameters.items()
+                    if param.annotation is OperationImplementationContext
+                ]
+            )
+        )
+        # Check if the function uses the operation implementation config
+        uses_config = None
+        if config_cls is not None:
+            for name, param in sig.parameters.items():
+                if param.annotation is config_cls:
+                    uses_config = name
+
+        class Implementation(
+            context_stacker(OperationImplementation, imp_enter)
+        ):
+            def __init__(self, config):
+                if config_cls is not None and isinstance(config, dict):
+                    if getattr(config_cls, "_fromdict", None) is not None:
+                        # Use _fromdict method if it exists
+                        config = config_cls._fromdict(**config)
+                    else:
+                        # Otherwise expand if existing config is a dict
+                        config = config_cls(**config)
+                super().__init__(config)
 
         if inspect.isclass(func) and issubclass(
             func, OperationImplementationContext
         ):
-
-            class Implementation(
-                context_stacker(OperationImplementation, imp_enter)
-            ):
-
-                op = func.op
-                CONTEXT = func
-
-            func.imp = Implementation
+            func.imp = type(
+                f"{cls_name}Implementation",
+                (Implementation,),
+                {"op": func.op, "CONTEXT": func},
+            )
             return func
         else:
 
@@ -133,24 +170,36 @@ def op(imp_enter=None, ctx_enter=None, **kwargs):
                 async def run(
                     self, inputs: Dict[str, Any]
                 ) -> Union[bool, Dict[str, Any]]:
-                    # TODO Add auto thread pooling of non-async functions
+                    # Add config to inputs if it's used by the function
+                    if uses_config is not None:
+                        inputs[uses_config] = self.parent.config
                     # If imp_enter or ctx_enter exist then bind the function to
                     # the ImplementationContext so that it has access to the
                     # context and it's parent
-                    if imp_enter is not None or ctx_enter is not None:
+                    if uses_self:
+                        # We can't pass self to functions running in threads
+                        # Its not thread safe!
                         return await (
                             func.__get__(self, self.__class__)(**inputs)
                         )
-                    return await func(**inputs)
+                    elif inspect.iscoroutinefunction(func):
+                        return await func(**inputs)
+                    else:
+                        # TODO Add auto thread pooling of non-async functions
+                        return func(**inputs)
 
-            class Implementation(
-                context_stacker(OperationImplementation, imp_enter)
-            ):
-
-                op = func.op
-                CONTEXT = ImplementationContext
-
-            func.imp = Implementation
+            func.imp = type(
+                f"{cls_name}Implementation",
+                (Implementation,),
+                {
+                    "op": func.op,
+                    "CONTEXT": type(
+                        f"{cls_name}ImplementationContext",
+                        (ImplementationContext,),
+                        {},
+                    ),
+                },
+            )
             return func
 
     return wrap
@@ -269,9 +318,6 @@ class BaseKeyValueStoreContext(BaseDataFlowObjectContext):
     Abstract Base Class for key value storage context
     """
 
-    def __init__(self, parent: "BaseKeyValueStore") -> None:
-        self.parent = parent
-
     @abc.abstractmethod
     async def get(self, key: str) -> Union[bytes, None]:
         """
@@ -384,9 +430,12 @@ class BaseParameterSet(abc.ABC):
 
 class BaseDefinitionSetContext(BaseDataFlowObjectContext):
     def __init__(
-        self, parent: "BaseInputNetworkContext", ctx: "BaseInputSetContext"
+        self,
+        config: BaseConfig,
+        parent: "BaseInputNetworkContext",
+        ctx: "BaseInputSetContext",
     ) -> None:
-        super().__init__(parent)
+        super().__init__(config, parent)
         self.ctx = ctx
 
     @abc.abstractmethod
@@ -455,6 +504,18 @@ class BaseInputNetwork(BaseDataFlowObject):
     """
     Input networks store all of the input data and output data of operations,
     which in turn becomes input data to other operations.
+    """
+
+
+class OperationImplementationNotInstantiable(Exception):
+    """
+    OperationImplementation cannot be instantiated and is required to continue.
+    """
+
+
+class OperationImplementationNotInNetwork(Exception):
+    """
+    OperationImplementation is not in the network and was required to continue.
     """
 
 

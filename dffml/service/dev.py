@@ -227,6 +227,155 @@ class Entrypoints(CMD):
     _list = ListEntrypoints
 
 
+import json
+import hashlib
+from pathlib import Path
+
+from ..df.types import DataFlow, Stage
+
+
+class Diagram(CMD):
+
+    arg_stages = Arg(
+        "-stages",
+        help="Which stages to display: (processing, cleanup, output)",
+        nargs="+",
+        default=[],
+        required=False,
+    )
+    arg_simple = Arg(
+        "-simple",
+        help="Don't display input and output names",
+        default=False,
+        action="store_true",
+        required=False,
+    )
+    arg_display = Arg(
+        "-display",
+        help="How to display (TD: top down, LR, RL, BT)",
+        default="TD",
+        required=False,
+    )
+    arg_dataflow = Arg("dataflow", help="Data flow file")
+
+    async def run(self):
+        dataflow = DataFlow._fromdict(
+            **json.loads(Path(self.dataflow).read_text())
+        )
+        print(f"graph {self.display}")
+        for stage in Stage:
+            # Skip stage if not wanted
+            if self.stages and stage.value not in self.stages:
+                continue
+            stage_node = hashlib.md5(
+                ("stage." + stage.value).encode()
+            ).hexdigest()
+            if len(self.stages) != 1:
+                print(f"subgraph {stage_node}[{stage.value.title()} Stage]")
+                print(f"style {stage_node} fill:#afd388b5,stroke:#a4ca7a")
+            for instance_name, operation in dataflow.operations.items():
+                if operation.stage != stage:
+                    continue
+                subgraph_node = hashlib.md5(
+                    ("subgraph." + instance_name).encode()
+                ).hexdigest()
+                node = hashlib.md5(instance_name.encode()).hexdigest()
+                if not self.simple:
+                    print(f"subgraph {subgraph_node}[{instance_name}]")
+                    print(f"style {subgraph_node} fill:#fff4de,stroke:#cece71")
+                print(f"{node}[{operation.name}]")
+                for input_name in operation.inputs.keys():
+                    input_node = hashlib.md5(
+                        ("input." + instance_name + "." + input_name).encode()
+                    ).hexdigest()
+                    if not self.simple:
+                        print(f"{input_node}({input_name})")
+                        print(f"{input_node} --> {node}")
+                for output_name in operation.outputs.keys():
+                    output_node = hashlib.md5(
+                        ("output." + instance_name + "." + output_name).encode()
+                    ).hexdigest()
+                    if not self.simple:
+                        print(f"{output_node}({output_name})")
+                        print(f"{node} --> {output_node}")
+                if not self.simple:
+                    print(f"end")
+            if len(self.stages) != 1:
+                print(f"end")
+        if len(self.stages) != 1:
+            print(f"subgraph inputs[Inputs]")
+            print(f"style inputs fill:#f6dbf9,stroke:#a178ca")
+        for instance_name, input_flow in dataflow.flow.items():
+            operation = dataflow.operations[instance_name]
+            if not operation.stage.value in self.stages:
+                continue
+            node = hashlib.md5(instance_name.encode()).hexdigest()
+            for input_name, sources in input_flow.items():
+                for source in sources:
+                    if source == "seed":
+                        input_definition = operation.inputs[input_name]
+                        seed_input_node = hashlib.md5(
+                            input_definition.name.encode()
+                        ).hexdigest()
+                        print(
+                            f"{seed_input_node}({input_definition.name})"
+                        )
+                        if len(self.stages) == 1:
+                            print(f"style {seed_input_node} fill:#f6dbf9,stroke:#a178ca")
+                        if not self.simple:
+                            input_node = hashlib.md5(
+                                ("input." + instance_name + "." + input_name).encode()
+                            ).hexdigest()
+                            print(f"{seed_input_node} --> {input_node}")
+                        else:
+                            print(f"{seed_input_node} --> {node}")
+                        continue
+                    if not self.simple:
+                        source_output_node = hashlib.md5(
+                            ("output." + source).encode()
+                        ).hexdigest()
+                        input_node = hashlib.md5(
+                            ("input." + instance_name + "." + input_name).encode()
+                        ).hexdigest()
+                        print(f"{source_output_node} --> {input_node}")
+                    else:
+                        source_split = source.split(".")
+                        source_operation = ".".join(source_split[:-1])
+                        source_operation_node = hashlib.md5(
+                            source_operation.encode()
+                        ).hexdigest()
+                        print(f"{source_operation_node} --> {node}")
+        if len(self.stages) != 1:
+            print(f"end")
+
+
+# TODO Make yaml its own plugin
+import yaml
+from dffml.df.linker import Linker
+
+
+class Export(CMD):
+
+    arg_export = Arg("export", help="Python path to object to export")
+
+    async def run(self):
+        # Push current directory into front of path so we can run things
+        # relative to where we are in the shell
+        sys.path.insert(0, os.getcwd())
+        # Lookup
+        modname, qualname_separator, qualname = self.export.partition(":")
+        obj = importlib.import_module(modname)
+        if qualname_separator:
+            for attr in qualname.split("."):
+                obj = getattr(obj, attr)
+                self.logger.debug("Loaded object: %s(%s)", attr, obj)
+                if isinstance(obj, DataFlow):
+                    exported = yaml.dump(Linker.export(obj)).strip()
+                    # Ensure re-import works
+                    imported = Linker.resolve(yaml.safe_load(exported))
+                    print(exported)
+
+
 class Develop(CMD):
     """
     Development utilities for hacking on DFFML itself
@@ -235,4 +384,7 @@ class Develop(CMD):
     create = Create
     skel = Skeleton
     run = Run
+    diagram = Diagram
+    export = Export
+    # _import = Import
     entrypoints = Entrypoints

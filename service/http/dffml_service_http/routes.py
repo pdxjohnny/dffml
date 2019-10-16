@@ -1,23 +1,29 @@
 import os
 import json
+import uuid
 import secrets
 import traceback
-from functools import wraps
+from functools import wraps, partial
 from http import HTTPStatus
 from functools import partial
 from dataclasses import dataclass
 from contextlib import AsyncExitStack
-from typing import List, Union, AsyncIterator, Dict
+from typing import List, Union, AsyncIterator, Type, NamedTuple, Dict
 
 from aiohttp import web
 import aiohttp_cors
 
 from dffml.repo import Repo
+from dffml.base import BaseConfig, MissingConfig
+from dffml.df.types import DataFlow, Input
+from dffml.source.source import BaseSource
+from dffml.df.memory import MemoryOrchestrator
 from dffml.base import MissingConfig
 from dffml.model import Model
 from dffml.feature import Features
 from dffml.source.source import BaseSource, SourcesContext
 from dffml.util.entrypoint import EntrypointNotFound
+from dffml.df.base import OperationImplementationNotInstantiable
 
 
 # TODO Add test for this
@@ -30,6 +36,7 @@ OK = {"error": None}
 SOURCE_NOT_LOADED = {"error": "Source not loaded"}
 MODEL_NOT_LOADED = {"error": "Model not loaded"}
 MODEL_NO_SOURCES = {"error": "No source context labels given"}
+MULTICOMM_NOT_LOADED = {"error": "MutliComm not loaded"}
 
 
 class JSONEncoder(json.JSONEncoder):
@@ -54,6 +61,26 @@ class IterkeyEntry:
 
     first: Union[Repo, None]
     repos: AsyncIterator[Repo]
+
+
+def mcctx_route(handler):
+    """
+    Ensure that the labeled multicomm context requested is loaded. Return the
+    mcctx if it is loaded and an error otherwise.
+    """
+
+    @wraps(handler)
+    async def get_mcctx(self, request):
+        mcctx = request.app["multicomm_contexts"].get(
+            request.match_info["label"], None
+        )
+        if mcctx is None:
+            return web.json_response(
+                MULTICOMM_NOT_LOADED, status=HTTPStatus.NOT_FOUND
+            )
+        return await handler(self, request, mcctx)
+
+    return get_mcctx
 
 
 def sctx_route(handler):
@@ -96,10 +123,107 @@ def mctx_route(handler):
     return get_mctx
 
 
+class HTTPChannelConfig(NamedTuple):
+    path: str
+    presentation: str
+    asynchronous: bool
+    dataflow: DataFlow
+
+    @classmethod
+    def _fromdict(cls, **kwargs):
+        kwargs["dataflow"] = DataFlow._fromdict(**kwargs["dataflow"])
+        return cls(**kwargs)
+
+
 class Routes:
+    PRESENTATION_OPTIONS = ["json", "blob", "text"]
+
+    async def get_registered_handler(self, request):
+        return self.app["multicomm_routes"].get(request.path, None)
+
+    async def multicomm_dataflow(self, config, request):
+        # Seed the network with inputs given by caller
+        # TODO allow list of valid definitions to seed
+        # TODO convert inputs into Input instances
+        inputs = []
+        # If data was sent add those inputs
+        if request.method == "POST":
+            # Accept a list of input data
+            for input_data in await request.json():
+                # TODO validate that input data is list and each item has definition
+                # and value properties
+                if (
+                    not input_data["definition"]["name"]
+                    in config.dataflow.definitions
+                ):
+                    return web.json_response(
+                        {
+                            "error": f"Missing definition for {input_data['definition']['name']} in dataflow"
+                        },
+                        status=HTTPStatus.NOT_FOUND,
+                    )
+                inputs.append(
+                    Input(
+                        value=input_data["value"],
+                        definition=config.dataflow.definitions[
+                            input_data["definition"]["name"]
+                        ],
+                    )
+                )
+        # Run the operation in an orchestrator
+        # TODO Create the orchestrator on startup of the HTTP API itself
+        async with MemoryOrchestrator.basic_config() as orchestrator:
+            async with orchestrator() as octx:
+                result = await octx.run_dataflow(
+                    config.dataflow, inputs=inputs
+                )
+                if config.presentation == "blob":
+                    return web.Response(body=result)
+                elif config.presentation == "text":
+                    return web.Response(text=result)
+                else:
+                    return web.json_response(result)
+
+    async def multicomm_dataflow_asynchronous(self, config, request):
+        # TODO allow list of valid definitions to seed
+        raise NotImplementedError(
+            "asynchronous data flows not yet implemented"
+        )
+        if (
+            headers.get("connection", "").lower() == "upgrade"
+            and headers.get("upgrade", "").lower() == "websocket"
+            and req.method == "GET"
+        ):
+            ws_server = web.WebSocketResponse()
+            await ws_server.prepare(req)
+            self.loop.create_task(
+                asyncio.wait(
+                    [
+                        self.wsforward(ws_server, ws_client),
+                        self.wsforward(ws_client, ws_server),
+                    ],
+                    return_when=asyncio.FIRST_COMPLETED,
+                )
+            )
+            return ws_server
+        else:
+            # TODO http/2
+            return web.json_response(
+                {"error": f"Must use websockets"},
+                status=HTTPStatus.UPGRADE_REQUIRED,
+            )
+
     @web.middleware
     async def error_middleware(self, request, handler):
         try:
+            # HACK This checks if aiohttp's builtin not found handler is going
+            # to be called
+            # Check if handler is the not found handler
+            if "Not Found" in str(handler):
+                # Run get_registered_handler to see if we can find the handler
+                new_handler = await self.get_registered_handler(request)
+                if new_handler is not None:
+                    handler = new_handler
             return await handler(request)
         except web.HTTPException as error:
             response = {"error": error.reason}
@@ -288,6 +412,119 @@ class Routes:
 
         return web.json_response(OK)
 
+    async def context_source(self, request):
+        label = request.match_info["label"]
+        ctx_label = request.match_info["ctx_label"]
+
+        if not label in request.app["sources"]:
+            return web.json_response(
+                {"error": f"{label} source not found"},
+                status=HTTPStatus.NOT_FOUND,
+            )
+
+        # Enter the source context and pass the features
+        exit_stack = request.app["exit_stack"]
+        source = request.app["sources"][label]
+        mctx = await exit_stack.enter_async_context(source())
+        request.app["source_contexts"][ctx_label] = mctx
+
+        return web.json_response(OK)
+
+    async def list_models(self, request):
+        return web.json_response(
+            {
+                model.ENTRY_POINT_ORIG_LABEL: model.args({})
+                for model in Model.load()
+            },
+            dumps=partial(json.dumps, cls=JSONEncoder),
+        )
+
+    async def configure_model(self, request):
+        model_name = request.match_info["model"]
+        label = request.match_info["label"]
+
+        config = await request.json()
+
+        try:
+            model = Model.load_labeled(f"{label}={model_name}")
+        except EntrypointNotFound as error:
+            self.logger.error(
+                f"/configure/model/ failed to load model: {error}"
+            )
+            return web.json_response(
+                {"error": f"model {model_name} not found"},
+                status=HTTPStatus.NOT_FOUND,
+            )
+
+        try:
+            model = model.withconfig(config)
+        except MissingConfig as error:
+            self.logger.error(
+                f"failed to configure model {model_name}: {error}"
+            )
+            return web.json_response(
+                {"error": str(error)}, status=HTTPStatus.BAD_REQUEST
+            )
+
+        # DFFML objects all follow a double context entry pattern
+        exit_stack = request.app["exit_stack"]
+        model = await exit_stack.enter_async_context(model)
+        request.app["models"][label] = model
+
+        return web.json_response(OK)
+
+    async def context_model(self, request):
+        label = request.match_info["label"]
+        ctx_label = request.match_info["ctx_label"]
+
+        if not label in request.app["models"]:
+            return web.json_response(
+                {"error": f"{label} model not found"},
+                status=HTTPStatus.NOT_FOUND,
+            )
+
+        features_dict = await request.json()
+
+        try:
+            features = Features._fromdict(**features_dict)
+        except:
+            return web.json_response(
+                {"error": "Incorrect format for features"},
+                status=HTTPStatus.BAD_REQUEST,
+            )
+
+        # Enter the model context and pass the features
+        exit_stack = request.app["exit_stack"]
+        model = request.app["models"][label]
+        mctx = await exit_stack.enter_async_context(model(features))
+        request.app["model_contexts"][ctx_label] = mctx
+
+        return web.json_response(OK)
+
+    def register_config(self) -> Type[HTTPChannelConfig]:
+        return HTTPChannelConfig
+
+    async def register(self, config: HTTPChannelConfig) -> None:
+        if config.asynchronous:
+            handler = self.multicomm_dataflow_asynchronous
+        else:
+            handler = self.multicomm_dataflow
+        self.app["multicomm_routes"][config.path] = partial(handler, config)
+
+    @mcctx_route
+    async def multicomm_register(self, request, mcctx):
+        config = mcctx.register_config()._fromdict(**(await request.json()))
+        if config.presentation not in self.PRESENTATION_OPTIONS:
+            return web.json_response(
+                {
+                    "error": f"{config.presentation!r} is not a valid presentation option: {self.PRESENTATION_OPTIONS!r}"
+                },
+                status=HTTPStatus.BAD_REQUEST,
+            )
+        self.logger.debug("Register new mutlicomm route: %r", config)
+        await mcctx.register(config)
+        return web.json_response(OK)
+
     @sctx_route
     async def source_repo(self, request, sctx):
         return web.json_response(
@@ -450,6 +687,8 @@ class Routes:
         self.app["exit_stack"] = AsyncExitStack()
         await self.app["exit_stack"].__aenter__()
         self.app.on_shutdown.append(self.on_shutdown)
+        self.app["multicomm_contexts"] = {"self": self}
+        self.app["multicomm_routes"] = {}
         self.app["sources"] = {}
         self.app["source_contexts"] = {}
         self.app["source_repos_iterkeys"] = {}
@@ -474,6 +713,8 @@ class Routes:
             ("GET", "/list/models", self.list_models),
             ("POST", "/configure/model/{model}/{label}", self.configure_model),
             ("POST", "/context/model/{label}/{ctx_label}", self.context_model),
+            # MutliComm APIs (Data Flow)
+            ("POST", "/multicomm/{label}/register", self.multicomm_register),
             # Source APIs
             ("GET", "/source/{label}/repo/{key}", self.source_repo),
             ("POST", "/source/{label}/update/{key}", self.source_update),
