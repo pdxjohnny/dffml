@@ -127,7 +127,12 @@ class CreateTLS(TLSCMD):
     client = CreateTLSClient
 
 
-class Server(TLSCMD, Routes):
+class MultiCommCMD(CMD):
+
+    mc_config = Arg("-mc-config", dest="mc_config", help="MultiComm config directory")
+
+
+class Server(TLSCMD, MultiCommCMD, Routes):
     """
     HTTP server providing access to DFFML APIs
     """
@@ -201,7 +206,7 @@ class Server(TLSCMD, Routes):
         try:
             # If we are testing then RUN_YIELD will be an asyncio.Event
             if self.RUN_YIELD_START is not False:
-                self.RUN_YIELD_START.set()
+                await self.RUN_YIELD_START.put(self)
                 await self.RUN_YIELD_FINISH.wait()
             else:  # pragma: no cov
                 # Wait for ctrl-c
