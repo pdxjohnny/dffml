@@ -61,6 +61,7 @@ setup(
         ],
         "dffml.port": ["json = dffml.port.json:JSON"],
         "dffml.service.cli": ["dev = dffml.service.dev:Develop"],
+        "dffml.config": ["json = dffml.config.json:JSONConfigLoader"],
         # Data Flow
         "dffml.operation": [
             "group_by = dffml.operation.output:GroupBy.op",
