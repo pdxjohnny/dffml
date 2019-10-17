@@ -91,7 +91,9 @@ class TestServer(AsyncTestCase):
         with tempfile.TemporaryDirectory() as tempdir:
             async with ServerRunner.patch(HTTPService.server) as tserver:
                 server = await tserver.start(
-                    HTTPService.server.cli("-port", "0", "-insecure", "-mc-config", tempdir)
+                    HTTPService.server.cli(
+                        "-port", "0", "-insecure", "-mc-config", tempdir
+                    )
                 )
                 self.assertEqual(server.mc_config, tempdir)
                 self.assertEqual(server.mc_config, tempdir)

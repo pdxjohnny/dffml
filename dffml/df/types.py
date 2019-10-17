@@ -16,6 +16,7 @@ from typing import (
 )
 
 from ..base import BaseConfig
+from ..util.data import export_dict
 from ..util.entrypoint import Entrypoint, base_entry_point
 
 
@@ -309,7 +310,7 @@ class DataFlow:
         self.definitions = definitions
 
     def export(self):
-        return dict(
+        return export_dict(
             operations={
                 instance_name: operation.export()
                 for instance_name, operation in self.operations.items()

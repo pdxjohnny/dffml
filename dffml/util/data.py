@@ -65,3 +65,34 @@ def ignore_args(func):
         return func()
 
     return wrapper
+
+
+def export_value(obj, key, value):
+    if hasattr(value, "export"):
+        obj[key] = value.export()
+    elif hasattr(value, "_asdict"):
+        obj[key] = value._asdict()
+
+
+def export_list(iterable):
+    for i, value in enumerate(iterable):
+        export_value(iterable, i, value)
+        if isinstance(iterable[i], dict):
+            iterable[i] = export_dict(**value)
+        elif isinstance(value, list):
+            iterable[i] = export_list(value)
+    return iterable
+
+
+def export_dict(**kwargs):
+    """
+    Return the dict given as kwargs but first recurse into each element and call
+    its export or _asdict function if it is not a serializable type.
+    """
+    for key, value in kwargs.items():
+        export_value(kwargs, key, value)
+        if isinstance(value, dict):
+            kwargs[key] = export_dict(**value)
+        elif isinstance(value, list):
+            kwargs[key] = export_list(value)
+    return kwargs

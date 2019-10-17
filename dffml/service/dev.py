@@ -293,7 +293,9 @@ class Diagram(CMD):
                         print(f"{input_node} --> {node}")
                 for output_name in operation.outputs.keys():
                     output_node = hashlib.md5(
-                        ("output." + instance_name + "." + output_name).encode()
+                        (
+                            "output." + instance_name + "." + output_name
+                        ).encode()
                     ).hexdigest()
                     if not self.simple:
                         print(f"{output_node}({output_name})")
@@ -317,14 +319,16 @@ class Diagram(CMD):
                         seed_input_node = hashlib.md5(
                             input_definition.name.encode()
                         ).hexdigest()
-                        print(
-                            f"{seed_input_node}({input_definition.name})"
-                        )
+                        print(f"{seed_input_node}({input_definition.name})")
                         if len(self.stages) == 1:
-                            print(f"style {seed_input_node} fill:#f6dbf9,stroke:#a178ca")
+                            print(
+                                f"style {seed_input_node} fill:#f6dbf9,stroke:#a178ca"
+                            )
                         if not self.simple:
                             input_node = hashlib.md5(
-                                ("input." + instance_name + "." + input_name).encode()
+                                (
+                                    "input." + instance_name + "." + input_name
+                                ).encode()
                             ).hexdigest()
                             print(f"{seed_input_node} --> {input_node}")
                         else:
@@ -335,7 +339,9 @@ class Diagram(CMD):
                             ("output." + source).encode()
                         ).hexdigest()
                         input_node = hashlib.md5(
-                            ("input." + instance_name + "." + input_name).encode()
+                            (
+                                "input." + instance_name + "." + input_name
+                            ).encode()
                         ).hexdigest()
                         print(f"{source_output_node} --> {input_node}")
                     else:

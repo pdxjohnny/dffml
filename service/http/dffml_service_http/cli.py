@@ -129,7 +129,9 @@ class CreateTLS(TLSCMD):
 
 class MultiCommCMD(CMD):
 
-    mc_config = Arg("-mc-config", dest="mc_config", help="MultiComm config directory")
+    mc_config = Arg(
+        "-mc-config", dest="mc_config", help="MultiComm config directory"
+    )
 
 
 class Server(TLSCMD, MultiCommCMD, Routes):
