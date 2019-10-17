@@ -3,23 +3,29 @@ import sys
 import uuid
 import json
 import pydoc
+import hashlib
 import getpass
 import importlib
 import configparser
 import pkg_resources
 from pathlib import Path
 
+from ..base import BaseConfig
 from ..util.skel import Skel
 from ..util.cli.cmd import CMD
 from ..version import VERSION
 from ..util.skel import Skel, SkelTemplateConfig
 from ..util.cli.arg import Arg
 from ..util.cli.cmd import CMD
+from ..util.entrypoint import load
 from ..base import MissingConfig
 from ..util.data import traverse_config_get
-from ..df.types import Input
+from ..df.types import Input, DataFlow, Stage
 from ..df.base import Operation
 from ..df.memory import MemoryOrchestrator
+from ..df.linker import Linker
+from ..config.config import BaseConfigLoader
+from ..config.json import JSONConfigLoader
 from ..operation.output import GetSingle
 
 config = configparser.ConfigParser()
@@ -227,13 +233,6 @@ class Entrypoints(CMD):
     _list = ListEntrypoints
 
 
-import json
-import hashlib
-from pathlib import Path
-
-from ..df.types import DataFlow, Stage
-
-
 class Diagram(CMD):
 
     arg_stages = Arg(
@@ -355,31 +354,38 @@ class Diagram(CMD):
             print(f"end")
 
 
-# TODO Make yaml its own plugin
-import yaml
-from dffml.df.linker import Linker
-
-
 class Export(CMD):
 
+    arg_config = Arg(
+        "-config",
+        help="ConfigLoader to use",
+        type=BaseConfigLoader.load,
+        default=JSONConfigLoader,
+    )
     arg_export = Arg("export", help="Python path to object to export")
 
     async def run(self):
-        # Push current directory into front of path so we can run things
-        # relative to where we are in the shell
-        sys.path.insert(0, os.getcwd())
-        # Lookup
-        modname, qualname_separator, qualname = self.export.partition(":")
-        obj = importlib.import_module(modname)
-        if qualname_separator:
-            for attr in qualname.split("."):
-                obj = getattr(obj, attr)
-                self.logger.debug("Loaded object: %s(%s)", attr, obj)
-                if isinstance(obj, DataFlow):
-                    exported = yaml.dump(Linker.export(obj)).strip()
-                    # Ensure re-import works
-                    imported = Linker.resolve(yaml.safe_load(exported))
-                    print(exported)
+        async with self.config(BaseConfig()) as configloader:
+            async with configloader() as loader:
+                for obj in load(self.export, relative=os.getcwd()):
+                    self.logger.debug(
+                        "Loaded object: %s(%s)", self.export, obj
+                    )
+                    # TODO Expor
+                    if isinstance(obj, DataFlow):
+                        print(await loader.dumps(Linker.export(obj)))
+                    elif hasattr(obj, "export"):
+                        print(await loader.dumps(obj.export()))
+                    elif hasattr(obj, "_asdict"):
+                        print(await loader.dumps(obj._asdict()))
+                        # TODO(dfass) yaml config, then try shouldi with HTTP
+                        # API
+                        """
+                        exported = yaml.dump(Linker.export(obj)).strip()
+                        # Ensure re-import works
+                        imported = Linker.resolve(yaml.safe_load(exported))
+                        print(exported)
+                        """
 
 
 class Develop(CMD):
