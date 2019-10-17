@@ -217,8 +217,9 @@ class Server(TLSCMD, MultiCommCMD, Routes):
         await self.start()
         # Load
         if self.mc_config is not None:
-            # Restore atomic after config is set
+            # Restore atomic after config is set, allow setting for now
             atomic = self.mc_atomic
+            self.mc_atomic = False
             await self.register_directory(self.mc_config)
             self.mc_atomic = atomic
         try:

@@ -183,7 +183,12 @@ class TestServer(AsyncTestCase):
             async with ServerRunner.patch(HTTPService.server) as tserver:
                 cli = await tserver.start(
                     HTTPService.server.cli(
-                        "-port", "0", "-insecure", "-mc-config", tempdir
+                        "-port",
+                        "0",
+                        "-insecure",
+                        "-mc-config",
+                        tempdir,
+                        "-mc-atomic",
                     )
                 )
                 self.assertEqual(cli.mc_config, tempdir)
