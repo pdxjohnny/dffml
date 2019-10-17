@@ -94,9 +94,11 @@ class CMD(object):
     )
 
     def __init__(self, extra_config=None, **kwargs) -> None:
-        self.logger = logging.getLogger(
-            "%s.%s" % (self.__class__.__module__, self.__class__.__qualname__)
-        )
+        if not hasattr(self, "logger"):
+            self.logger = logging.getLogger(
+                "%s.%s"
+                % (self.__class__.__module__, self.__class__.__qualname__)
+            )
         if extra_config is None:
             extra_config = {}
         self.extra_config = extra_config

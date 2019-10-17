@@ -14,15 +14,8 @@ from dffml.util.asynctestcase import AsyncTestCase
 from dffml_service_http.cli import HTTPService
 
 from .common import ServerRunner
-from .dataflow import (
-    formatter,
-    HELLO_BLANK_DATAFLOW,
-    HELLO_WORLD_DATAFLOW,
-)
-from .test_routes import (
-    ServerException,
-    TestRoutesMultiComm,
-)
+from .dataflow import formatter, HELLO_BLANK_DATAFLOW, HELLO_WORLD_DATAFLOW
+from .test_routes import ServerException, TestRoutesMultiComm
 
 
 class TestCreateTLS(AsyncTestCase):
@@ -102,7 +95,9 @@ class TestServer(AsyncTestCase):
     @contextlib.asynccontextmanager
     async def post(self, cli, path, *args, **kwargs):
         async with aiohttp.ClientSession() as session:
-            async with session.post(self.url(cli) + path, *args, **kwargs) as r:
+            async with session.post(
+                self.url(cli) + path, *args, **kwargs
+            ) as r:
                 if r.status != HTTPStatus.OK:
                     raise ServerException((await r.json())["error"])
                 yield r
@@ -146,30 +141,43 @@ class TestServer(AsyncTestCase):
             # Create the required directory structure
             # Create directories for multicomm, dataflow, and dataflow overrides
             pathlib.Path(tempdir, "mc").mkdir()
+            pathlib.Path(tempdir, "mc", "http").mkdir()
             pathlib.Path(tempdir, "df").mkdir()
             # TODO split config part of dataflow into seperate directory
             pathlib.Path(tempdir, "config").mkdir()
             # Write out multicomm configs
-            pathlib.Path(tempdir, "mc", "hello_world.json").write_text(
-                json.dumps({
-                    "path": hello_world_url,
-                    "presentation": "json",
-                    "asynchronous": False,
-                }, sort_keys=True, indent=4)
+            pathlib.Path(tempdir, "mc", "http", "hello_world.json").write_text(
+                json.dumps(
+                    {
+                        "path": hello_world_url,
+                        "presentation": "json",
+                        "asynchronous": False,
+                    },
+                    sort_keys=True,
+                    indent=4,
+                )
             )
-            pathlib.Path(tempdir, "mc", "hello_blank.json").write_text(
-                json.dumps({
-                    "path": hello_blank_url,
-                    "presentation": "json",
-                    "asynchronous": False,
-                }, sort_keys=True, indent=4)
+            pathlib.Path(tempdir, "mc", "http", "hello_blank.json").write_text(
+                json.dumps(
+                    {
+                        "path": hello_blank_url,
+                        "presentation": "json",
+                        "asynchronous": False,
+                    },
+                    sort_keys=True,
+                    indent=4,
+                )
             )
             # Write out dataflow configs
             pathlib.Path(tempdir, "df", "hello_world.json").write_text(
-                json.dumps(HELLO_WORLD_DATAFLOW.export(), sort_keys=True, indent=4)
+                json.dumps(
+                    HELLO_WORLD_DATAFLOW.export(), sort_keys=True, indent=4
+                )
             )
             pathlib.Path(tempdir, "df", "hello_blank.json").write_text(
-                json.dumps(HELLO_BLANK_DATAFLOW.export(), sort_keys=True, indent=4)
+                json.dumps(
+                    HELLO_BLANK_DATAFLOW.export(), sort_keys=True, indent=4
+                )
             )
             # Start the server
             async with ServerRunner.patch(HTTPService.server) as tserver:
@@ -185,7 +193,8 @@ class TestServer(AsyncTestCase):
                     # Check that hello world works
                     async with self.get(cli, hello_world_url) as response:
                         self.assertEqual(
-                            json.dumps({"response": message}), await response.text()
+                            json.dumps({"response": message}),
+                            await response.text(),
                         )
                 # Check that hello blank works
                 message: str = "Hello Feedface"
@@ -196,10 +205,13 @@ class TestServer(AsyncTestCase):
                         json=[
                             {
                                 "value": "Feedface",
-                                "definition": formatter.op.inputs["data"].export(),
+                                "definition": formatter.op.inputs[
+                                    "data"
+                                ].export(),
                             }
                         ],
                     ) as response:
                         self.assertEqual(
-                            json.dumps({"response": message}), await response.text()
+                            json.dumps({"response": message}),
+                            await response.text(),
                         )

@@ -9,6 +9,10 @@ from ..base import (
 
 
 class BaseConfigLoaderContext(BaseDataFlowFacilitatorObjectContext):
+    def __init__(self, parent: "BaseConfigLoader") -> None:
+        super().__init__()
+        self.parent = parent
+
     @abc.abstractmethod
     def load(self, resource: Any) -> Dict:
         """
@@ -19,4 +23,5 @@ class BaseConfigLoaderContext(BaseDataFlowFacilitatorObjectContext):
 
 @base_entry_point("dffml.config", "config")
 class BaseConfigLoader(BaseDataFlowFacilitatorObject):
-    pass
+    def __call__(self) -> BaseConfigLoaderContext:
+        return self.CONTEXT(self)

@@ -1,7 +1,10 @@
+import json
 import pathlib
 from typing import Dict, Any
 
 from ..util.entrypoint import entry_point
+from ..util.cli.arg import Arg
+from ..base import BaseConfig
 from .config import BaseConfigLoaderContext, BaseConfigLoader
 
 
@@ -14,4 +17,12 @@ class JSONConfigLoaderContext(BaseConfigLoaderContext):
 
 @entry_point("json")
 class JSONConfigLoader(BaseConfigLoader):
-    pass
+    CONTEXT = JSONConfigLoaderContext
+
+    @classmethod
+    def args(cls, args, *above) -> Dict[str, Arg]:
+        return args
+
+    @classmethod
+    def config(cls, config, *above) -> BaseConfig:
+        return BaseConfig()

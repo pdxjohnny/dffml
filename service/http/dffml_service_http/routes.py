@@ -2,6 +2,7 @@ import os
 import json
 import uuid
 import secrets
+import pathlib
 import traceback
 from functools import wraps, partial
 from http import HTTPStatus
@@ -16,13 +17,14 @@ import aiohttp_cors
 from dffml.repo import Repo
 from dffml.base import BaseConfig, MissingConfig
 from dffml.df.types import DataFlow, Input
+from dffml.df.multicomm import MultiCommInAtomicMode, BaseMultiCommContext
 from dffml.source.source import BaseSource
 from dffml.df.memory import MemoryOrchestrator
 from dffml.base import MissingConfig
 from dffml.model import Model
 from dffml.feature import Features
 from dffml.source.source import BaseSource, SourcesContext
-from dffml.util.entrypoint import EntrypointNotFound
+from dffml.util.entrypoint import EntrypointNotFound, entry_point
 from dffml.df.base import OperationImplementationNotInstantiable
 
 
@@ -135,7 +137,8 @@ class HTTPChannelConfig(NamedTuple):
         return cls(**kwargs)
 
 
-class Routes:
+@entry_point("http")
+class Routes(BaseMultiCommContext):
     PRESENTATION_OPTIONS = ["json", "blob", "text"]
 
     async def get_registered_handler(self, request):
@@ -416,6 +419,8 @@ class Routes:
         return HTTPChannelConfig
 
     async def register(self, config: HTTPChannelConfig) -> None:
+        if self.mc_atomic:
+            raise MultiCommInAtomicMode("No registrations allowed")
         if config.asynchronous:
             handler = self.multicomm_dataflow_asynchronous
         else:
@@ -433,7 +438,13 @@ class Routes:
                 status=HTTPStatus.BAD_REQUEST,
             )
         self.logger.debug("Register new mutlicomm route: %r", config)
-        await mcctx.register(config)
+        try:
+            await mcctx.register(config)
+        except:
+            return web.json_response(
+                {"error": "In atomic mode, no registrations allowed"},
+                status=HTTPStatus.BAD_REQUEST,
+            )
         return web.json_response(OK)
 
     @sctx_route

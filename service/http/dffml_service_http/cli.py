@@ -130,7 +130,17 @@ class CreateTLS(TLSCMD):
 class MultiCommCMD(CMD):
 
     mc_config = Arg(
-        "-mc-config", dest="mc_config", help="MultiComm config directory"
+        "-mc-config",
+        dest="mc_config",
+        default=None,
+        help="MultiComm config directory",
+    )
+    mc_atomic = Arg(
+        "-mc-atomic",
+        dest="mc_atomic",
+        action="store_true",
+        default=False,
+        help="Change all registered routes or not at all",
     )
 
 
@@ -205,6 +215,12 @@ class Server(TLSCMD, MultiCommCMD, Routes):
         # Create dictionaries to hold configured sources and models
         await self.setup()
         await self.start()
+        # Load
+        if self.mc_config is not None:
+            # Restore atomic after config is set
+            atomic = self.mc_atomic
+            await self.register_directory(self.mc_config)
+            self.mc_atomic = atomic
         try:
             # If we are testing then RUN_YIELD will be an asyncio.Event
             if self.RUN_YIELD_START is not False:
