@@ -9,10 +9,11 @@ from .config import BaseConfigLoaderContext, BaseConfigLoader
 
 
 class JSONConfigLoaderContext(BaseConfigLoaderContext):
-    def load(self, resource: Any) -> Dict:
-        if not isinstance(resource, pathlib.Path):
-            resource = pathlib.Path(resource)
-        return json.loads(resource.read_text())
+    async def loadb(self, resource: bytes) -> Dict:
+        return json.loads(resource.decode())
+
+    async def dumpb(self, resource: Dict) -> bytes:
+        return json.dumps(resource, sort_keys=True, indent=4).encode()
 
 
 @entry_point("json")

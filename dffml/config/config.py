@@ -14,10 +14,17 @@ class BaseConfigLoaderContext(BaseDataFlowFacilitatorObjectContext):
         self.parent = parent
 
     @abc.abstractmethod
-    def load(self, resource: Any) -> Dict:
+    async def loadb(self, resource: bytes) -> Dict:
         """
         ConfigLoaders need to be able to return the dict representation of the
         resources they are asked to load.
+        """
+
+    @abc.abstractmethod
+    async def dumpb(self, resource: Dict) -> bytes:
+        """
+        ConfigLoaders need to be serialize a dict representation of the
+        resources they are asked to dump.
         """
 
 

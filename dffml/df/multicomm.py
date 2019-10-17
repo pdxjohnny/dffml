@@ -81,7 +81,7 @@ class BaseMultiCommContext(BaseDataFlowObjectContext, abc.ABC):
         config_path[-1] = path.stem
         config_path = tuple(config_path)
         # Load the file
-        return config_path, parsers[filetype].load(path)
+        return config_path, await parsers[filetype].loadb(path.read_bytes())
 
     async def register_directory(
         self, directory: Union[pathlib.Path, str]
