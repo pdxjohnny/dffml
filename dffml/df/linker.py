@@ -57,9 +57,14 @@ class Linker(object):
     def export(cls, dataflow: DataFlow):
         exported = {"definitions": {}, "operations": {}}
         for operation in dataflow.operations.values():
+            exported_operation = operation.export()
+            for name, definition in operation.inputs.items():
+                exported_operation["inputs"][name] = definition.name
+            for name, definition in operation.outputs.items():
+                exported_operation["outputs"][name] = definition.name
             exported["operations"][
                 operation.instance_name
-            ] = operation.export()
+            ] = exported_operation
             exported["definitions"].update(
                 {
                     definition.name: definition.export()
