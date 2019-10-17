@@ -110,6 +110,7 @@ class Create(CMD):
     operations = create_from_skel("operations")
     service = create_from_skel("service")
     source = create_from_skel("source")
+    config = create_from_skel("config")
 
 
 class Link(CMD):
