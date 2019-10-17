@@ -381,12 +381,6 @@ class Export(CMD):
                         sys.stdout.buffer.write(await loader.dumpb(obj._asdict()))
                         # TODO(dfass) yaml config, then try shouldi with HTTP
                         # API
-                        """
-                        exported = yaml.dump(Linker.export(obj)).strip()
-                        # Ensure re-import works
-                        imported = Linker.resolve(yaml.safe_load(exported))
-                        print(exported)
-                        """
 
 
 class Develop(CMD):
