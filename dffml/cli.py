@@ -15,11 +15,14 @@ import pkg_resources
 
 from .log import LOGGER
 from .version import VERSION
+from .base import BaseConfig
 from .repo import Repo
 from .port import Port
 from .feature import Feature, Features, Data
 from .source.source import BaseSource, Sources, SubsetSources
 from .model import Model
+from .config.config import BaseConfigLoader
+from .config.json import JSONConfigLoader
 from .df.types import Input, Operation, DataFlow
 from .df.base import StringInputSetContext
 from .df.memory import MemoryInputSet, MemoryInputSetConfig
@@ -461,6 +464,19 @@ class DataflowCreate(CMD):
     arg_operations = Arg(
         "operations", nargs="+", help="Operations to create a dataflow for"
     )
+    arg_config = Arg(
+        "-config",
+        help="ConfigLoader to use",
+        type=BaseConfigLoader.load,
+        default=JSONConfigLoader,
+    )
+    arg_not_linked = Arg(
+        "-not-linked",
+        dest="not_linked",
+        help="Do not export dataflows as linked",
+        default=False,
+        action="store_true",
+    )
 
     async def run(self):
         operations = []
@@ -469,7 +485,11 @@ class DataflowCreate(CMD):
                 operations += list(load(load_operation))
             else:
                 operations += [Operation.load(load_operation)]
-        return DataFlow.auto(*operations).export()
+        async with self.config(BaseConfig()) as configloader:
+            async with configloader() as loader:
+                dataflow = DataFlow.auto(*operations)
+                exported = dataflow.export(linked=not self.not_linked)
+                sys.stdout.buffer.write(await loader.dumpb(exported))
 
 
 # Name collision
