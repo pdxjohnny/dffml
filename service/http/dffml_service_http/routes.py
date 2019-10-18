@@ -155,13 +155,10 @@ class Routes(BaseMultiCommContext):
             for input_data in await request.json():
                 # TODO validate that input data is list and each item has definition
                 # and value properties
-                if (
-                    not input_data["definition"]["name"]
-                    in config.dataflow.definitions
-                ):
+                if not input_data["definition"] in config.dataflow.definitions:
                     return web.json_response(
                         {
-                            "error": f"Missing definition for {input_data['definition']['name']} in dataflow"
+                            "error": f"Missing definition for {input_data['definition']} in dataflow"
                         },
                         status=HTTPStatus.NOT_FOUND,
                     )
@@ -169,7 +166,7 @@ class Routes(BaseMultiCommContext):
                     Input(
                         value=input_data["value"],
                         definition=config.dataflow.definitions[
-                            input_data["definition"]["name"]
+                            input_data["definition"]
                         ],
                     )
                 )

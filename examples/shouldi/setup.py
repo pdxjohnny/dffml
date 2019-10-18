@@ -68,5 +68,16 @@ setup(
     install_requires=INSTALL_REQUIRES,
     tests_require=[],
     packages=find_packages(),
-    entry_points={"console_scripts": ["shouldi = shouldi.cli:ShouldI.main"]},
+    entry_points={
+        "console_scripts": ["shouldi = shouldi.cli:ShouldI.main"],
+        "dffml.operation": [
+            "run_bandit = shouldi.bandit:run_bandit",
+            "safety_check = shouldi.safety:safety_check",
+            "cleanup_pypi_package = shouldi.pypi:cleanup_pypi_package",
+            "pypi_package_contents = shouldi.pypi:pypi_package_contents",
+            "pypi_package_json = shouldi.pypi:pypi_package_json",
+            "pypi_package_url = shouldi.pypi:pypi_package_url",
+            "pypi_latest_package_version = shouldi.pypi:pypi_latest_package_version",
+        ],
+    },
 )
