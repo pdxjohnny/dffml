@@ -85,7 +85,14 @@ class OperationImplementationContext(BaseDataFlowObjectContext):
         """
 
 
-@base_entry_point("dffml.operation.implementation", "opimp")
+class FailedToLoadOperationImplementation(Exception):
+    """
+    Raised when an OperationImplementation wasn't found to be registered with
+    the dffml.operation entrypoint.
+    """
+
+
+@base_entry_point("dffml.operation", "opimp")
 class OperationImplementation(BaseDataFlowObject):
     def __init__(self, config: "BaseConfig") -> None:
         super().__init__(config)
@@ -107,6 +114,41 @@ class OperationImplementation(BaseDataFlowObject):
     @classmethod
     def add_label(cls, *above):
         return list(above) + cls.op.name.split("_")
+
+    @classmethod
+    def _imp(cls, loaded):
+        """
+        Returns the operation implemention from a loaded entrypoint object, or
+        None if its not an operation implemention or doesn't have the imp
+        parameter which is an operation implemention.
+        """
+        for obj in [loaded, getattr(loaded, "imp", None)]:
+            if inspect.isclass(obj) and issubclass(obj, cls):
+                return obj
+        return None
+
+    @classmethod
+    def load(cls, loading=None):
+        loading_classes = []
+        # Load operations
+        for i in pkg_resources.iter_entry_points(cls.ENTRY_POINT):
+            if loading is not None and i.name == loading:
+                loaded = cls._imp(i.load())
+                if loaded is not None:
+                    return loaded
+            elif loading is None:
+                loaded = cls._imp(i.load())
+                if loaded is not None:
+                    loading_classes.append(loaded)
+        if loading is not None:
+            raise FailedToLoadOperationImplementation(
+                "%s was not found in (%s)"
+                % (
+                    repr(loading),
+                    ", ".join(list(map(lambda op: op.name, loading_classes))),
+                )
+            )
+        return loading_classes
 
 
 def op(imp_enter=None, ctx_enter=None, config_cls=None, **kwargs):

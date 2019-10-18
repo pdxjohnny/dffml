@@ -85,6 +85,13 @@ class Stage(Enum):
     OUTPUT = "output"
 
 
+class FailedToLoadOperation(Exception):
+    """
+    Raised when an Operation wasn't found to be registered with the
+    dffml.operation entrypoint.
+    """
+
+
 @base_entry_point("dffml.operation", "operation")
 class Operation(NamedTuple, Entrypoint):
     name: str
@@ -159,6 +166,40 @@ class Operation(NamedTuple, Entrypoint):
                 loading_classes.append(loaded)
         if loading is not None:
             raise KeyError(
+                "%s was not found in (%s)"
+                % (
+                    repr(loading),
+                    ", ".join(list(map(lambda op: op.name, loading_classes))),
+                )
+            )
+        return loading_classes
+
+    @classmethod
+    def _op(cls, loaded):
+        """
+        Returns the operation from a loaded entrypoint object, or None if its
+        not an operation or doesn't have the op parameter which is an operation.
+        """
+        for obj in [loaded, getattr(loaded, "op", None)]:
+            if isinstance(obj, cls):
+                return obj
+        return None
+
+    @classmethod
+    def load(cls, loading=None):
+        loading_classes = []
+        # Load operations
+        for i in pkg_resources.iter_entry_points(cls.ENTRY_POINT):
+            if loading is not None and i.name == loading:
+                loaded = cls._op(i.load())
+                if loaded is not None:
+                    return loaded
+            elif loading is None:
+                loaded = cls._op(i.load())
+                if loaded is not None:
+                    loading_classes.append(loaded)
+        if loading is not None:
+            raise FailedToLoadOperation(
                 "%s was not found in (%s)"
                 % (
                     repr(loading),

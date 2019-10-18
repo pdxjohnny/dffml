@@ -369,16 +369,20 @@ class Export(CMD):
         async with self.config(BaseConfig()) as configloader:
             async with configloader() as loader:
                 for obj in load(self.export, relative=os.getcwd()):
-                    self.logger.debug(
-                        "Loaded %s: %s", self.export, obj
-                    )
+                    self.logger.debug("Loaded %s: %s", self.export, obj)
                     # TODO Expor
                     if isinstance(obj, DataFlow):
-                        sys.stdout.buffer.write(await loader.dumpb(Linker.export(obj)))
+                        sys.stdout.buffer.write(
+                            await loader.dumpb(Linker.export(obj))
+                        )
                     elif hasattr(obj, "export"):
-                        sys.stdout.buffer.write(await loader.dumpb(obj.export()))
+                        sys.stdout.buffer.write(
+                            await loader.dumpb(obj.export())
+                        )
                     elif hasattr(obj, "_asdict"):
-                        sys.stdout.buffer.write(await loader.dumpb(obj._asdict()))
+                        sys.stdout.buffer.write(
+                            await loader.dumpb(obj._asdict())
+                        )
                         # TODO(dfass) yaml config, then try shouldi with HTTP
                         # API
 

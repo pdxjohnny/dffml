@@ -15,8 +15,8 @@ import itertools
 import collections
 from itertools import product
 from datetime import datetime
-from unittest.mock import patch
-from contextlib import asynccontextmanager, AsyncExitStack
+from unittest.mock import patch, MagicMock
+from contextlib import asynccontextmanager, AsyncExitStack, ExitStack
 from typing import (
     AsyncIterator,
     Dict,
@@ -32,13 +32,15 @@ from typing import (
     Iterator,
 )
 
-from dffml.df.types import Operation, Definition, Input
+from dffml.df.types import Operation, Definition, Input, FailedToLoadOperation
 from dffml.df.linker import Linker
 from dffml.df.base import (
     op,
     opwraped_in,
     operation_in,
     opimp_in,
+    FailedToLoadOperationImplementation,
+    OperationImplementation,
     BaseConfig,
     BaseRedundancyCheckerConfig,
     StringInputSetContext,
@@ -226,33 +228,66 @@ class TestRunner(AsyncTestCase):
                     )
 
 
-class TestOperationImplementation(AsyncTestCase):
-    entrypoints = {
-        "dffml.operation.implementation": {
-            'add': add.imp,
-            'mult': mult.imp,
-            'parse_line': parse_line.imp,
-            },
-        "dffml.operation": {
-            'add': add.op,
-            'mult': mult.op,
-            'parse_line': parse_line.op,
-            }
-        }
-
+class MockIterEntryPoints(AsyncTestCase):
     def iter_entry_points(self, entrypoint):
         for key, value in self.entrypoints[entrypoint].items():
-            # TODO
-            yield Entrypoint
+            mock = MagicMock()
+            mock.name = key
+            mock.load.return_value = value
+            yield mock
 
     async def setUp(self):
         self.exit_stack = ExitStack().__enter__()
-        self.exit_stack.enter_context(patch(
-            'pkg_resources.iter_entry_points', new=self.iter_entry_points
-            ))
+        self.exit_stack.enter_context(
+            patch(
+                "pkg_resources.iter_entry_points", new=self.iter_entry_points
+            )
+        )
 
     async def tearDown(self):
         self.exit_stack.__exit__(None, None, None)
 
+
+class TestOperation(MockIterEntryPoints):
+    entrypoints = {
+        "dffml.operation": {
+            "add": add,
+            "mult": mult.op,
+            "parse_line": parse_line.imp,
+        }
+    }
+
     async def test_load(self):
-        self.assertEqual(self.opimps.values(), OperationImplementation.load())
+        loaded = Operation.load()
+        self.assertIn(add.op, loaded)
+        self.assertIn(mult.op, loaded)
+        self.assertIn(parse_line.op, loaded)
+
+    async def test_load_name_given(self):
+        self.assertEqual(add.op, Operation.load("add"))
+        self.assertEqual(mult.op, Operation.load("mult"))
+        self.assertEqual(parse_line.op, Operation.load("parse_line"))
+
+
+class TestOperationImplementation(MockIterEntryPoints):
+    entrypoints = {
+        "dffml.operation": {
+            "add": add,
+            "mult": mult.imp,
+            "parse_line": parse_line.op,
+        }
+    }
+
+    async def test_load(self):
+        loaded = OperationImplementation.load()
+        self.assertIn(add.imp, loaded)
+        self.assertIn(mult.imp, loaded)
+        self.assertNotIn(parse_line.op, loaded)
+
+    async def test_load_name_given(self):
+        self.assertEqual(add.imp, OperationImplementation.load("add"))
+        self.assertEqual(mult.imp, OperationImplementation.load("mult"))
+
+    async def test_load_failure(self):
+        with self.assertRaises(FailedToLoadOperationImplementation):
+            OperationImplementation.load("parse_line")
