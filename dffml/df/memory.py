@@ -984,8 +984,7 @@ class MemoryOrchestratorContext(BaseOrchestratorContext):
         dataflow: DataFlow,
         *,
         ctx: Optional[BaseInputSetContext] = None,
-        inputs: Optional[List[Input]] = None,
-    ):
+    ) -> None:
         """
         Initialize a DataFlow by preforming the following steps.
 
@@ -995,15 +994,6 @@ class MemoryOrchestratorContext(BaseOrchestratorContext):
         3. Seed input network context with given inputs
         """
         self.logger.debug("Initializing dataflow: %s", dataflow)
-        if inputs is None:
-            # Create a list if extra inputs were not given
-            inputs = []
-        else:
-            # Do not modify the callers list if extra inputs were given
-            inputs = inputs.copy()
-        # TODO(dfass) Shouldn't we be seeding the inputs on run?
-        # Add seed values to inputs
-        list(map(inputs.append, dataflow.seed))
         # Add operations to operations network context
         await self.octx.add(dataflow.operations.values())
         # Instantiate all operations
@@ -1035,6 +1025,22 @@ class MemoryOrchestratorContext(BaseOrchestratorContext):
                     await self.nctx.instantiate(
                         operation, opimp_config, opimp=opimp
                     )
+
+    async def seed_inputs_for_dataflow(
+        self,
+        dataflow: DataFlow,
+        *,
+        ctx: Optional[BaseInputSetContext] = None,
+        inputs: Optional[List[Input]] = None,
+    ) -> BaseInputSetContext:
+        if inputs is None:
+            # Create a list if extra inputs were not given
+            inputs = []
+        else:
+            # Do not modify the callers list if extra inputs were given
+            inputs = inputs.copy()
+        # Add seed values to inputs
+        list(map(inputs.append, dataflow.seed))
         # Add all the inputs
         if inputs:
             self.logger.debug("Seeding dataflow with inputs: %s", inputs)
@@ -1056,7 +1062,8 @@ class MemoryOrchestratorContext(BaseOrchestratorContext):
         """
         Run a DataFlow.
         """
-        await self.initialize_dataflow(dataflow, ctx=ctx, inputs=inputs)
+        await self.initialize_dataflow(dataflow, ctx=ctx)
+        ctx = await self.seed_inputs_for_dataflow(dataflow, ctx=ctx, inputs=inputs)
         self.logger.debug("Running dataflow: %s", dataflow)
         # Return the output
         async for nctx, result in self.run_operations(
@@ -1081,7 +1088,8 @@ class MemoryOrchestratorContext(BaseOrchestratorContext):
         """
         Run a DataFlow but only run output operations.
         """
-        ctx = await self.initialize_dataflow(dataflow, ctx=ctx, inputs=inputs)
+        await self.initialize_dataflow(dataflow, ctx=ctx)
+        ctx = await self.seed_inputs_for_dataflow(dataflow, ctx=ctx, inputs=inputs)
         self.logger.debug("Running output subflow: %s", dataflow)
         # Run output operations and create a dict mapping the operation name to
         # the output of that operation

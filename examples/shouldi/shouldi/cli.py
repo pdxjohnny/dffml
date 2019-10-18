@@ -49,6 +49,15 @@ DATAFLOW = DataFlow(
         "bandit": InputFlow(pkg=["pkg.contents.directory"]),
         "safety": InputFlow(package=["seed"], version=["pkg.version.version"]),
     },
+    seed=[
+        Input(
+            value=[
+                safety_check.op.outputs["issues"].name,
+                run_bandit.op.outputs["report"].name,
+            ],
+            definition=GetSingle.op.inputs["spec"],
+        ),
+    ],
 )
 
 
@@ -81,13 +90,6 @@ class Install(CMD):
                         Input(
                             value=package_name,
                             definition=pypi_package_json.op.inputs["package"],
-                        ),
-                        Input(
-                            value=[
-                                safety_check.op.outputs["issues"].name,
-                                run_bandit.op.outputs["report"].name,
-                            ],
-                            definition=GetSingle.op.inputs["spec"],
                         ),
                     )
 
