@@ -15,6 +15,7 @@ import itertools
 import collections
 from itertools import product
 from datetime import datetime
+from unittest.mock import patch
 from contextlib import asynccontextmanager, AsyncExitStack
 from typing import (
     AsyncIterator,
@@ -223,3 +224,35 @@ class TestRunner(AsyncTestCase):
                         calc_strings_check[ctx_str],
                         results[add.op.outputs["sum"].name],
                     )
+
+
+class TestOperationImplementation(AsyncTestCase):
+    entrypoints = {
+        "dffml.operation.implementation": {
+            'add': add.imp,
+            'mult': mult.imp,
+            'parse_line': parse_line.imp,
+            },
+        "dffml.operation": {
+            'add': add.op,
+            'mult': mult.op,
+            'parse_line': parse_line.op,
+            }
+        }
+
+    def iter_entry_points(self, entrypoint):
+        for key, value in self.entrypoints[entrypoint].items():
+            # TODO
+            yield Entrypoint
+
+    async def setUp(self):
+        self.exit_stack = ExitStack().__enter__()
+        self.exit_stack.enter_context(patch(
+            'pkg_resources.iter_entry_points', new=self.iter_entry_points
+            ))
+
+    async def tearDown(self):
+        self.exit_stack.__exit__(None, None, None)
+
+    async def test_load(self):
+        self.assertEqual(self.opimps.values(), OperationImplementation.load())

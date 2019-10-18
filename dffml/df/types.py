@@ -140,12 +140,23 @@ class Operation(NamedTuple, Entrypoint):
     @classmethod
     def load(cls, loading=None):
         loading_classes = []
+        # Load operations
         for i in pkg_resources.iter_entry_points(cls.ENTRY_POINT):
-            loaded = i.load()
-            if isinstance(loaded, cls):
-                loading_classes.append(loaded)
-                if loading is not None and loaded.name == loading:
+            if loading is not None and i.name == loading:
+                loaded = i.load()
+                if isinstance(loaded, cls):
                     return loaded
+                elif isinstance(getattr(loaded, "op", None), cls):
+                    # Handle operations decorated with op
+                    return loaded.op
+            else:
+                loaded = i.load()
+                loading_classes.append(loaded)
+        for i in pkg_resources.iter_entry_points(cls.ENTRY_POINT):
+            if loading is not None and i.name == loading:
+                return i.load()
+            else:
+                loading_classes.append(loaded)
         if loading is not None:
             raise KeyError(
                 "%s was not found in (%s)"
