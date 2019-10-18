@@ -236,6 +236,12 @@ class Entrypoints(CMD):
 
 class Diagram(CMD):
 
+    arg_config = Arg(
+        "-config",
+        help="ConfigLoader to use",
+        type=BaseConfigLoader.load,
+        default=JSONConfigLoader,
+    )
     arg_stages = Arg(
         "-stages",
         help="Which stages to display: (processing, cleanup, output)",
@@ -259,9 +265,10 @@ class Diagram(CMD):
     arg_dataflow = Arg("dataflow", help="Data flow file")
 
     async def run(self):
-        dataflow = DataFlow._fromdict(
-            **json.loads(Path(self.dataflow).read_text())
-        )
+        async with self.config(BaseConfig()) as configloader:
+            async with configloader() as loader:
+                exported = await loader.loadb(Path(self.dataflow).read_bytes())
+                dataflow = DataFlow._fromdict(**exported)
         print(f"graph {self.display}")
         for stage in Stage:
             # Skip stage if not wanted
