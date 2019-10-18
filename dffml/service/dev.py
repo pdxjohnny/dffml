@@ -309,7 +309,7 @@ class Diagram(CMD):
             print(f"style inputs fill:#f6dbf9,stroke:#a178ca")
         for instance_name, input_flow in dataflow.flow.items():
             operation = dataflow.operations[instance_name]
-            if not operation.stage.value in self.stages:
+            if self.stages and not operation.stage.value in self.stages:
                 continue
             node = hashlib.md5(instance_name.encode()).hexdigest()
             for input_name, sources in input_flow.items():
