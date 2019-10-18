@@ -363,6 +363,13 @@ class Export(CMD):
         type=BaseConfigLoader.load,
         default=JSONConfigLoader,
     )
+    arg_not_linked = Arg(
+        "-not-linked",
+        dest="not_linked",
+        help="Do not export dataflows as linked",
+        default=False,
+        action="store_true",
+    )
     arg_export = Arg("export", help="Python path to object to export")
 
     async def run(self):
@@ -370,10 +377,11 @@ class Export(CMD):
             async with configloader() as loader:
                 for obj in load(self.export, relative=os.getcwd()):
                     self.logger.debug("Loaded %s: %s", self.export, obj)
-                    # TODO Expor
                     if isinstance(obj, DataFlow):
                         sys.stdout.buffer.write(
-                            await loader.dumpb(Linker.export(obj))
+                            await loader.dumpb(
+                                obj.export(linked=not self.not_linked)
+                            )
                         )
                     elif hasattr(obj, "export"):
                         sys.stdout.buffer.write(
@@ -397,5 +405,4 @@ class Develop(CMD):
     run = Run
     diagram = Diagram
     export = Export
-    # _import = Import
     entrypoints = Entrypoints

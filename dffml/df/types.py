@@ -1,5 +1,6 @@
 import uuid
 import pydoc
+import inspect
 import itertools
 import pkg_resources
 from enum import Enum
@@ -361,29 +362,36 @@ class DataFlow:
         }
         self.definitions = definitions
 
-    def export(self):
-        return export_dict(
-            operations={
+    def export(self, *, linked: bool = False):
+        exported = {
+            "operations": {
                 instance_name: operation.export()
                 for instance_name, operation in self.operations.items()
-            },
-            seed=[input_data.export() for input_data in self.seed],
-            configs=self.configs.copy(),
-            flow={
-                instance_name: input_flow.export()
-                for instance_name, input_flow in self.flow.items()
-            },
-        )
+            }
+            if not linked
+            else self._linked_operations(),
+            "seed": self.seed.copy(),
+            "configs": self.configs.copy(),
+            "flow": self.flow.copy(),
+        }
+        if linked:
+            exported["linked"] = True
+            exported["definitions"] = self.definitions.copy()
+        return export_dict(**exported)
 
     @classmethod
-    def _fromdict(cls, **kwargs):
+    def _fromdict(cls, *, linked: bool = False, **kwargs):
         # Import all operations
-        kwargs["operations"] = {
-            instance_name: Operation._fromdict(
-                instance_name=instance_name, **operation
-            )
-            for instance_name, operation in kwargs["operations"].items()
-        }
+        if linked:
+            kwargs["operations"] = cls._resolve_operations(kwargs)
+            del kwargs["definitions"]
+        else:
+            kwargs["operations"] = {
+                instance_name: Operation._fromdict(
+                    instance_name=instance_name, **operation
+                )
+                for instance_name, operation in kwargs["operations"].items()
+            }
         # Import seed inputs
         kwargs["seed"] = [
             Input._fromdict(**input_data) for input_data in kwargs["seed"]
@@ -453,3 +461,61 @@ class DataFlow:
             operations={operation.name: operation for operation in operations},
             flow=flow_dict,
         )
+
+    @classmethod
+    def _resolve_operations(cls, source: Dict):
+        definitions = {}
+        operations = {}
+        outputs = {}
+        for name, kwargs in source.get("definitions", {}).items():
+            kwargs.setdefault("name", name)
+            definitions[name] = Definition(**kwargs)
+        sig = inspect.signature(Operation)
+        for name, kwargs in source.get("operations", {}).items():
+            for arg, parameter in sig.parameters.items():
+                if (
+                    arg != "name"
+                    and not arg in kwargs
+                    and parameter.default == inspect.Parameter.empty
+                ):
+                    # From 3.7/Lib/typing.py:
+                    # "For internal bookkeeping of generic types __origin__
+                    # keeps a reference to a type that was subscripted."
+                    kwargs[arg] = parameter.annotation.__origin__()
+            # Replaces strings referencing definitions with definitions
+            for arg in ["conditions"]:
+                if not arg in kwargs:
+                    continue
+                try:
+                    kwargs[arg] = [definitions[i] for i in kwargs[arg]]
+                except KeyError as error:
+                    raise KeyError(
+                        "Definition missing while resolving %s.%s"
+                        % (name, arg)
+                    ) from error
+            for arg in ["inputs", "outputs"]:
+                if not arg in kwargs:
+                    continue
+                try:
+                    kwargs[arg] = {
+                        i: definitions[i] for i in kwargs[arg].values()
+                    }
+                except KeyError as error:
+                    raise KeyError(
+                        "Definition missing while resolving %s.%s"
+                        % (name, arg)
+                    ) from error
+            kwargs.setdefault("name", name)
+            operations[name] = Operation(**kwargs)
+        return operations
+
+    def _linked_operations(self):
+        exported = {}
+        for operation in self.operations.values():
+            exported_operation = operation.export()
+            for name, definition in operation.inputs.items():
+                exported_operation["inputs"][name] = definition.name
+            for name, definition in operation.outputs.items():
+                exported_operation["outputs"][name] = definition.name
+            exported[operation.instance_name] = exported_operation
+        return exported

@@ -78,9 +78,9 @@ def export_list(iterable):
     for i, value in enumerate(iterable):
         export_value(iterable, i, value)
         if isinstance(iterable[i], dict):
-            iterable[i] = export_dict(**value)
+            iterable[i] = export_dict(**iterable[i])
         elif isinstance(value, list):
-            iterable[i] = export_list(value)
+            iterable[i] = export_list(iterable[i])
     return iterable
 
 
@@ -91,8 +91,8 @@ def export_dict(**kwargs):
     """
     for key, value in kwargs.items():
         export_value(kwargs, key, value)
-        if isinstance(value, dict):
-            kwargs[key] = export_dict(**value)
-        elif isinstance(value, list):
-            kwargs[key] = export_list(value)
+        if isinstance(kwargs[key], dict):
+            kwargs[key] = export_dict(**kwargs[key])
+        elif isinstance(kwargs[key], list):
+            kwargs[key] = export_list(kwargs[key])
     return kwargs

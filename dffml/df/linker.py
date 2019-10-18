@@ -55,7 +55,7 @@ class Linker(object):
 
     @classmethod
     def export(cls, dataflow: DataFlow):
-        exported = {"definitions": {}, "operations": {}}
+        exported = {"linker": True, "definitions": {}, "operations": {}}
         for operation in dataflow.operations.values():
             exported_operation = operation.export()
             for name, definition in operation.inputs.items():
