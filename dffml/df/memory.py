@@ -1001,6 +1001,7 @@ class MemoryOrchestratorContext(BaseOrchestratorContext):
         else:
             # Do not modify the callers list if extra inputs were given
             inputs = inputs.copy()
+        # TODO(dfass) Shouldn't we be seeding the inputs on run?
         # Add seed values to inputs
         list(map(inputs.append, dataflow.seed))
         # Add operations to operations network context

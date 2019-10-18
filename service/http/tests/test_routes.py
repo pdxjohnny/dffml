@@ -427,7 +427,7 @@ class TestRoutesMultiComm(TestRoutesRunning, AsyncTestCase):
             json=[
                 {
                     "value": "Feedface",
-                    "definition": formatter.op.inputs["data"].export(),
+                    "definition": formatter.op.inputs["data"].name,
                 }
             ],
         ) as response:

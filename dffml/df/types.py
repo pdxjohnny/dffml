@@ -385,13 +385,12 @@ class DataFlow:
         if linked:
             kwargs["operations"] = cls._resolve_operations(kwargs)
             del kwargs["definitions"]
-        else:
-            kwargs["operations"] = {
-                instance_name: Operation._fromdict(
-                    instance_name=instance_name, **operation
-                )
-                for instance_name, operation in kwargs["operations"].items()
-            }
+        kwargs["operations"] = {
+            instance_name: Operation._fromdict(
+                instance_name=instance_name, **operation
+            )
+            for instance_name, operation in kwargs["operations"].items()
+        }
         # Import seed inputs
         kwargs["seed"] = [
             Input._fromdict(**input_data) for input_data in kwargs["seed"]
@@ -466,48 +465,31 @@ class DataFlow:
     def _resolve_operations(cls, source: Dict):
         definitions = {}
         operations = {}
-        outputs = {}
-        for name, kwargs in source.get("definitions", {}).items():
-            kwargs.setdefault("name", name)
-            definitions[name] = Definition(**kwargs)
-        sig = inspect.signature(Operation)
-        for name, kwargs in source.get("operations", {}).items():
-            for arg, parameter in sig.parameters.items():
-                if (
-                    arg != "name"
-                    and not arg in kwargs
-                    and parameter.default == inspect.Parameter.empty
-                ):
-                    # From 3.7/Lib/typing.py:
-                    # "For internal bookkeeping of generic types __origin__
-                    # keeps a reference to a type that was subscripted."
-                    kwargs[arg] = parameter.annotation.__origin__()
+        for name, definition in source.get("definitions", {}).items():
+            definition.setdefault("name", name)
+            definitions[name] = definition
+        for instance_name, operation in source.get("operations", {}).items():
             # Replaces strings referencing definitions with definitions
             for arg in ["conditions"]:
-                if not arg in kwargs:
+                if not arg in operation:
                     continue
-                try:
-                    kwargs[arg] = [definitions[i] for i in kwargs[arg]]
-                except KeyError as error:
-                    raise KeyError(
-                        "Definition missing while resolving %s.%s"
-                        % (name, arg)
-                    ) from error
+                for i, definition_name in enumerate(operation[arg]):
+                    if not definition_name in definitions:
+                        raise DefinitionMissing(
+                            "While resolving {instance_name}.{arg}, missing {definition_name}"
+                        )
+                    operation[arg][i] = definitions[definition_name]
             for arg in ["inputs", "outputs"]:
-                if not arg in kwargs:
+                if not arg in operation:
                     continue
-                try:
-                    kwargs[arg] = {
-                        i: definitions[i] for i in kwargs[arg].values()
-                    }
-                except KeyError as error:
-                    raise KeyError(
-                        "Definition missing while resolving %s.%s"
-                        % (name, arg)
-                    ) from error
-            kwargs.setdefault("name", name)
-            operations[name] = Operation(**kwargs)
-        return operations
+                for input_name, definition_name in operation[arg].items():
+                    if not definition_name in definitions:
+                        raise DefinitionMissing(
+                            "While resolving {instance_name}.{arg}, missing {definition_name}"
+                        )
+                    operation[arg][input_name] = definitions[definition_name]
+            operation.setdefault("name", name)
+        return source["operations"]
 
     def _linked_operations(self):
         exported = {}
