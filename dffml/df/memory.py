@@ -1052,6 +1052,11 @@ class MemoryOrchestratorContext(BaseOrchestratorContext):
                 ctx = await self.ictx.uadd(*inputs)
         return ctx
 
+    # TODO(dfass) Get rid of run_operations, make it run_dataflow. Pass down the
+    # dataflow to everything. Make inputs a list of InputSets or an
+    # asyncgenerator of InputSets. Add a parameter which tells us if we should
+    # exit when all operations are complete or continue to wait for more inputs
+    # from the asyncgenerator. Make that parameter an asyncio.Event
     async def run_dataflow(
         self,
         dataflow: DataFlow,
