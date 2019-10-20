@@ -986,10 +986,7 @@ class MemoryOrchestratorContext(BaseOrchestratorContext):
     async def __aexit__(self, exc_type, exc_value, traceback):
         await self._stack.aclose()
 
-    async def initialize_dataflow(
-        self,
-        dataflow: DataFlow,
-    ) -> None:
+    async def initialize_dataflow(self, dataflow: DataFlow) -> None:
         """
         Initialize a DataFlow by preforming the following steps.
 
@@ -1049,7 +1046,9 @@ class MemoryOrchestratorContext(BaseOrchestratorContext):
         elif isinstance(input_set, BaseInputSet):
             # TODO Maybe allow setting it? Is there a usecase for this?
             if ctx is not None:
-                self.logger.info("seed_inputs will not set the context of a BaseInputSet instance to the new context provided")
+                self.logger.info(
+                    "seed_inputs will not set the context of a BaseInputSet instance to the new context provided"
+                )
             # Add all seed input_set to the input set
             for item in self.config.dataflow.seed:
                 await input_set.add(item)
@@ -1098,7 +1097,9 @@ class MemoryOrchestratorContext(BaseOrchestratorContext):
         else:
             # Add each input set in the list of input sets if given
             for input_set in input_sets:
-                ctxs.append(await self.seed_inputs(ctx=ctx, input_set=input_set))
+                ctxs.append(
+                    await self.seed_inputs(ctx=ctx, input_set=input_set)
+                )
         # TODO Add check that ctx returned is the ctx corresponding to uadd.
         # We'll have to make uadd return the ctx so we can compare.
         # TODO Send the context back into some list maintained by
@@ -1157,10 +1158,7 @@ class MemoryOrchestratorContext(BaseOrchestratorContext):
                     task.exception()
 
     async def run_operations_for_ctx(
-        self,
-        ctx: BaseContextHandle,
-        *,
-        strict: bool = True,
+        self, ctx: BaseContextHandle, *, strict: bool = True
     ) -> AsyncIterator[Tuple[BaseContextHandle, Dict[str, Any]]]:
         # Track if there are more inputs
         more = True
@@ -1281,7 +1279,9 @@ class MemoryOrchestratorContext(BaseOrchestratorContext):
         """
         Run a DataFlow but only run output operations.
         """
-        ctx = await self.seed_inputs_for_dataflow(dataflow, ctx=ctx, inputs=inputs)
+        ctx = await self.seed_inputs_for_dataflow(
+            dataflow, ctx=ctx, inputs=inputs
+        )
         self.logger.debug("Running output subflow: %s", dataflow)
         # Run output operations and create a dict mapping the operation name to
         # the output of that operation
@@ -1323,7 +1323,9 @@ class MemoryOrchestrator(BaseOrchestrator, BaseMemoryDataFlowObject):
     async def __aexit__(self, exc_type, exc_value, traceback):
         await self._stack.aclose()
 
-    def __call__(self, dataflow: DataFlow, **kwargs) -> BaseDataFlowObjectContext:
+    def __call__(
+        self, dataflow: DataFlow, **kwargs
+    ) -> BaseDataFlowObjectContext:
         return self.CONTEXT(
             MemoryOrchestratorContextConfig(
                 uid=secrets.token_hex(), dataflow=dataflow, reuse=kwargs

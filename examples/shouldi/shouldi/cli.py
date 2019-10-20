@@ -2,7 +2,12 @@ import sys
 
 from dffml.df.types import Input, Operation, DataFlow, InputFlow
 from dffml.df.base import operation_in, opimp_in
-from dffml.df.memory import MemoryOrchestrator, MemoryInputSet, MemoryInputSetConfig, StringInputSetContext
+from dffml.df.memory import (
+    MemoryOrchestrator,
+    MemoryInputSet,
+    MemoryInputSetConfig,
+    StringInputSetContext,
+)
 from dffml.df.linker import Linker
 from dffml.operation.output import GetSingle
 from dffml.util.cli.cmd import CMD
@@ -56,7 +61,7 @@ DATAFLOW = DataFlow(
                 run_bandit.op.outputs["report"].name,
             ],
             definition=GetSingle.op.inputs["spec"],
-        ),
+        )
     ],
 )
 
@@ -86,20 +91,24 @@ class Install(CMD):
                 # Run all the operations, Each iteration of this loop happens
                 # when all inputs are exhausted for a context, the output
                 # operations are then run and their results are yielded
-                async for package_name, results in octx.run(*[
+                async for package_name, results in octx.run(
+                    *[
                         MemoryInputSet(
                             MemoryInputSetConfig(
                                 ctx=StringInputSetContext(package_name),
                                 inputs=[
                                     Input(
                                         value=package_name,
-                                        definition=pypi_package_json.op.inputs["package"],
-                                    ),
-                                ]
+                                        definition=pypi_package_json.op.inputs[
+                                            "package"
+                                        ],
+                                    )
+                                ],
                             )
                         )
                         for package_name in self.packages
-                    ]):
+                    ]
+                ):
                     # Grab the number of saftey issues and the bandit report
                     # from the results dict
                     safety_issues = results[

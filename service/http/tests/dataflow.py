@@ -51,7 +51,9 @@ async def remap(
     # Create a new orchestrator context. Specify that it should use the existing
     # input set context, this way the output operations we'll be running have
     # access to the data from this data flow rather than a new sub flow.
-    async with self.octx.parent(self.config.dataflow, ictx=self.octx.ictx) as octx:
+    async with self.octx.parent(
+        self.config.dataflow, ictx=self.octx.ictx
+    ) as octx:
         _ctx, result = [result async for result in octx.run(ctx=self.ctx)][0]
     # Remap the output operations to their feature (copied logic
     # from CLI)
