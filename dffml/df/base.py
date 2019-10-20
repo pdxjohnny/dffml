@@ -426,6 +426,12 @@ class BaseInputSet(abc.ABC):
         self.logger = LOGGER.getChild(self.__class__.__qualname__)
 
     @abc.abstractmethod
+    async def add(self, item: Input) -> None:
+        """
+        Add an input to the input set.
+        """
+
+    @abc.abstractmethod
     async def definitions(self) -> Set[Definition]:
         pass
 

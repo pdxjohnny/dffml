@@ -171,12 +171,11 @@ class Routes(BaseMultiCommContext):
                     )
                 )
         # Run the operation in an orchestrator
-        # TODO Create the orchestrator on startup of the HTTP API itself
+        # TODO(dfass) Create the orchestrator on startup of the HTTP API itself
         async with MemoryOrchestrator.basic_config() as orchestrator:
-            async with orchestrator() as octx:
-                result = await octx.run_dataflow(
-                    config.dataflow, inputs=inputs
-                )
+            # TODO(dfass) Create octx on dataflow registration
+            async with orchestrator(config.dataflow) as octx:
+                _ctx, result = [result async for result in octx.run(inputs)][0]
                 if config.presentation == "blob":
                     return web.Response(body=result)
                 elif config.presentation == "text":

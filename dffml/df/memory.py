@@ -2,6 +2,7 @@ import io
 import asyncio
 import secrets
 import hashlib
+import inspect
 import itertools
 from datetime import datetime
 from itertools import product
@@ -108,6 +109,9 @@ class MemoryInputSet(BaseInputSet):
     def __init__(self, config: MemoryInputSetConfig) -> None:
         super().__init__(config)
         self.__inputs = config.inputs
+
+    async def add(self, item: Input) -> None:
+        self.__inputs.append(item)
 
     async def definitions(self) -> Set[Definition]:
         return set(map(lambda item: item.definition, self.__inputs))
@@ -928,6 +932,7 @@ class MemoryOrchestratorConfig(BaseOrchestratorConfig):
 
 class MemoryOrchestratorContextConfig(NamedTuple):
     uid: str
+    dataflow: DataFlow
     # Context objects to reuse. If not present in this dict a new context object
     # will be created.
     reuse: Dict[str, BaseDataFlowObjectContext]
@@ -974,6 +979,8 @@ class MemoryOrchestratorContext(BaseOrchestratorContext):
         # Creat the exit stack and enter all the contexts we won't be reusing
         self._stack = AsyncExitStack()
         self._stack = await aenter_stack(self, enter)
+        # Ensure that we can run the dataflow
+        await self.initialize_dataflow(self.config.dataflow)
         return self
 
     async def __aexit__(self, exc_type, exc_value, traceback):
@@ -982,8 +989,6 @@ class MemoryOrchestratorContext(BaseOrchestratorContext):
     async def initialize_dataflow(
         self,
         dataflow: DataFlow,
-        *,
-        ctx: Optional[BaseInputSetContext] = None,
     ) -> None:
         """
         Initialize a DataFlow by preforming the following steps.
@@ -1026,30 +1031,40 @@ class MemoryOrchestratorContext(BaseOrchestratorContext):
                         operation, opimp_config, opimp=opimp
                     )
 
-    async def seed_inputs_for_dataflow(
+    async def seed_inputs(
         self,
-        dataflow: DataFlow,
         *,
         ctx: Optional[BaseInputSetContext] = None,
-        inputs: Optional[List[Input]] = None,
+        input_set: Optional[Union[List[Input], BaseInputSet]] = None,
     ) -> BaseInputSetContext:
-        if inputs is None:
+        self.logger.debug("Seeding dataflow with input_set: %s", input_set)
+        if input_set is None:
             # Create a list if extra inputs were not given
-            inputs = []
-        else:
+            input_set: List[Input] = []
+        if isinstance(input_set, list):
             # Do not modify the callers list if extra inputs were given
-            inputs = inputs.copy()
-        # Add seed values to inputs
-        list(map(inputs.append, dataflow.seed))
-        # Add all the inputs
-        if inputs:
-            self.logger.debug("Seeding dataflow with inputs: %s", inputs)
+            input_set = input_set.copy()
+            # Add seed values to the input set
+            list(map(input_set.append, self.config.dataflow.seed))
+        elif isinstance(input_set, BaseInputSet):
+            # TODO Maybe allow setting it? Is there a usecase for this?
+            if ctx is not None:
+                self.logger.info("seed_inputs will not set the context of a BaseInputSet instance to the new context provided")
+            # Add all seed input_set to the input set
+            for item in self.config.dataflow.seed:
+                await input_set.add(item)
+        # Add all the input sets
+        if isinstance(input_set, list):
             if ctx is not None:
                 # Add under existing context if given
-                await self.ictx.cadd(ctx, *inputs)
+                await self.ictx.cadd(ctx, *input_set)
             else:
                 # Otherwise create new context
-                ctx = await self.ictx.uadd(*inputs)
+                ctx = await self.ictx.uadd(*input_set)
+        else:
+            # Add the input set
+            await self.ictx.add(input_set)
+            ctx = input_set.ctx
         return ctx
 
     # TODO(dfass) Get rid of run_operations, make it run_dataflow. Pass down the
@@ -1057,72 +1072,46 @@ class MemoryOrchestratorContext(BaseOrchestratorContext):
     # asyncgenerator of InputSets. Add a parameter which tells us if we should
     # exit when all operations are complete or continue to wait for more inputs
     # from the asyncgenerator. Make that parameter an asyncio.Event
-    async def run_dataflow(
+    async def run(
         self,
-        dataflow: DataFlow,
-        *,
+        *input_sets: Union[List[Input], BaseInputSet],
+        strict: bool = True,
         ctx: Optional[BaseInputSetContext] = None,
-        inputs: Optional[List[Input]] = None,
-    ):
+        halt: Optional[asyncio.Event] = None,
+    ) -> AsyncIterator[Tuple[BaseContextHandle, Dict[str, Any]]]:
         """
         Run a DataFlow.
         """
-        await self.initialize_dataflow(dataflow, ctx=ctx)
-        ctx = await self.seed_inputs_for_dataflow(dataflow, ctx=ctx, inputs=inputs)
-        self.logger.debug("Running dataflow: %s", dataflow)
-        # Return the output
-        async for nctx, result in self.run_operations(
-            ctx=ctx, dataflow=dataflow
-        ):
-            # TODO Add check that ctx returned is the ctx corresponding to uadd.
-            # We'll have to make uadd return the ctx so we can compare.
-            # TODO Send the context back into some list maintained by
-            # run_operations so that if there is another run_dataflow method
-            # running on the same orchestrator context it will get the context
-            # it's waiting for and return
-            self.logger.debug("dataflow: %s, result: %s", dataflow, result)
-            return result
-
-    async def output_subflow(
-        self,
-        dataflow: DataFlow,
-        *,
-        ctx: Optional[BaseInputSetContext] = None,
-        inputs: Optional[List[Input]] = None,
-    ):
-        """
-        Run a DataFlow but only run output operations.
-        """
-        await self.initialize_dataflow(dataflow, ctx=ctx)
-        ctx = await self.seed_inputs_for_dataflow(dataflow, ctx=ctx, inputs=inputs)
-        self.logger.debug("Running output subflow: %s", dataflow)
-        # Run output operations and create a dict mapping the operation name to
-        # the output of that operation
-        output = {
-            operation.instance_name: results
-            async for operation, results in self.run_stage(ctx, Stage.OUTPUT)
-        }
-        # If there is only one output operation, return only it's result instead
-        # of a dict with it as the only key value pair
-        if len(output) == 1:
-            output = list(output.values())[0]
-        # Return the context along with it's output
-        return ctx, output
-
-    async def run_operations(
-        self,
-        *,
-        strict: bool = True,
-        ctx: Optional[BaseInputSetContext] = None,
-        dataflow: Optional[DataFlow] = None,
-    ) -> AsyncIterator[Tuple[BaseContextHandle, Dict[str, Any]]]:
-        # Track if there are more contexts
-        more = True
+        # Lists of contexts we care about for this dataflow
+        ctxs: List[BaseInputSetContext] = []
+        self.logger.debug("Running %s: %s", self.config.dataflow, input_sets)
+        if not input_sets:
+            # If there are no input sets, add only seed inputs
+            ctxs.append(await self.seed_inputs(ctx=ctx))
+        if len(input_sets) == 1 and inspect.isasyncgen(input_sets[0]):
+            # Check if inputs is an asyncgenerator
+            # If it is, start a coroutine to wait for new inputs or input sets
+            # from it. When new inputs are received, add the seed inputs from
+            # the dataflow to the context.
+            # TODO(dfass) Grab inputs from asyncgen, combine with seed
+            raise NotImplementedError("asyncgen not yet supported")
+        else:
+            # Add each input set in the list of input sets if given
+            for input_set in input_sets:
+                ctxs.append(await self.seed_inputs(ctx=ctx, input_set=input_set))
+        # TODO Add check that ctx returned is the ctx corresponding to uadd.
+        # We'll have to make uadd return the ctx so we can compare.
+        # TODO Send the context back into some list maintained by
+        # run_operations so that if there is another run_dataflow method
+        # running on the same orchestrator context it will get the context
+        # it's waiting for and return
+        # BEGIN old run_operations
         # Set of tasks we are waiting on
+        # TODO Make some way to cap the number of context's who have operations
+        # executing. Or maybe just the number of operations. Or both.
         tasks = set()
-        # If we are a subflow of a given context initiate runing operation witin
-        # that context
-        if ctx is not None:
+        # Create tasks to wait on the results of each of the contexts submitted
+        for ctx in ctxs:
             self.logger.debug(
                 "kickstarting context: %s", (await ctx.handle()).as_string()
             )
@@ -1131,18 +1120,9 @@ class MemoryOrchestratorContext(BaseOrchestratorContext):
                     self.run_operations_for_ctx(ctx, strict=strict)
                 )
             )
-        # Create initial events to wait on
-        new_context_enters_network = asyncio.create_task(self.ictx.ctx())
-        tasks.add(new_context_enters_network)
         try:
             # Return when outstanding operations reaches zero
             while tasks:
-                if (
-                    not more
-                    and len(tasks) == 1
-                    and new_context_enters_network in tasks
-                ):
-                    break
                 # Wait for incoming events
                 done, _pending = await asyncio.wait(
                     tasks, return_when=asyncio.FIRST_COMPLETED
@@ -1161,29 +1141,6 @@ class MemoryOrchestratorContext(BaseOrchestratorContext):
                         task.print_stack(file=output)
                         self.logger.error("%s", output.getvalue().rstrip())
                         output.close()
-                    elif task is new_context_enters_network:
-                        # TODO Make some way to cap the number of context's who have
-                        # operations executing. Or maybe just the number of
-                        # operations. Or both.
-                        # A new context entered the network
-                        more, new_ctx = new_context_enters_network.result()
-                        self.logger.debug(
-                            "new_context_enters_network: %s",
-                            (await new_ctx.handle()).as_string(),
-                        )
-                        # Add a task which will run operations for the new context
-                        tasks.add(
-                            asyncio.create_task(
-                                self.run_operations_for_ctx(
-                                    new_ctx, strict=strict
-                                )
-                            )
-                        )
-                        # Create a another task to waits for a new context
-                        new_context_enters_network = asyncio.create_task(
-                            self.ictx.ctx()
-                        )
-                        tasks.add(new_context_enters_network)
                     else:
                         # All operations for a context completed
                         # Yield the context that completed and the results of its
@@ -1204,7 +1161,6 @@ class MemoryOrchestratorContext(BaseOrchestratorContext):
         ctx: BaseContextHandle,
         *,
         strict: bool = True,
-        dataflow: DataFlow = None,
     ) -> AsyncIterator[Tuple[BaseContextHandle, Dict[str, Any]]]:
         # Track if there are more inputs
         more = True
@@ -1213,6 +1169,7 @@ class MemoryOrchestratorContext(BaseOrchestratorContext):
         # String representing the context we are executing operations for
         ctx_str = (await ctx.handle()).as_string()
         # Create initial events to wait on
+        # TODO(dfass) Make ictx.added(ctx) specific to dataflow
         input_set_enters_network = asyncio.create_task(self.ictx.added(ctx))
         tasks.add(input_set_enters_network)
         try:
@@ -1312,6 +1269,33 @@ class MemoryOrchestratorContext(BaseOrchestratorContext):
                 ctx, self, operation, await parameter_set._asdict()
             )
 
+    async def output_subflow(
+        self,
+        dataflow: DataFlow,
+        *,
+        ctx: Optional[BaseInputSetContext] = None,
+        inputs: Optional[List[Input]] = None,
+    ):
+        # TODO(dfass) This doesn't seem do be used, can we remove? Removal,
+        # dependent on making sure remap testcase works within service/http
+        """
+        Run a DataFlow but only run output operations.
+        """
+        ctx = await self.seed_inputs_for_dataflow(dataflow, ctx=ctx, inputs=inputs)
+        self.logger.debug("Running output subflow: %s", dataflow)
+        # Run output operations and create a dict mapping the operation name to
+        # the output of that operation
+        output = {
+            operation.instance_name: results
+            async for operation, results in self.run_stage(ctx, Stage.OUTPUT)
+        }
+        # If there is only one output operation, return only it's result instead
+        # of a dict with it as the only key value pair
+        if len(output) == 1:
+            output = list(output.values())[0]
+        # Return the context along with it's output
+        return ctx, output
+
 
 @entry_point("memory")
 class MemoryOrchestrator(BaseOrchestrator, BaseMemoryDataFlowObject):
@@ -1339,10 +1323,10 @@ class MemoryOrchestrator(BaseOrchestrator, BaseMemoryDataFlowObject):
     async def __aexit__(self, exc_type, exc_value, traceback):
         await self._stack.aclose()
 
-    def __call__(self, **kwargs) -> BaseDataFlowObjectContext:
+    def __call__(self, dataflow: DataFlow, **kwargs) -> BaseDataFlowObjectContext:
         return self.CONTEXT(
             MemoryOrchestratorContextConfig(
-                uid=secrets.token_hex(), reuse=kwargs
+                uid=secrets.token_hex(), dataflow=dataflow, reuse=kwargs
             ),
             self,
         )
