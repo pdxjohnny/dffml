@@ -2,7 +2,7 @@ import sys
 
 from dffml.df.types import Input, Operation, DataFlow, InputFlow
 from dffml.df.base import operation_in, opimp_in
-from dffml.df.memory import MemoryOrchestrator
+from dffml.df.memory import MemoryOrchestrator, MemoryInputSet, MemoryInputSetConfig, StringInputSetContext
 from dffml.df.linker import Linker
 from dffml.operation.output import GetSingle
 from dffml.util.cli.cmd import CMD
@@ -72,9 +72,7 @@ class Install(CMD):
         async with MemoryOrchestrator.basic_config() as orchestrator:
             # Create a orchestrator context, everything in DFFML follows this
             # one-two context entry pattern
-            async with orchestrator() as octx:
-                # Load the operations into the orchestrator context
-                await octx.initialize_dataflow(DATAFLOW)
+            async with orchestrator(DATAFLOW) as octx:
                 # For each package add a new input set to the network of inputs
                 # (ictx). Operations run under a context, the context here is
                 # the package_name to evaluate (the first argument). The next
@@ -84,19 +82,24 @@ class Install(CMD):
                 # which safety will then use. We also give an input to the
                 # output operation GetSingle, which takes a list of data type
                 # definitions we want to select as our results.
-                for package_name in self.packages:
-                    await octx.ictx.sadd(
-                        package_name,
-                        Input(
-                            value=package_name,
-                            definition=pypi_package_json.op.inputs["package"],
-                        ),
-                    )
 
                 # Run all the operations, Each iteration of this loop happens
                 # when all inputs are exhausted for a context, the output
                 # operations are then run and their results are yielded
-                async for package_name, results in octx.run_operations():
+                async for package_name, results in octx.run(*[
+                        MemoryInputSet(
+                            MemoryInputSetConfig(
+                                ctx=StringInputSetContext(package_name),
+                                inputs=[
+                                    Input(
+                                        value=package_name,
+                                        definition=pypi_package_json.op.inputs["package"],
+                                    ),
+                                ]
+                            )
+                        )
+                        for package_name in self.packages
+                    ]):
                     # Grab the number of saftey issues and the bandit report
                     # from the results dict
                     safety_issues = results[
