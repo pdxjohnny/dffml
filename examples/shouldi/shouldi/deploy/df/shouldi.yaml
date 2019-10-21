@@ -109,4 +109,10 @@ operations:
     outputs:
       issues: safety_check_number_of_issues
     stage: processing
-seed: []
+seed:
+- definition:
+    name: get_single_spec
+    primitive: List[str]
+  value:
+  - safety_check_number_of_issues
+  - bandit_output
