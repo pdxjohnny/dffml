@@ -507,8 +507,7 @@ class DataFlow:
                 exported_operation["inputs"][name] = definition.name
             for name, definition in operation.outputs.items():
                 exported_operation["outputs"][name] = definition.name
-            exported[operation.instance_name] = exported_operation
-        exported["operations"] = operations
+            operations[operation.instance_name] = exported_operation
         # Remove definitions from seed inputs, just use definition name
         seed = []
         for item in self.seed:

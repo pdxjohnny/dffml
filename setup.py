@@ -64,9 +64,13 @@ setup(
         "dffml.config": ["json = dffml.config.json:JSONConfigLoader"],
         # Data Flow
         "dffml.operation": [
+            # Output
             "group_by = dffml.operation.output:GroupBy",
             "get_single = dffml.operation.output:GetSingle",
             "associate = dffml.operation.output:Associate",
+            # Mapping
+            "dffml.mapping.extract = dffml.operation.mapping:mapping_extract_value",
+            "dffml.mapping.create = dffml.operation.mapping:create_mapping",
         ],
         "dffml.kvstore": ["memory = dffml.df.memory:MemoryKeyValueStore"],
         "dffml.input.network": ["memory = dffml.df.memory:MemoryInputNetwork"],

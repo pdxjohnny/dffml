@@ -3,10 +3,14 @@ import pathlib
 import contextlib
 from typing import Union, Tuple, Dict
 
+from ..util.data import merge
 from ..util.entrypoint import base_entry_point
 from ..config.config import BaseConfigLoader
 from .base import BaseConfig, BaseDataFlowObjectContext, BaseDataFlowObject
 from .types import DataFlow
+
+# Filetypes to ignore (don't try to load as a config)
+IGNORE = ["swp"]
 
 
 class MultiCommInAtomicMode(Exception):
@@ -24,6 +28,12 @@ class NoConfigsForMultiComm(Exception):
 class NoDataFlows(Exception):
     """
     Raised when no dataflows are found
+    """
+
+
+class NoDataFlowsForConfig(Exception):
+    """
+    Raised when no dataflows are found for a channel config
     """
 
 
@@ -53,6 +63,19 @@ class BaseMultiCommContext(BaseDataFlowObjectContext, abc.ABC):
         """
         Return the config object to be passed to the resigter method
         """
+
+    def _iter_configs(
+        self,
+        directory: pathlib.Path,
+    ) -> Dict:
+        """
+        Yield pathlib.Path objects for each relevant config file. Ignore some
+        filetypes.
+        """
+        for path in directory.rglob("*"):
+            if path.suffix.replace(".", "") in IGNORE:
+                continue
+            yield path
 
     async def _load_file(
         self,
@@ -121,12 +144,29 @@ class BaseMultiCommContext(BaseDataFlowObjectContext, abc.ABC):
                 config_path, config = await self._load_file(
                     parsers, exit_stack, df_dir, path
                 )
-                # TODO Provide a way to add overrides via another directory and
-                # .update to the original
                 df_configs[config_path] = config
                 # Now that we have all the dataflow, add it to its respective
                 # multicomm config
                 mc_configs[config_path]["dataflow"] = config
+            # Load all overrides
+            override_dir = pathlib.Path(directory, "override")
+            for path in self._iter_configs(override_dir):
+                config_path, config = await self._load_file(
+                    parsers, exit_stack, override_dir, path
+                )
+                if not config_path in df_configs:
+                    self.logger.info(
+                        "Overriding non-existent DataFlow: %s", config_path
+                    )
+                    df_configs[config_path] = config
+                else:
+                    merge(df_configs[config_path], config)
+            # Instantiate all configs and register them
+            for config_path in mc_configs.keys():
+                # Assign dataflow to its respective channel config
+                if not config_path in df_configs:
+                    raise NoDataFlowsForConfig(config_path)
+                mc_configs[config_path]["dataflow"] = df_configs[config_path]
                 # Finally, turn the dict into an object and register it
                 mc_configs[config_path] = config_cls._fromdict(
                     **mc_configs[config_path]
