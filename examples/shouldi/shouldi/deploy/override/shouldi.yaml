@@ -21,16 +21,18 @@ definitions:
     primitive: generic
 flow:
   transform_to_repo:
-    key:
-    - seed
-    value:
-    - pkg.contents.directory
+    inputs:
+      key: seed
+      value:
+      - directory: pkg.contents
   lines_of_code_by_language:
-    repo:
-    - transform_to_repo.mapping
+    inputs:
+      repo:
+      - mapping: transform_to_repo
   lines_of_code_to_comments:
-    langs:
-    - lines_of_code_by_language.lines_by_language
+    inputs:
+      langs:
+      - lines_by_language: lines_of_code_by_language
 linked: true
 operations:
   transform_to_repo:

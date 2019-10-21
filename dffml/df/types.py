@@ -4,7 +4,7 @@ import inspect
 import itertools
 import pkg_resources
 from enum import Enum
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, asdict
 from typing import (
     NamedTuple,
     Union,
@@ -14,6 +14,7 @@ from typing import (
     Any,
     Iterator,
     Callable,
+    Tuple,
 )
 
 from ..base import BaseConfig
@@ -240,6 +241,7 @@ class Input(object):
         value: Any,
         definition: Definition,
         parents: Optional[List["Input"]] = None,
+        origin: Optional[Union[str, Tuple[Operation, str]]] = "seed",
         *,
         uid: Optional[str] = "",
     ):
@@ -248,6 +250,7 @@ class Input(object):
         self.value = value
         self.definition = definition
         self.parents = parents
+        self.origin = origin
         self.uid = uid
         if not self.uid:
             self.uid = str(uuid.uuid4())
@@ -286,7 +289,8 @@ class Parameter(NamedTuple):
     definition: Definition
 
 
-class InputFlow(dict):
+@dataclass
+class InputFlow:
     """
     Inputs of an operation by their name as used by the operation implementation
     mapped to a list of locations they can come from. The list contains strings
@@ -294,9 +298,33 @@ class InputFlow(dict):
     literal "seed" which specifies that the value could be seeded to the
     network.
     """
+    inputs: Dict[str, List[Dict[str, Operation]]] = field(default=None)
+    conditions: List[Dict[str, Operation]] = field(default=None)
+
+    def __post_init__(self):
+        if self.inputs is None:
+            self.inputs = {}
+        if self.conditions is None:
+            self.conditions = []
 
     def export(self):
-        return dict(self)
+        return export_dict(**asdict(self))
+
+    @classmethod
+    def _fromdict(cls, **kwargs):
+        if "conditions" in kwargs:
+            kwargs["conditions"] = [
+                {output_name: Operation._fromdict(**operation)
+                for output_name, operation in condition_source.items()}
+                for condition_source in kwargs["conditions"]
+                ]
+        if "inputs" in kwargs:
+            kwargs["inputs"] = {
+                input_name: {output_name: Operation._fromdict(**operation)
+                             for output_name, operation in input_source.items()}
+                for input_name, input_source in kwargs["inputs"].items()
+                }
+        return cls(**kwargs)
 
 
 @dataclass
@@ -306,6 +334,7 @@ class DataFlow:
     configs: Dict[str, BaseConfig] = field(default=None)
     definitions: Dict[str, Definition] = field(init=False)
     flow: Dict[str, InputFlow] = field(default=None)
+    by_origin: Dict[Stage, Dict[str, Operation]] = field(default=None)
     # Implementations can be provided in case they haven't been registered via
     # the entrypoint system.
     implementations: Dict[str, "OperationImplementation"] = field(default=None)
@@ -317,8 +346,8 @@ class DataFlow:
             self.seed = []
         if self.configs is None:
             self.configs = {}
-        if self.flow is None:
-            self.flow = {}
+        if self.by_origin is None:
+            self.by_origin = {}
         if self.implementations is None:
             self.implementations = {}
         # Allow callers to pass in functions decorated with op. Iterate over the
@@ -361,6 +390,15 @@ class DataFlow:
             definition.name: definition for definition in definitions
         }
         self.definitions = definitions
+        # Determine the dataflow if not given
+        if self.flow is None:
+            self.flow = self.auto_flow()
+        # Create by_origin which maps operation instance names to the sources
+        for instance_name, input_flow in self.flow.values():
+            operation = self.operations[instance_name]
+            self.by_origin.setdefault(operation.stage, {})
+            for output_name, output_operation in input_flow.inputs.items():
+                self.by_origin[operation.stage][output_operation.instance_name].append(operation)
 
     def export(self, *, linked: bool = False):
         exported = {
@@ -403,16 +441,22 @@ class DataFlow:
 
     @classmethod
     def auto(cls, *operations):
+        return cls(
+            operations={operation.name: operation for operation in operations},
+        )
+
+    def auto_flow(self):
         flow_dict = {}
         # Create output_dict, which maps all of the definitions to the
         # operations that create them.
         output_dict = {}
-        for operation in operations:
+        for operation in self.operations.values():
             for output in operation.outputs.values():
                 output_dict.setdefault(output.name, {})
                 output_dict[output.name].update({operation.name: operation})
         # Got through all the operations and look at their inputs
-        for operation in operations:
+        for operation in self.operations.values():
+            # TODO Auto flow on operation conditions too
             flow_dict.setdefault(operation.name, InputFlow())
             # Example operation:
             # Operation(
@@ -436,7 +480,7 @@ class DataFlow:
                     producing_operations = output_dict[definition.name]
                     # If the input could be produced by an operation in the
                     # network, then it's definition name will be in output_dict.
-                    flow_dict[operation.name][internal_name] = []
+                    flow_dict[operation.name].inputs[internal_name] = []
                     # We look through the outputs and add any one that matches
                     # the definition and add it to the list in format of
                     # operation_name . internal_name (of output)
@@ -446,7 +490,7 @@ class DataFlow:
                             output_definition,
                         ) in producting_operation.outputs.items():
                             if output_definition == definition:
-                                flow_dict[operation.name][
+                                flow_dict[operation.name].inputs[
                                     internal_name
                                 ].append(
                                     producting_operation.name
@@ -454,11 +498,8 @@ class DataFlow:
                                     + internal_name_of_output
                                 )
                 else:
-                    flow_dict[operation.name][internal_name] = ["seed"]
-        return cls(
-            operations={operation.name: operation for operation in operations},
-            flow=flow_dict,
-        )
+                    flow_dict[operation.name].inputs[internal_name] = ["seed"]
+        return flow_dict
 
     @classmethod
     def _resolve(cls, source: Dict):

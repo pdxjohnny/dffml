@@ -5,7 +5,7 @@ import hashlib
 import inspect
 import itertools
 from datetime import datetime
-from itertools import product
+from itertools import product, chain
 from contextlib import asynccontextmanager, AsyncExitStack
 from typing import (
     AsyncIterator,
@@ -369,6 +369,7 @@ class MemoryInputNetworkContext(BaseInputNetworkContext):
         self,
         rctx: "BaseRedundancyCheckerContext",
         operation: Operation,
+        dataflow: DataFlow,
         ctx: Optional[BaseInputSetContext] = None,
     ) -> AsyncIterator[BaseParameterSet]:
         # Create a mapping of definitions to inputs for that definition
@@ -387,38 +388,36 @@ class MemoryInputNetworkContext(BaseInputNetworkContext):
                 # Limit search to given context via context handle
                 contexts = [self.ctxhd[handle_string]]
             for ctx, definitions in contexts:
+                # Grab the input flow to check for definition overrides
+                input_flow = dataflow.flow[operation.instance_name]
                 # Check that all conditions are present and logicly True
-                if not all(
-                    map(
-                        lambda definition: (
-                            definition in definitions
-                            and all(
-                                map(
-                                    lambda item: bool(item.value),
-                                    definitions[definition],
-                                )
-                            )
-                        ),
-                        operation.conditions,
-                    )
-                ):
-                    return
-                # Gather all inputs with matching definitions and contexts
-                for key, definition in operation.inputs.items():
-                    # Return if any inputs are missing
-                    if not definition in definitions:
+                # TODO(dfass) Store inputs by the operation instance name that
+                # created them
+                for output_name, source_operation in input_flow.conditions:
+                    definition = source_operation.outputs[output_name]
+                    if not definition in definitions \
+                            or not all(map(lambda item: bool(item.value),
+                                           definitions[definition])):
+
                         return
-                    else:
-                        # Generate parameters from inputs
-                        gather[key] = [
-                            Parameter(
-                                key=key,
-                                value=item.value,
-                                origin=item,
-                                definition=definition,
-                            )
-                            for item in definitions[definition]
-                        ]
+                # Gather all inputs with matching definitions and contexts
+                for input_name, input_sources in input_flow.inputs.items():
+                    for output_name, source_operation in input_sources:
+                        definition = source_operation.outputs[output_name]
+                        # Return if any inputs are missing
+                        if not definition in definitions:
+                            return
+                        else:
+                            # Generate parameters from inputs
+                            gather[input_name] = [
+                                Parameter(
+                                    key=key,
+                                    value=item.value,
+                                    origin=item,
+                                    definition=definition,
+                                )
+                                for item in definitions[definition]
+                            ]
         # Generate all possible permutations of applicable inputs
         for permutation in product(*list(gather.values())):
             # Create the parameter set
@@ -460,9 +459,22 @@ class MemoryOperationNetworkContext(BaseOperationNetworkContext):
 
     async def operations(
         self,
+        dataflow: DataFlow,
+        *,
         input_set: Optional[BaseInputSet] = None,
         stage: Stage = Stage.PROCESSING,
     ) -> AsyncIterator[Operation]:
+        if input_set is None:
+            for operation, _ in chain(dataflow.by_origin[stage].values()):
+                yield operation
+        else:
+            async for item in input_set.inputs():
+                origin = "seed"
+                if item.origin != "seed":
+                    origin = item.origin.operation.instance_name
+                for operation, _ in dataflow.by_origin[stage][origin]:
+                    yield operation
+        """
         # Set list of needed input definitions if given
         if not input_set is None:
             input_definitions = await input_set.definitions()
@@ -485,6 +497,7 @@ class MemoryOperationNetworkContext(BaseOperationNetworkContext):
                 ]:
                     continue
             yield operation
+        """
 
 
 @entry_point("memory")
@@ -824,6 +837,7 @@ class MemoryOperationImplementationNetworkContext(
                             value=value,
                             definition=operation.outputs[key],
                             parents=parents,
+                            origin=(operation, key,),
                         )
                     )
         except KeyError as error:
@@ -865,6 +879,7 @@ class MemoryOperationImplementationNetworkContext(
         octx: BaseOperationNetworkContext,
         rctx: BaseRedundancyCheckerContext,
         ctx: BaseInputSetContext,
+        dataflow: DataFlow,
         *,
         new_input_set: Optional[BaseInputSet] = None,
         stage: Stage = Stage.PROCESSING,
@@ -877,11 +892,11 @@ class MemoryOperationImplementationNetworkContext(
         """
         # Get operations which may possibly run as a result of these new inputs
         async for operation in octx.operations(
-            input_set=new_input_set, stage=stage
+            dataflow, input_set=new_input_set, stage=stage
         ):
             # Generate all pairs of un-run input combinations
             async for parameter_set in ictx.gather_inputs(
-                rctx, operation, ctx=ctx
+                rctx, operation, dataflow, ctx=ctx
             ):
                 yield operation, parameter_set
 
@@ -1158,7 +1173,10 @@ class MemoryOrchestratorContext(BaseOrchestratorContext):
                     task.exception()
 
     async def run_operations_for_ctx(
-        self, ctx: BaseContextHandle, *, strict: bool = True
+        self,
+        ctx: BaseContextHandle,
+        *,
+        strict: bool = True
     ) -> AsyncIterator[Tuple[BaseContextHandle, Dict[str, Any]]]:
         # Track if there are more inputs
         more = True
@@ -1209,6 +1227,7 @@ class MemoryOrchestratorContext(BaseOrchestratorContext):
                                 self.octx,
                                 self.rctx,
                                 ctx,
+                                self.config.dataflow,
                                 new_input_set=new_input_set,
                             ):
                                 # Add inputs and operation to redundancy checker before
@@ -1258,7 +1277,7 @@ class MemoryOrchestratorContext(BaseOrchestratorContext):
         # Identify which operations have complete contextually appropriate
         # input sets which haven't been run yet and are stage operations
         async for operation, parameter_set in self.nctx.operations_parameter_set_pairs(
-            self.ictx, self.octx, self.rctx, ctx, stage=stage
+            self.ictx, self.octx, self.rctx, ctx, self.config.dataflow, stage=stage
         ):
             # Add inputs and operation to redundancy checker before dispatch
             await self.rctx.add(operation, parameter_set)
