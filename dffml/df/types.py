@@ -367,9 +367,7 @@ class DataFlow:
             "operations": {
                 instance_name: operation.export()
                 for instance_name, operation in self.operations.items()
-            }
-            if not linked
-            else self._linked_operations(),
+            },
             "seed": self.seed.copy(),
             "configs": self.configs.copy(),
             "flow": self.flow.copy(),
@@ -377,13 +375,14 @@ class DataFlow:
         if linked:
             exported["linked"] = True
             exported["definitions"] = self.definitions.copy()
+            exported.update(self._linked()),
         return export_dict(**exported)
 
     @classmethod
     def _fromdict(cls, *, linked: bool = False, **kwargs):
         # Import all operations
         if linked:
-            kwargs["operations"] = cls._resolve_operations(kwargs)
+            kwargs.update(cls._resolve(kwargs))
             del kwargs["definitions"]
         kwargs["operations"] = {
             instance_name: Operation._fromdict(
@@ -462,7 +461,7 @@ class DataFlow:
         )
 
     @classmethod
-    def _resolve_operations(cls, source: Dict):
+    def _resolve(cls, source: Dict):
         definitions = {}
         operations = {}
         for name, definition in source.get("definitions", {}).items():
@@ -489,10 +488,19 @@ class DataFlow:
                         )
                     operation[arg][input_name] = definitions[definition_name]
             operation.setdefault("name", name)
-        return source["operations"]
+        for item in source.get("seed", []):
+            # Replaces strings referencing definitions with definitions
+            if not item["definition"] in definitions:
+                raise DefinitionMissing(
+                    "While resolving {instance_name}.{arg}, missing {definition_name}"
+                )
+            item["definition"] = definitions[item["definition"]]
+        return source
 
-    def _linked_operations(self):
+    def _linked(self):
         exported = {}
+        # Remove definitions from operations, just use definition name
+        operations = {}
         for operation in self.operations.values():
             exported_operation = operation.export()
             for name, definition in operation.inputs.items():
@@ -500,4 +508,14 @@ class DataFlow:
             for name, definition in operation.outputs.items():
                 exported_operation["outputs"][name] = definition.name
             exported[operation.instance_name] = exported_operation
+        exported["operations"] = operations
+        # Remove definitions from seed inputs, just use definition name
+        seed = []
+        for item in self.seed:
+            exported_item = item.export()
+            exported_item["definition"] = exported_item["definition"]["name"]
+            seed.append(exported_item)
+        # Set linked exported
+        exported["seed"] = seed
+        exported["operations"] = operations
         return exported
