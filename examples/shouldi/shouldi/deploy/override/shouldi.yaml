@@ -24,15 +24,15 @@ flow:
     inputs:
       key: seed
       value:
-      - directory: pkg.contents
+        pkg.contents: directory
   lines_of_code_by_language:
     inputs:
       repo:
-      - mapping: transform_to_repo
+        transform_to_repo: mapping
   lines_of_code_to_comments:
     inputs:
       langs:
-      - lines_by_language: lines_of_code_by_language
+        lines_of_code_by_language: lines_by_language
 linked: true
 operations:
   transform_to_repo:

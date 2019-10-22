@@ -64,10 +64,7 @@ class BaseMultiCommContext(BaseDataFlowObjectContext, abc.ABC):
         Return the config object to be passed to the resigter method
         """
 
-    def _iter_configs(
-        self,
-        directory: pathlib.Path,
-    ) -> Dict:
+    def _iter_configs(self, directory: pathlib.Path) -> Dict:
         """
         Yield pathlib.Path objects for each relevant config file. Ignore some
         filetypes.

@@ -395,9 +395,12 @@ class MemoryInputNetworkContext(BaseInputNetworkContext):
                 # created them
                 for output_name, source_operation in input_flow.conditions:
                     definition = source_operation.outputs[output_name]
-                    if not definition in definitions \
-                            or not all(map(lambda item: bool(item.value),
-                                           definitions[definition])):
+                    if not definition in definitions or not all(
+                        map(
+                            lambda item: bool(item.value),
+                            definitions[definition],
+                        )
+                    ):
 
                         return
                 # Gather all inputs with matching definitions and contexts
@@ -469,10 +472,10 @@ class MemoryOperationNetworkContext(BaseOperationNetworkContext):
                 yield operation
         else:
             async for item in input_set.inputs():
-                origin = "seed"
-                if item.origin != "seed":
-                    origin = item.origin.operation.instance_name
-                for operation, _ in dataflow.by_origin[stage][origin]:
+                origin = item.origin
+                if isinstance(origin, Operation):
+                    origin = origin.instance_name
+                for operation in dataflow.by_origin[stage][origin]:
                     yield operation
         """
         # Set list of needed input definitions if given
@@ -837,7 +840,7 @@ class MemoryOperationImplementationNetworkContext(
                             value=value,
                             definition=operation.outputs[key],
                             parents=parents,
-                            origin=(operation, key,),
+                            origin=(operation, key),
                         )
                     )
         except KeyError as error:
@@ -1173,10 +1176,7 @@ class MemoryOrchestratorContext(BaseOrchestratorContext):
                     task.exception()
 
     async def run_operations_for_ctx(
-        self,
-        ctx: BaseContextHandle,
-        *,
-        strict: bool = True
+        self, ctx: BaseContextHandle, *, strict: bool = True
     ) -> AsyncIterator[Tuple[BaseContextHandle, Dict[str, Any]]]:
         # Track if there are more inputs
         more = True
@@ -1277,7 +1277,12 @@ class MemoryOrchestratorContext(BaseOrchestratorContext):
         # Identify which operations have complete contextually appropriate
         # input sets which haven't been run yet and are stage operations
         async for operation, parameter_set in self.nctx.operations_parameter_set_pairs(
-            self.ictx, self.octx, self.rctx, ctx, self.config.dataflow, stage=stage
+            self.ictx,
+            self.octx,
+            self.rctx,
+            ctx,
+            self.config.dataflow,
+            stage=stage,
         ):
             # Add inputs and operation to redundancy checker before dispatch
             await self.rctx.add(operation, parameter_set)

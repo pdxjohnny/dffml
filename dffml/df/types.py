@@ -298,6 +298,7 @@ class InputFlow:
     literal "seed" which specifies that the value could be seeded to the
     network.
     """
+
     inputs: Dict[str, List[Dict[str, Operation]]] = field(default=None)
     conditions: List[Dict[str, Operation]] = field(default=None)
 
@@ -314,16 +315,20 @@ class InputFlow:
     def _fromdict(cls, **kwargs):
         if "conditions" in kwargs:
             kwargs["conditions"] = [
-                {output_name: Operation._fromdict(**operation)
-                for output_name, operation in condition_source.items()}
+                {
+                    output_name: Operation._fromdict(**operation)
+                    for output_name, operation in condition_source.items()
+                }
                 for condition_source in kwargs["conditions"]
-                ]
+            ]
         if "inputs" in kwargs:
             kwargs["inputs"] = {
-                input_name: {output_name: Operation._fromdict(**operation)
-                             for output_name, operation in input_source.items()}
-                for input_name, input_source in kwargs["inputs"].items()
+                input_name: {
+                    output_name: Operation._fromdict(**operation)
+                    for output_name, operation in input_source.items()
                 }
+                for input_name, input_source in kwargs["inputs"].items()
+            }
         return cls(**kwargs)
 
 
@@ -393,12 +398,30 @@ class DataFlow:
         # Determine the dataflow if not given
         if self.flow is None:
             self.flow = self.auto_flow()
+        print(self.flow)
         # Create by_origin which maps operation instance names to the sources
-        for instance_name, input_flow in self.flow.values():
+        thing = {}
+        for instance_name, input_flow in self.flow.items():
             operation = self.operations[instance_name]
-            self.by_origin.setdefault(operation.stage, {})
-            for output_name, output_operation in input_flow.inputs.items():
-                self.by_origin[operation.stage][output_operation.instance_name].append(operation)
+            thing.setdefault(operation.stage, {})
+            for output_name, output_sources in input_flow.inputs.items():
+                # TODO Make stanardize this so that seed is also a dict
+                for output_source in output_sources:
+                    if isinstance(output_source, str):
+                        thing[operation.stage].setdefault(output_source, [])
+                        thing[operation.stage][output_source].append(operation)
+                    else:
+                        for (
+                            output_operation_instance_name,
+                            output_name,
+                        ) in output_source.items():
+                            thing[operation.stage].setdefault(
+                                output_operation_instance_name, []
+                            )
+                            thing[operation.stage][
+                                output_operation_instance_name
+                            ].append(operation)
+        self.by_origin = thing
 
     def export(self, *, linked: bool = False):
         exported = {
@@ -442,7 +465,7 @@ class DataFlow:
     @classmethod
     def auto(cls, *operations):
         return cls(
-            operations={operation.name: operation for operation in operations},
+            operations={operation.name: operation for operation in operations}
         )
 
     def auto_flow(self):
@@ -451,13 +474,15 @@ class DataFlow:
         # operations that create them.
         output_dict = {}
         for operation in self.operations.values():
-            for output in operation.outputs.values():
-                output_dict.setdefault(output.name, {})
-                output_dict[output.name].update({operation.name: operation})
+            for definition in operation.outputs.values():
+                output_dict.setdefault(definition.name, {})
+                output_dict[definition.name].update(
+                    {operation.instance_name: operation}
+                )
         # Got through all the operations and look at their inputs
         for operation in self.operations.values():
             # TODO Auto flow on operation conditions too
-            flow_dict.setdefault(operation.name, InputFlow())
+            flow_dict.setdefault(operation.instance_name, InputFlow())
             # Example operation:
             # Operation(
             #     name="pypi_package_json",
@@ -480,7 +505,9 @@ class DataFlow:
                     producing_operations = output_dict[definition.name]
                     # If the input could be produced by an operation in the
                     # network, then it's definition name will be in output_dict.
-                    flow_dict[operation.name].inputs[internal_name] = []
+                    flow_dict[operation.instance_name].inputs[
+                        internal_name
+                    ] = []
                     # We look through the outputs and add any one that matches
                     # the definition and add it to the list in format of
                     # operation_name . internal_name (of output)
@@ -490,15 +517,17 @@ class DataFlow:
                             output_definition,
                         ) in producting_operation.outputs.items():
                             if output_definition == definition:
-                                flow_dict[operation.name].inputs[
+                                flow_dict[operation.instance_name].inputs[
                                     internal_name
                                 ].append(
-                                    producting_operation.name
-                                    + "."
-                                    + internal_name_of_output
+                                    {
+                                        producting_operation.instance_name: internal_name_of_output
+                                    }
                                 )
                 else:
-                    flow_dict[operation.name].inputs[internal_name] = ["seed"]
+                    flow_dict[operation.instance_name].inputs[
+                        internal_name
+                    ] = ["seed"]
         return flow_dict
 
     @classmethod
