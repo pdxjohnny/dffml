@@ -313,22 +313,6 @@ class InputFlow:
 
     @classmethod
     def _fromdict(cls, **kwargs):
-        if "conditions" in kwargs:
-            kwargs["conditions"] = [
-                {
-                    output_name: Operation._fromdict(**operation)
-                    for output_name, operation in condition_source.items()
-                }
-                for condition_source in kwargs["conditions"]
-            ]
-        if "inputs" in kwargs:
-            kwargs["inputs"] = {
-                input_name: {
-                    output_name: Operation._fromdict(**operation)
-                    for output_name, operation in input_source.items()
-                }
-                for input_name, input_source in kwargs["inputs"].items()
-            }
         return cls(**kwargs)
 
 
@@ -398,30 +382,28 @@ class DataFlow:
         # Determine the dataflow if not given
         if self.flow is None:
             self.flow = self.auto_flow()
-        print(self.flow)
         # Create by_origin which maps operation instance names to the sources
-        thing = {}
+        self.by_origin = {}
         for instance_name, input_flow in self.flow.items():
             operation = self.operations[instance_name]
-            thing.setdefault(operation.stage, {})
+            self.by_origin.setdefault(operation.stage, {})
             for output_name, output_sources in input_flow.inputs.items():
                 # TODO Make stanardize this so that seed is also a dict
                 for output_source in output_sources:
                     if isinstance(output_source, str):
-                        thing[operation.stage].setdefault(output_source, [])
-                        thing[operation.stage][output_source].append(operation)
+                        self.by_origin[operation.stage].setdefault(output_source, [])
+                        self.by_origin[operation.stage][output_source].append(operation)
                     else:
                         for (
                             output_operation_instance_name,
                             output_name,
                         ) in output_source.items():
-                            thing[operation.stage].setdefault(
+                            self.by_origin[operation.stage].setdefault(
                                 output_operation_instance_name, []
                             )
-                            thing[operation.stage][
+                            self.by_origin[operation.stage][
                                 output_operation_instance_name
                             ].append(operation)
-        self.by_origin = thing
 
     def export(self, *, linked: bool = False):
         exported = {
@@ -457,7 +439,7 @@ class DataFlow:
         ]
         # Import input flows
         kwargs["flow"] = {
-            instance_name: InputFlow(input_flow)
+            instance_name: InputFlow._fromdict(**input_flow)
             for instance_name, input_flow in kwargs["flow"].items()
         }
         return cls(**kwargs)

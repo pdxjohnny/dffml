@@ -387,40 +387,58 @@ class MemoryInputNetworkContext(BaseInputNetworkContext):
                     return
                 # Limit search to given context via context handle
                 contexts = [self.ctxhd[handle_string]]
-            for ctx, definitions in contexts:
+            for ctx, by_origin in contexts:
                 # Grab the input flow to check for definition overrides
                 input_flow = dataflow.flow[operation.instance_name]
                 # Check that all conditions are present and logicly True
-                # TODO(dfass) Store inputs by the operation instance name that
-                # created them
-                for output_name, source_operation in input_flow.conditions:
-                    definition = source_operation.outputs[output_name]
-                    if not definition in definitions or not all(
-                        map(
-                            lambda item: bool(item.value),
-                            definitions[definition],
-                        )
-                    ):
-
-                        return
+                for condition_sources in input_flow.conditions:
+                    for condition_source in condition_sources:
+                        # Create a list of places this input originates from
+                        origins = []
+                        if isinstance(condition_source, dict):
+                            for origin in condition_sources.items():
+                                origins.append(origin)
+                        else:
+                            origins.append(condition_source)
+                        # Ensure all conditions from all origins are True
+                        for origin in origins:
+                            # Bail if the condition doesn't exist
+                            if not origin in by_origin:
+                                return
+                            # Bail if the condition is not True
+                            for item in by_origin[origin]:
+                                if not bool(item.value):
+                                    return
                 # Gather all inputs with matching definitions and contexts
                 for input_name, input_sources in input_flow.inputs.items():
-                    for output_name, source_operation in input_sources:
-                        definition = source_operation.outputs[output_name]
-                        # Return if any inputs are missing
-                        if not definition in definitions:
-                            return
+                    for input_source in input_sources:
+                        # Create a list of places this input originates from
+                        origins = []
+                        if isinstance(input_source, dict):
+                            for origin in input_sources.items():
+                                origins.append(origin)
                         else:
+                            origins.append(input_source)
+                        # Create parameters for all the inputs
+                        gather[input_name] = []
+                        for origin in origins:
+                            # Don't try to grab inputs from an origin that
+                            # doesn't have any to give us
+                            if not origin in by_origin:
+                                continue
                             # Generate parameters from inputs
-                            gather[input_name] = [
+                            gather[input_name] += [
                                 Parameter(
                                     key=key,
                                     value=item.value,
                                     origin=item,
                                     definition=definition,
                                 )
-                                for item in definitions[definition]
+                                for item in by_origin[origin]
                             ]
+                        # Return if there is no data for an input
+                        if not gather[input_name]:
+                            return
         # Generate all possible permutations of applicable inputs
         for permutation in product(*list(gather.values())):
             # Create the parameter set
@@ -467,8 +485,10 @@ class MemoryOperationNetworkContext(BaseOperationNetworkContext):
         input_set: Optional[BaseInputSet] = None,
         stage: Stage = Stage.PROCESSING,
     ) -> AsyncIterator[Operation]:
+        if stage not in dataflow.by_origin:
+            return
         if input_set is None:
-            for operation, _ in chain(dataflow.by_origin[stage].values()):
+            for operation in chain(*dataflow.by_origin[stage].values()):
                 yield operation
         else:
             async for item in input_set.inputs():
