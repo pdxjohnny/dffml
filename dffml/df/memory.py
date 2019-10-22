@@ -423,7 +423,7 @@ class MemoryInputNetworkContext(BaseInputNetworkContext):
                         # Create a list of places this input originates from
                         origins = []
                         if isinstance(input_source, dict):
-                            for origin in input_sources.items():
+                            for origin in input_source.items():
                                 origins.append(origin)
                         else:
                             origins.append(input_source)

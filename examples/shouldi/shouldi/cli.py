@@ -26,43 +26,24 @@ from shouldi.safety import safety_check
 OPIMPS = opimp_in(sys.modules[__name__])
 
 # TODO(arv1ndh) Add the auto method to DataFlow
-DATAFLOW = DataFlow(
-    # The keys in the operations dict are the names of the instances of these
-    # operations. This is needed because two of the same operation could be
-    # instantiated with different configs.
-    operations={
-        "pkg.json": pypi_package_json,
-        "pkg.version": pypi_latest_package_version,
-        "pkg.url": pypi_package_url,
-        "pkg.contents": pypi_package_contents,
-        "pkg.cleanup": cleanup_pypi_package,
-        "bandit": run_bandit,
-        "safety": safety_check,
-        "output": GetSingle,
-    },
-    # The flow defines how data will move between operation instances. For the
-    # input of each operation, we specify where it will come from. The origin
-    # could be a seed value to the network (a reserved word) or it could be in
-    # the format of instance_name.output_parameter. We define a list of places
-    # it could come from to ensure data could come from varying operations.
-    flow={
-        "pkg.json": InputFlow(package=["seed"]),
-        "pkg.version": InputFlow(response_json=["pkg.json.response_json"]),
-        "pkg.url": InputFlow(response_json=["pkg.json.response_json"]),
-        "pkg.contents": InputFlow(url=["pkg.url.url"]),
-        "pkg.cleanup": InputFlow(directory=["pkg.contents.directory"]),
-        "bandit": InputFlow(pkg=["pkg.contents.directory"]),
-        "safety": InputFlow(package=["seed"], version=["pkg.version.version"]),
-    },
-    seed=[
-        Input(
-            value=[
-                safety_check.op.outputs["issues"].name,
-                run_bandit.op.outputs["report"].name,
-            ],
-            definition=GetSingle.op.inputs["spec"],
-        )
-    ],
+DATAFLOW = DataFlow.auto(
+    pypi_package_json,
+    pypi_latest_package_version,
+    pypi_package_url,
+    pypi_package_contents,
+    cleanup_pypi_package,
+    safety_check,
+    run_bandit,
+    GetSingle,
+)
+DATAFLOW.seed.append(
+    Input(
+        value=[
+            safety_check.op.outputs["issues"].name,
+            run_bandit.op.outputs["report"].name,
+        ],
+        definition=GetSingle.op.inputs["spec"],
+    )
 )
 
 

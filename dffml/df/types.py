@@ -309,7 +309,10 @@ class InputFlow:
             self.conditions = []
 
     def export(self):
-        return export_dict(**asdict(self))
+        exported = export_dict(**asdict(self))
+        if not exported["conditions"]:
+            del exported["conditions"]
+        return exported
 
     @classmethod
     def _fromdict(cls, **kwargs):
@@ -398,16 +401,13 @@ class DataFlow:
                             operation
                         )
                     else:
-                        for (
-                            output_operation_instance_name,
-                            output_name,
-                        ) in output_source.items():
+                        for origin in output_source.items():
                             self.by_origin[operation.stage].setdefault(
-                                output_operation_instance_name, []
+                                origin, []
                             )
-                            self.by_origin[operation.stage][
-                                output_operation_instance_name
-                            ].append(operation)
+                            self.by_origin[operation.stage][origin].append(
+                                operation
+                            )
 
     def export(self, *, linked: bool = False):
         exported = {
@@ -451,7 +451,10 @@ class DataFlow:
     @classmethod
     def auto(cls, *operations):
         return cls(
-            operations={operation.name: operation for operation in operations}
+            operations={
+                getattr(getattr(operation, "op", operation), "name"): operation
+                for operation in operations
+            }
         )
 
     def auto_flow(self):
