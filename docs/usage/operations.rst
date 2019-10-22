@@ -436,3 +436,6 @@ is set up correctly.
     $ shouldi install insecure-package bandit
     bandit is okay to install
     Do not install insecure-package! {'safety_check_number_of_issues': 1}
+
+.. TODO dffml service dev export -config yaml shouldi.cli:DATAFLOW | tee examples/shouldi/shouldi/deploy/df/shouldi.yaml
+.. TODO dffml dataflow create -config yaml dffml.mapping.create lines_of_code_by_language lines_of_code_to_comments > examples/shouldi/shouldi/deploy/override/shouldi.yaml

@@ -22,17 +22,18 @@ definitions:
 flow:
   transform_to_repo:
     inputs:
-      key: seed
+      key:
+      - seed
       value:
-        pkg.contents: directory
+      - pypi_package_contents: directory
   lines_of_code_by_language:
     inputs:
       repo:
-        transform_to_repo: mapping
+      - transform_to_repo: mapping
   lines_of_code_to_comments:
     inputs:
       langs:
-        lines_of_code_by_language: lines_by_language
+      - lines_of_code_by_language: lines_by_language
 linked: true
 operations:
   transform_to_repo:
@@ -59,4 +60,9 @@ operations:
     stage: processing
 seed:
 - definition: key
-  value: repo
+  value: directory
+- definition: get_single_spec
+  value:
+  - safety_check_number_of_issues
+  - bandit_output
+  - language_to_comment_ratio

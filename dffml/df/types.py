@@ -245,6 +245,8 @@ class Input(object):
         *,
         uid: Optional[str] = "",
     ):
+        # TODO Add optional parameter Input.target which specifies the operation
+        # instance name this Input is intended for.
         if parents is None:
             parents = []
         self.value = value
