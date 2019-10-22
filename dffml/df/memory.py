@@ -207,6 +207,7 @@ class NotificationSet(object):
 class MemoryInputNetworkContextEntry(NamedTuple):
     ctx: BaseInputSetContext
     definitions: Dict[Definition, List[Input]]
+    by_origin: Dict[Union[str, Tuple[str, str]], List[Input]]
 
 
 class MemoryDefinitionSetContext(BaseDefinitionSetContext):
@@ -238,6 +239,8 @@ class MemoryInputNetworkContext(BaseInputNetworkContext):
         # Grab the input set context handle
         handle = await input_set.ctx.handle()
         handle_string = handle.as_string()
+        # TODO These ctx.add calls should probably happen after inputs are in
+        # self.ctxhd
         # If the context for this input set does not exist create a
         # NotificationSet for it to notify the orchestrator
         if not handle_string in self.input_notification_set:
@@ -254,7 +257,7 @@ class MemoryInputNetworkContext(BaseInputNetworkContext):
             # Create dict for handle_string if not present
             if not handle_string in self.ctxhd:
                 self.ctxhd[handle_string] = MemoryInputNetworkContextEntry(
-                    ctx=input_set.ctx, definitions={}
+                    ctx=input_set.ctx, definitions={}, by_origin={}
                 )
             # Go through each item in the input set
             async for item in input_set.inputs():
@@ -268,6 +271,11 @@ class MemoryInputNetworkContext(BaseInputNetworkContext):
                 self.ctxhd[handle_string].definitions[item.definition].append(
                     item
                 )
+                # Create set for item origin if not present
+                if not item.origin in self.ctxhd[handle_string].by_origin:
+                    self.ctxhd[handle_string].by_origin[item.origin] = []
+                # Add input to by origin set
+                self.ctxhd[handle_string].by_origin[item.origin].append(item)
 
     async def uadd(self, *args: Input):
         """
@@ -387,7 +395,7 @@ class MemoryInputNetworkContext(BaseInputNetworkContext):
                     return
                 # Limit search to given context via context handle
                 contexts = [self.ctxhd[handle_string]]
-            for ctx, by_origin in contexts:
+            for ctx, _, by_origin in contexts:
                 # Grab the input flow to check for definition overrides
                 input_flow = dataflow.flow[operation.instance_name]
                 # Check that all conditions are present and logicly True
@@ -427,15 +435,30 @@ class MemoryInputNetworkContext(BaseInputNetworkContext):
                             if not origin in by_origin:
                                 continue
                             # Generate parameters from inputs
-                            gather[input_name] += [
-                                Parameter(
-                                    key=key,
-                                    value=item.value,
-                                    origin=item,
-                                    definition=definition,
+                            for item in by_origin[origin]:
+                                if isinstance(input_source, str):
+                                    if (
+                                        item.definition
+                                        != operation.inputs[input_name]
+                                    ):
+                                        continue
+                                elif (
+                                    item.definition
+                                    != dataflow.operations[origin[0]].outputs[
+                                        origin[1]
+                                    ]
+                                ):
+                                    continue
+                                gather[input_name].append(
+                                    Parameter(
+                                        key=input_name,
+                                        value=item.value,
+                                        origin=item,
+                                        definition=operation.inputs[
+                                            input_name
+                                        ],
+                                    )
                                 )
-                                for item in by_origin[origin]
-                            ]
                         # Return if there is no data for an input
                         if not gather[input_name]:
                             return
@@ -485,42 +508,23 @@ class MemoryOperationNetworkContext(BaseOperationNetworkContext):
         input_set: Optional[BaseInputSet] = None,
         stage: Stage = Stage.PROCESSING,
     ) -> AsyncIterator[Operation]:
+        operations: Dict[str, Operation] = {}
         if stage not in dataflow.by_origin:
             return
         if input_set is None:
             for operation in chain(*dataflow.by_origin[stage].values()):
-                yield operation
+                operations[operation.instance_name] = operation
         else:
             async for item in input_set.inputs():
                 origin = item.origin
                 if isinstance(origin, Operation):
                     origin = origin.instance_name
-                for operation in dataflow.by_origin[stage][origin]:
-                    yield operation
-        """
-        # Set list of needed input definitions if given
-        if not input_set is None:
-            input_definitions = await input_set.definitions()
-        # Yield all operations with an input in the input set
-        for operation in self.memory.values():
-            # Only run operations of the requested stage
-            if operation.stage != stage:
-                continue
-            # If there is a given input set check each definition in it against
-            # the operation's inputs to verify we are only looking at the subset
-            if input_set is not None:
-                if not [
-                    item
-                    for item in operation.inputs.values()
-                    if item in input_definitions
-                ] and not [
-                    item
-                    for item in operation.conditions
-                    if item in input_definitions
-                ]:
+                if origin not in dataflow.by_origin[stage]:
                     continue
+                for operation in dataflow.by_origin[stage][origin]:
+                    operations[operation.instance_name] = operation
+        for operation in operations.values():
             yield operation
-        """
 
 
 @entry_point("memory")
@@ -860,7 +864,7 @@ class MemoryOperationImplementationNetworkContext(
                             value=value,
                             definition=operation.outputs[key],
                             parents=parents,
-                            origin=(operation, key),
+                            origin=(operation.instance_name, key),
                         )
                     )
         except KeyError as error:

@@ -268,7 +268,7 @@ class Input(object):
         )
 
     def __repr__(self):
-        return "%s: %s" % (self.definition.name, self.value)
+        return f"Input(value={self.value}, definition={self.definition})"
 
     def __str__(self):
         return repr(self)
@@ -391,8 +391,12 @@ class DataFlow:
                 # TODO Make stanardize this so that seed is also a dict
                 for output_source in output_sources:
                     if isinstance(output_source, str):
-                        self.by_origin[operation.stage].setdefault(output_source, [])
-                        self.by_origin[operation.stage][output_source].append(operation)
+                        self.by_origin[operation.stage].setdefault(
+                            output_source, []
+                        )
+                        self.by_origin[operation.stage][output_source].append(
+                            operation
+                        )
                     else:
                         for (
                             output_operation_instance_name,
