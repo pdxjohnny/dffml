@@ -198,8 +198,8 @@ class TestServer(AsyncTestCase):
                     # Check that hello world works
                     async with self.get(cli, hello_world_url) as response:
                         self.assertEqual(
-                            json.dumps({"response": message}),
-                            await response.text(),
+                            {"response": message},
+                            list((await response.json()).values())[0],
                         )
                 # Check that hello blank works
                 message: str = "Hello Feedface"
@@ -207,14 +207,18 @@ class TestServer(AsyncTestCase):
                     async with self.post(
                         cli,
                         hello_blank_url,
-                        json=[
-                            {
-                                "value": "Feedface",
-                                "definition": formatter.op.inputs["data"].name,
-                            }
-                        ],
+                        json={
+                            "Feedface": [
+                                {
+                                    "value": "Feedface",
+                                    "definition": formatter.op.inputs[
+                                        "data"
+                                    ].name,
+                                }
+                            ]
+                        },
                     ) as response:
                         self.assertEqual(
-                            json.dumps({"response": message}),
-                            await response.text(),
+                            {"Feedface": {"response": message}},
+                            await response.json(),
                         )

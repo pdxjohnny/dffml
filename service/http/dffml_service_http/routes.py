@@ -19,7 +19,12 @@ from dffml.base import BaseConfig, MissingConfig
 from dffml.df.types import DataFlow, Input
 from dffml.df.multicomm import MultiCommInAtomicMode, BaseMultiCommContext
 from dffml.source.source import BaseSource
-from dffml.df.memory import MemoryOrchestrator
+from dffml.df.memory import (
+    MemoryOrchestrator,
+    MemoryInputSet,
+    MemoryInputSetConfig,
+    StringInputSetContext,
+)
 from dffml.base import MissingConfig
 from dffml.model import Model
 from dffml.feature import Features
@@ -146,28 +151,40 @@ class Routes(BaseMultiCommContext):
 
     async def multicomm_dataflow(self, config, request):
         # Seed the network with inputs given by caller
-        # TODO allow list of valid definitions to seed
-        # TODO convert inputs into Input instances
+        # TODO allow list of valid definitions to seed (set Input.origin to
+        # something other than seed)
         inputs = []
         # If data was sent add those inputs
         if request.method == "POST":
             # Accept a list of input data
-            for input_data in await request.json():
-                # TODO validate that input data is list and each item has definition
-                # and value properties
-                if not input_data["definition"] in config.dataflow.definitions:
-                    return web.json_response(
-                        {
-                            "error": f"Missing definition for {input_data['definition']} in dataflow"
-                        },
-                        status=HTTPStatus.NOT_FOUND,
-                    )
+            # TODO validate that input data is dict of list of inputs each item
+            # has definition and value properties
+            for ctx, client_inputs in (await request.json()).items():
+                for input_data in client_inputs:
+                    if (
+                        not input_data["definition"]
+                        in config.dataflow.definitions
+                    ):
+                        return web.json_response(
+                            {
+                                "error": f"Missing definition for {input_data['definition']} in dataflow"
+                            },
+                            status=HTTPStatus.NOT_FOUND,
+                        )
                 inputs.append(
-                    Input(
-                        value=input_data["value"],
-                        definition=config.dataflow.definitions[
-                            input_data["definition"]
-                        ],
+                    MemoryInputSet(
+                        MemoryInputSetConfig(
+                            ctx=StringInputSetContext(ctx),
+                            inputs=[
+                                Input(
+                                    value=input_data["value"],
+                                    definition=config.dataflow.definitions[
+                                        input_data["definition"]
+                                    ],
+                                )
+                                for input_data in client_inputs
+                            ],
+                        )
                     )
                 )
         # Run the operation in an orchestrator
@@ -175,13 +192,18 @@ class Routes(BaseMultiCommContext):
         async with MemoryOrchestrator.basic_config() as orchestrator:
             # TODO(dfass) Create octx on dataflow registration
             async with orchestrator(config.dataflow) as octx:
-                _ctx, result = [result async for result in octx.run(inputs)][0]
+                results = {
+                    str(ctx): result async for ctx, result in octx.run(*inputs)
+                }
+                # TODO Implement input and presentation stages?
+                """
                 if config.presentation == "blob":
-                    return web.Response(body=result)
+                    return web.Response(body=results)
                 elif config.presentation == "text":
-                    return web.Response(text=result)
+                    return web.Response(text=results)
                 else:
-                    return web.json_response(result)
+                """
+                return web.json_response(results)
 
     async def multicomm_dataflow_asynchronous(self, config, request):
         # TODO allow list of valid definitions to seed
@@ -614,46 +636,66 @@ class Routes(BaseMultiCommContext):
         self.app["model_contexts"] = {}
         self.app.update(kwargs)
         # Allow no routes other than pre-registered if in atomic mode
-        self.routes = [] if self.mc_atomic else [
-            # HTTP Service specific APIs
-            ("POST", "/service/upload/{filepath:.+}", self.service_upload),
-            # DFFML APIs
-            ("GET", "/list/sources", self.list_sources),
-            (
-                "POST",
-                "/configure/source/{source}/{label}",
-                self.configure_source,
-            ),
-            (
-                "GET",
-                "/context/source/{label}/{ctx_label}",
-                self.context_source,
-            ),
-            ("GET", "/list/models", self.list_models),
-            ("POST", "/configure/model/{model}/{label}", self.configure_model),
-            ("POST", "/context/model/{label}/{ctx_label}", self.context_model),
-            # MutliComm APIs (Data Flow)
-            ("POST", "/multicomm/{label}/register", self.multicomm_register),
-            # Source APIs
-            ("GET", "/source/{label}/repo/{key}", self.source_repo),
-            ("POST", "/source/{label}/update/{key}", self.source_update),
-            ("GET", "/source/{label}/repos/{chunk_size}", self.source_repos),
-            (
-                "GET",
-                "/source/{label}/repos/{iterkey}/{chunk_size}",
-                self.source_repos_iter,
-            ),
-            # TODO route to delete iterkey before iteration has completed
-            # Model APIs
-            ("POST", "/model/{label}/train", self.model_train),
-            ("POST", "/model/{label}/accuracy", self.model_accuracy),
-            # TODO Provide an iterkey method for model prediction
-            (
-                "POST",
-                "/model/{label}/predict/{chunk_size}",
-                self.model_predict,
-            ),
-        ]
+        self.routes = (
+            []
+            if self.mc_atomic
+            else [
+                # HTTP Service specific APIs
+                ("POST", "/service/upload/{filepath:.+}", self.service_upload),
+                # DFFML APIs
+                ("GET", "/list/sources", self.list_sources),
+                (
+                    "POST",
+                    "/configure/source/{source}/{label}",
+                    self.configure_source,
+                ),
+                (
+                    "GET",
+                    "/context/source/{label}/{ctx_label}",
+                    self.context_source,
+                ),
+                ("GET", "/list/models", self.list_models),
+                (
+                    "POST",
+                    "/configure/model/{model}/{label}",
+                    self.configure_model,
+                ),
+                (
+                    "POST",
+                    "/context/model/{label}/{ctx_label}",
+                    self.context_model,
+                ),
+                # MutliComm APIs (Data Flow)
+                (
+                    "POST",
+                    "/multicomm/{label}/register",
+                    self.multicomm_register,
+                ),
+                # Source APIs
+                ("GET", "/source/{label}/repo/{key}", self.source_repo),
+                ("POST", "/source/{label}/update/{key}", self.source_update),
+                (
+                    "GET",
+                    "/source/{label}/repos/{chunk_size}",
+                    self.source_repos,
+                ),
+                (
+                    "GET",
+                    "/source/{label}/repos/{iterkey}/{chunk_size}",
+                    self.source_repos_iter,
+                ),
+                # TODO route to delete iterkey before iteration has completed
+                # Model APIs
+                ("POST", "/model/{label}/train", self.model_train),
+                ("POST", "/model/{label}/accuracy", self.model_accuracy),
+                # TODO Provide an iterkey method for model prediction
+                (
+                    "POST",
+                    "/model/{label}/predict/{chunk_size}",
+                    self.model_predict,
+                ),
+            ]
+        )
         for route in self.routes:
             route = self.app.router.add_route(*route)
             # Add cors to all routes

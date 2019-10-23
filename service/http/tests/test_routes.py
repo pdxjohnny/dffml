@@ -400,7 +400,8 @@ class TestRoutesMultiComm(TestRoutesRunning, AsyncTestCase):
         # Test the URL now does exist
         async with self.get(url) as response:
             self.assertEqual(
-                json.dumps({"response": message}), await response.text()
+                {"response": message},
+                list((await response.json()).values())[0],
             )
 
     async def test_post(self):
@@ -424,15 +425,17 @@ class TestRoutesMultiComm(TestRoutesRunning, AsyncTestCase):
         # Test the URL now does exist (and send data for formatting)
         async with self.post(
             url,
-            json=[
-                {
-                    "value": "Feedface",
-                    "definition": formatter.op.inputs["data"].name,
-                }
-            ],
+            json={
+                "Feedface": [
+                    {
+                        "value": "Feedface",
+                        "definition": formatter.op.inputs["data"].name,
+                    }
+                ]
+            },
         ) as response:
             self.assertEqual(
-                json.dumps({"response": message}), await response.text()
+                {"Feedface": {"response": message}}, await response.json()
             )
 
 
