@@ -53,7 +53,7 @@ setup(
         ],
     },
     entry_points={
-        "console_scripts": ["dffml = dffml.cli:CLI.main"],
+        "console_scripts": ["dffml = dffml.cli.cli:CLI.main"],
         "dffml.source": [
             "csv = dffml.source.csv:CSVSource",
             "json = dffml.source.json:JSONSource",

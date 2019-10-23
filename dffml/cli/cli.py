@@ -14,25 +14,25 @@ import inspect
 import argparse
 import contextlib
 import pkg_resources
+from typing import List
 
-from .log import LOGGER
-from .version import VERSION
-from .base import BaseConfig
-from .repo import Repo
-from .port import Port
-from .feature import Feature, Features, Data
-from .source.source import BaseSource, Sources, SubsetSources
-from .model import Model
-from .config.config import BaseConfigLoader
-from .config.json import JSONConfigLoader
-from .df.types import Input, Operation, DataFlow
-from .df.base import StringInputSetContext
-from .df.memory import MemoryInputSet, MemoryInputSetConfig
-from .util.entrypoint import load
-from .util.data import merge
-from .util.cli.arg import Arg
-from .util.cli.cmd import CMD
-from .util.cli.cmds import (
+from ..version import VERSION
+from ..base import BaseConfig
+from ..repo import Repo
+from ..port import Port
+from ..feature import Feature, Features, Data
+from ..source.source import BaseSource, Sources, SubsetSources
+from ..model import Model
+from ..config.config import BaseConfigLoader
+from ..config.json import JSONConfigLoader
+from ..df.types import Input, Operation, DataFlow
+from ..df.base import StringInputSetContext
+from ..df.memory import MemoryInputSet, MemoryInputSetConfig
+from ..util.entrypoint import load
+from ..util.data import merge
+from ..util.cli.arg import Arg
+from ..util.cli.cmd import CMD
+from ..util.cli.cmds import (
     SourcesCMD,
     FeaturesCMD,
     ModelCMD,
@@ -42,15 +42,22 @@ from .util.cli.cmds import (
     OrchestratorCMD,
 )
 
+from .dataflow import Dataflow
+
 
 class Version(CMD):
     """
-    Print version and exit
+    Print version and installed dffml packages
     """
 
     async def run(self):
-        LOGGER.debug("Reporting version")
-        print(VERSION)
+        self.logger.debug("Reporting version")
+        devmode = False
+        pkgs: List[str] = []
+        for syspath in map(pathlib.Path, sys.path):
+            if (syspath / "dffml.egg-link").is_file():
+                devmode = True
+        print(f"dffml version {VERSION} (devmode: {str(devmode).lower()})")
 
 
 class Edit(SourcesCMD, KeysCMD):
@@ -461,83 +468,6 @@ class Export(ImportExportCMD):
         async with self.sources as sources:
             async with sources() as sctx:
                 return await self.port.export_to_file(sctx, self.filename)
-
-
-class DataflowMerge(CMD):
-    arg_dataflows = Arg(
-        "dataflows", help="DataFlows to merge", nargs="+", type=pathlib.Path
-    )
-    arg_config = Arg(
-        "-config",
-        help="ConfigLoader to use for exporting",
-        type=BaseConfigLoader.load,
-        default=JSONConfigLoader,
-    )
-    arg_not_linked = Arg(
-        "-not-linked",
-        dest="not_linked",
-        help="Do not export dataflows as linked",
-        default=False,
-        action="store_true",
-    )
-
-    async def run(self):
-        # The merged dataflow
-        merged: Dict[str, Any] = {}
-        # For entering ConfigLoader contexts
-        async with contextlib.AsyncExitStack() as exit_stack:
-            # Load config loaders we'll need as we see their file types
-            parsers: Dict[str, BaseConfigLoader] = {}
-            for path in self.dataflows:
-                _, exported = await BaseConfigLoader.load_file(
-                    parsers, exit_stack, path
-                )
-                merge(merged, exported)
-        # Export the dataflow
-        dataflow = DataFlow._fromdict(**merged)
-        async with self.config(BaseConfig()) as configloader:
-            async with configloader() as loader:
-                exported = dataflow.export(linked=not self.not_linked)
-                sys.stdout.buffer.write(await loader.dumpb(exported))
-
-
-class DataflowCreate(CMD):
-    arg_operations = Arg(
-        "operations", nargs="+", help="Operations to create a dataflow for"
-    )
-    arg_config = Arg(
-        "-config",
-        help="ConfigLoader to use",
-        type=BaseConfigLoader.load,
-        default=JSONConfigLoader,
-    )
-    arg_not_linked = Arg(
-        "-not-linked",
-        dest="not_linked",
-        help="Do not export dataflows as linked",
-        default=False,
-        action="store_true",
-    )
-
-    async def run(self):
-        operations = []
-        for load_operation in self.operations:
-            if ":" in load_operation:
-                operations += list(load(load_operation))
-            else:
-                operations += [Operation.load(load_operation)]
-        async with self.config(BaseConfig()) as configloader:
-            async with configloader() as loader:
-                dataflow = DataFlow.auto(*operations)
-                exported = dataflow.export(linked=not self.not_linked)
-                sys.stdout.buffer.write(await loader.dumpb(exported))
-
-
-# Name collision
-class Dataflow(CMD):
-
-    create = DataflowCreate
-    merge = DataflowMerge
 
 
 def services():

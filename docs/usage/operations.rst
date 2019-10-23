@@ -618,7 +618,7 @@ Extending
       dffml dataflow merge \
         shouldi/deploy/df/shouldi.json \
         shouldi/deploy/override/shouldi.json \
-      | dffml service dev diagram \
+      | dffml dataflow diagram \
           -display LR -stages processing -simple -config json /dev/stdin
 
 .. image:: /images/shouldi-dataflow-extended.svg
