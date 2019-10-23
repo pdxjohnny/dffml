@@ -23,8 +23,10 @@ I install Python package X? When it's done it'll look like this
         safety_check_number_of_issues: 1
         bandit_output: {'CONFIDENCE.HIGH': 0.0, 'CONFIDENCE.LOW': 0.0, 'CONFIDENCE.MEDIUM': 0.0, 'CONFIDENCE.UNDEFINED': 0.0, 'SEVERITY.HIGH': 0.0, 'SEVERITY.LOW': 0.0, 'SEVERITY.MEDIUM': 0.0, 'SEVERITY.UNDEFINED': 0.0, 'loc': 100, 'nosec': 0, 'CONFIDENCE.HIGH_AND_SEVERITY.HIGH': 0}
 
-We'll then deploy the dataflow as an HTTP API endpoint rather than a command
-line application.
+We'll then deploy the tool as an HTTP API endpoint rather than a command line
+application.
+
+.. TODO What about multiple packages over HTTP API?
 
 .. code-block:: console
 
@@ -553,6 +555,9 @@ Registering Operations
 
 .. TODO Add they operations to setup.py entry_points
 
+After you've registered the operations with the ``entry_points`` sytem you'll be
+able to deploy them 
+
 HTTP Deployment
 ---------------
 
@@ -597,13 +602,15 @@ Extending
 
 
 .. code-block:: console
+
     $ dffml dataflow create -config json \
       dffml.mapping.create lines_of_code_by_language lines_of_code_to_comments \
-      > shouldi/deploy/override/shouldi.yaml
+      > shouldi/deploy/override/shouldi.json
 
 **shouldi/deploy/override/shouldi.yaml**
 
-.. literalinclude:: /../examples/shouldi/shouldi/deploy/override/shouldi.yaml
+.. literalinclude:: /../examples/shouldi/shouldi/deploy/override/shouldi.json
+    :language: json
 
 .. code-block:: console
 
