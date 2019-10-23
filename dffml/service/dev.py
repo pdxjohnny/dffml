@@ -236,12 +236,6 @@ class Entrypoints(CMD):
 
 class Diagram(CMD):
 
-    arg_config = Arg(
-        "-config",
-        help="ConfigLoader to use",
-        type=BaseConfigLoader.load,
-        default=JSONConfigLoader,
-    )
     arg_stages = Arg(
         "-stages",
         help="Which stages to display: (processing, cleanup, output)",
@@ -262,12 +256,15 @@ class Diagram(CMD):
         default="TD",
         required=False,
     )
-    arg_dataflow = Arg("dataflow", help="Data flow file")
+    arg_dataflow = Arg("dataflow", help="File containing exported DataFlow")
 
     async def run(self):
-        async with self.config(BaseConfig()) as configloader:
+        dataflow_path = Path(self.dataflow)
+        config_type = dataflow_path.suffix.replace(".", "")
+        config_cls = BaseConfigLoader.load(config_type)
+        async with config_cls.withconfig(self.extra_config) as configloader:
             async with configloader() as loader:
-                exported = await loader.loadb(Path(self.dataflow).read_bytes())
+                exported = await loader.loadb(dataflow_path.read_bytes())
                 dataflow = DataFlow._fromdict(**exported)
         print(f"graph {self.display}")
         for stage in Stage:
@@ -319,12 +316,13 @@ class Diagram(CMD):
             if self.stages and not operation.stage.value in self.stages:
                 continue
             node = hashlib.md5(instance_name.encode()).hexdigest()
-            for input_name, sources in input_flow.items():
+            for input_name, sources in input_flow.inputs.items():
                 for source in sources:
-                    if source == "seed":
+                    # TODO Put various sources in their own "Inputs" subgraphs
+                    if isinstance(source, str):
                         input_definition = operation.inputs[input_name]
                         seed_input_node = hashlib.md5(
-                            input_definition.name.encode()
+                            (source + "." + input_definition.name).encode()
                         ).hexdigest()
                         print(f"{seed_input_node}({input_definition.name})")
                         if len(self.stages) == 1:
@@ -340,24 +338,25 @@ class Diagram(CMD):
                             print(f"{seed_input_node} --> {input_node}")
                         else:
                             print(f"{seed_input_node} --> {node}")
-                        continue
-                    if not self.simple:
-                        source_output_node = hashlib.md5(
-                            ("output." + source).encode()
-                        ).hexdigest()
-                        input_node = hashlib.md5(
-                            (
-                                "input." + instance_name + "." + input_name
-                            ).encode()
-                        ).hexdigest()
-                        print(f"{source_output_node} --> {input_node}")
                     else:
-                        source_split = source.split(".")
-                        source_operation = ".".join(source_split[:-1])
-                        source_operation_node = hashlib.md5(
-                            source_operation.encode()
-                        ).hexdigest()
-                        print(f"{source_operation_node} --> {node}")
+                        if not self.simple:
+                            source_output_node = hashlib.md5(
+                                (
+                                    "output."
+                                    + ".".join(list(source.items())[0])
+                                ).encode()
+                            ).hexdigest()
+                            input_node = hashlib.md5(
+                                (
+                                    "input." + instance_name + "." + input_name
+                                ).encode()
+                            ).hexdigest()
+                            print(f"{source_output_node} --> {input_node}")
+                        else:
+                            source_operation_node = hashlib.md5(
+                                list(source.keys())[0].encode()
+                            ).hexdigest()
+                            print(f"{source_operation_node} --> {node}")
         if len(self.stages) != 1:
             print(f"end")
 
@@ -398,8 +397,6 @@ class Export(CMD):
                         sys.stdout.buffer.write(
                             await loader.dumpb(obj._asdict())
                         )
-                        # TODO(dfass) yaml config, then try shouldi with HTTP
-                        # API
 
 
 class Develop(CMD):

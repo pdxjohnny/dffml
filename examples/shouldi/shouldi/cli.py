@@ -103,7 +103,9 @@ class Install(CMD):
                         or bandit_report["CONFIDENCE.HIGH_AND_SEVERITY.HIGH"]
                         > 5
                     ):
-                        print(f"Do not install {package_name}! {results!r}")
+                        print(f"Do not install {package_name}!")
+                        for definition_name, result in results.items():
+                            print(f"    {definition_name}: {result}")
                     else:
                         print(f"{package_name} is okay to install")
 

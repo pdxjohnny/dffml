@@ -15,13 +15,40 @@ tools. With the goal being to create a command line utility called ``shouldi``
 which will provide us with the information we need to make the decision, should
 I install Python package X? When it's done it'll look like this
 
-.. TODO Update example output
+.. code-block:: console
+
+    $ shouldi install dffml insecure-package
+    dffml is okay to install
+    Do not install insecure-package!
+        safety_check_number_of_issues: 1
+        bandit_output: {'CONFIDENCE.HIGH': 0.0, 'CONFIDENCE.LOW': 0.0, 'CONFIDENCE.MEDIUM': 0.0, 'CONFIDENCE.UNDEFINED': 0.0, 'SEVERITY.HIGH': 0.0, 'SEVERITY.LOW': 0.0, 'SEVERITY.MEDIUM': 0.0, 'SEVERITY.UNDEFINED': 0.0, 'loc': 100, 'nosec': 0, 'CONFIDENCE.HIGH_AND_SEVERITY.HIGH': 0}
+
+We'll then deploy the dataflow as an HTTP API endpoint rather than a command
+line application.
 
 .. code-block:: console
 
-    $ shouldi install dffml bandit
-    dffml is okay to install
-    Do not install insecure-package! {'safety_check_number_of_issues': 1}
+    $ curl -s \
+      --header "Content-Type: application/json" \
+      --request POST \
+      --data '[{"value":"insecure-package","definition":"package"}]' \
+      http://localhost:8080/shouldi | python -m json.tool
+    {
+        "safety_check_number_of_issues": 1,
+        "bandit_output": {
+            "CONFIDENCE.HIGH": 0,
+            "CONFIDENCE.LOW": 0,
+            "CONFIDENCE.MEDIUM": 0,
+            "CONFIDENCE.UNDEFINED": 0,
+            "SEVERITY.HIGH": 0,
+            "SEVERITY.LOW": 0,
+            "SEVERITY.MEDIUM": 0,
+            "SEVERITY.UNDEFINED": 0,
+            "loc": 100,
+            "nosec": 0,
+            "CONFIDENCE.HIGH_AND_SEVERITY.HIGH": 0
+        }
+    }
 
 Tools
 -----
@@ -179,9 +206,13 @@ To get parsable output, we'll run ``safety`` with the ``--json`` flag.
 
 Let's now write the operation to call ``safety`` via a subprocess.
 
+**shouldi/safety.py**
+
 .. literalinclude:: /../examples/shouldi/shouldi/safety.py
 
 Write a test for it
+
+**tests/test_safety.py**
 
 .. literalinclude:: /../examples/shouldi/tests/test_safety.py
 
@@ -253,9 +284,13 @@ To get parsable output, we'll run with the ``-f json`` flag.
 
 Let's now write the operation to call ``safety`` via a subprocess.
 
+**shouldi/bandit.py**
+
 .. literalinclude:: /../examples/shouldi/shouldi/bandit.py
 
 Write a test for it
+
+**tests/test_bandit.py**
 
 .. literalinclude:: /../examples/shouldi/tests/test_bandit.py
 
@@ -322,17 +357,21 @@ connected.
 
 .. TODO Autogenerate this from the dataflow
 
-.. image:: /images/shouldi-dataflow.png
-    :alt: Diagram showing Dataflow
+.. image:: /images/shouldi-dataflow-processing.svg
+    :alt: Diagram showing DataFlow for processing stage
 
 PyPi Operations
 ---------------
 
 Let's write an operation to grab the version of a package.
 
+**shouldi/pypi.py**
+
 .. literalinclude:: /../examples/shouldi/shouldi/pypi.py
 
 Write a test for it
+
+**tests/test_pypi.py**
 
 .. literalinclude:: /../examples/shouldi/tests/test_pypi.py
 
@@ -341,8 +380,6 @@ Run the tests
 .. code-block:: console
 
     $ python3.7 setup.py test -s tests.test_pypi
-
-.. TODO Add they operations to setup.py entry_points
 
 CLI
 ---
@@ -359,6 +396,8 @@ based on :py:mod:`argparse` which will speed things up.
 
 Let's test out the code in ``shouldi.cli`` before making it accessible via the
 command line.
+
+**tests/test_cli.py**
 
 .. literalinclude:: /../examples/shouldi/tests/test_cli.py
 
@@ -429,13 +468,164 @@ Re-install the package via pip
     $ python3.7 -m pip install -e .
 
 Now we should be able to run our new tool via the CLI! (Provided your ``$PATH``
-is set up correctly.
+is set up correctly).
 
 .. code-block:: console
 
-    $ shouldi install insecure-package bandit
-    bandit is okay to install
-    Do not install insecure-package! {'safety_check_number_of_issues': 1}
+    $ shouldi install dffml insecure-package
+    dffml is okay to install
+    Do not install insecure-package!
+        safety_check_number_of_issues: 1
+        bandit_output: {'CONFIDENCE.HIGH': 0.0, 'CONFIDENCE.LOW': 0.0, 'CONFIDENCE.MEDIUM': 0.0, 'CONFIDENCE.UNDEFINED': 0.0, 'SEVERITY.HIGH': 0.0, 'SEVERITY.LOW': 0.0, 'SEVERITY.MEDIUM': 0.0, 'SEVERITY.UNDEFINED': 0.0, 'loc': 100, 'nosec': 0, 'CONFIDENCE.HIGH_AND_SEVERITY.HIGH': 0}
 
-.. TODO dffml service dev export -config yaml shouldi.cli:DATAFLOW | tee examples/shouldi/shouldi/deploy/df/shouldi.yaml
-.. TODO dffml dataflow create -config yaml dffml.mapping.create lines_of_code_by_language lines_of_code_to_comments > examples/shouldi/shouldi/deploy/override/shouldi.yaml
+Visualizing the DataFlow
+------------------------
+
+DataFlows can be visualized using `mermaidjs <https://mermaidjs.github.io/>`_.
+
+We first export the DataFlow to a config file on disk.
+
+.. code-block:: console
+
+    $ dffml service dev export -config json shouldi.cli:DATAFLOW \
+      > shouldi/deploy/df/shouldi.json
+
+.. note::
+
+    Installing the ``dffml-config-yaml`` package will enable the
+    ``-config yaml`` option. Allowing you to export to YAML instead of JSON.
+
+We then create the mermaidjs digarm from the DataFlow. The ``-simple`` flag says
+to only show connections between operations, don't show which inputs and outputs
+are connected.
+
+.. code-block:: console
+
+    $ dffml service dev diagram -simple shouldi/deploy/df/shouldi.json
+    graph TD
+    subgraph a759a07029077edc5c37fea0326fa281[Processing Stage]
+    style a759a07029077edc5c37fea0326fa281 fill:#afd388b5,stroke:#a4ca7a
+    a55c24c0d1363ec4d3c9e20883f3c740[pypi_latest_package_version]
+    d273c0a72c6acc57e33c2f7162fa7363[pypi_package_contents]
+    83503ba9fe6c0f5649644d26e59c5590[pypi_package_json]
+    00f7f4637f6f67120e83e75c78949806[pypi_package_url]
+    9220cb5f5732d9e6dcc130a4908ddf92[run_bandit]
+    88517e4cd0cae33deff50d987f2683fe[safety_check]
+    end
+    subgraph a4827add25f5c7d5895c5728b74e2beb[Cleanup Stage]
+    style a4827add25f5c7d5895c5728b74e2beb fill:#afd388b5,stroke:#a4ca7a
+    7ec0058800fd4bed6fb63633330588c7[cleanup_pypi_package]
+    end
+    subgraph 58ca4d24d2767176f196436c2890b926[Output Stage]
+    style 58ca4d24d2767176f196436c2890b926 fill:#afd388b5,stroke:#a4ca7a
+    b42e9e149e775202b18841f1f67061c4[get_single]
+    end
+    subgraph inputs[Inputs]
+    style inputs fill:#f6dbf9,stroke:#a178ca
+    d273c0a72c6acc57e33c2f7162fa7363 --> 7ec0058800fd4bed6fb63633330588c7
+    d60584024f765273b6f41d6d36f8320c(get_single_spec)
+    d60584024f765273b6f41d6d36f8320c --> b42e9e149e775202b18841f1f67061c4
+    83503ba9fe6c0f5649644d26e59c5590 --> a55c24c0d1363ec4d3c9e20883f3c740
+    00f7f4637f6f67120e83e75c78949806 --> d273c0a72c6acc57e33c2f7162fa7363
+    314b1a20a4db6b3bf3f2627830da97a3(package)
+    314b1a20a4db6b3bf3f2627830da97a3 --> 83503ba9fe6c0f5649644d26e59c5590
+    83503ba9fe6c0f5649644d26e59c5590 --> 00f7f4637f6f67120e83e75c78949806
+    d273c0a72c6acc57e33c2f7162fa7363 --> 9220cb5f5732d9e6dcc130a4908ddf92
+    314b1a20a4db6b3bf3f2627830da97a3(package)
+    314b1a20a4db6b3bf3f2627830da97a3 --> 88517e4cd0cae33deff50d987f2683fe
+    a55c24c0d1363ec4d3c9e20883f3c740 --> 88517e4cd0cae33deff50d987f2683fe
+    end
+
+You can now copy that graph and paste it in the mermaidjs live editor:
+
+- https://mermaidjs.github.io/mermaid-live-editor
+
+It should render the following SVG showing how all the operations are connected.
+
+.. image:: /images/shouldi-dataflow.svg
+    :alt: Diagram showing DataFlow
+
+GitLab will render mermaidjs diagrams found in markdown files. There is also a
+sphinx plugin, and a command line utility.
+
+Registering Operations
+----------------------
+
+.. TODO Add they operations to setup.py entry_points
+
+HTTP Deployment
+---------------
+
+We can take the
+
+.. code-block:: console
+
+    $ dffml service http server -insecure -log debug -mc-config shouldi/deploy
+
+.. warning::
+
+    The ``-insecure`` flag is only being used here to speed up this already long
+    tutorial. See documentation on HTTP API security for more information.
+
+.. code-block:: console
+
+    $ curl -s \
+      --header "Content-Type: application/json" \
+      --request POST \
+      --data '[{"value":"insecure-package","definition":"package"}]' \
+      http://localhost:8080/shouldi | python -m json.tool
+    {
+        "bandit_output": {
+            "CONFIDENCE.HIGH": 0,
+            "CONFIDENCE.LOW": 0,
+            "CONFIDENCE.MEDIUM": 0,
+            "CONFIDENCE.UNDEFINED": 0,
+            "SEVERITY.HIGH": 0,
+            "SEVERITY.LOW": 0,
+            "SEVERITY.MEDIUM": 0,
+            "SEVERITY.UNDEFINED": 0,
+            "loc": 100,
+            "nosec": 0,
+            "CONFIDENCE.HIGH_AND_SEVERITY.HIGH": 0
+        },
+        "safety_check_number_of_issues": 1
+    }
+
+Extending
+---------
+
+
+
+.. code-block:: console
+    $ dffml dataflow create -config json \
+      dffml.mapping.create lines_of_code_by_language lines_of_code_to_comments \
+      > shouldi/deploy/override/shouldi.yaml
+
+**shouldi/deploy/override/shouldi.yaml**
+
+.. literalinclude:: /../examples/shouldi/shouldi/deploy/override/shouldi.yaml
+
+.. code-block:: console
+
+    $ curl -s \
+      --header "Content-Type: application/json" \
+      --request POST \
+      --data '[{"value":"insecure-package","definition":"package"}]' \
+      http://localhost:8080/shouldi | python -m json.tool
+    {
+        "bandit_output": {
+            "CONFIDENCE.HIGH": 0,
+            "CONFIDENCE.LOW": 0,
+            "CONFIDENCE.MEDIUM": 0,
+            "CONFIDENCE.UNDEFINED": 0,
+            "SEVERITY.HIGH": 0,
+            "SEVERITY.LOW": 0,
+            "SEVERITY.MEDIUM": 0,
+            "SEVERITY.UNDEFINED": 0,
+            "loc": 100,
+            "nosec": 0,
+            "CONFIDENCE.HIGH_AND_SEVERITY.HIGH": 0
+        },
+        "language_to_comment_ratio": 19,
+        "safety_check_number_of_issues": 1
+    }
