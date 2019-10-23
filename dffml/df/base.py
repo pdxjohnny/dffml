@@ -152,6 +152,23 @@ class OperationImplementation(BaseDataFlowObject):
 
 
 def op(imp_enter=None, ctx_enter=None, config_cls=None, **kwargs):
+    """
+    The ``op`` decorator creates a subclass of
+    :py:class:`dffml.df.OperationImplementation` and assigns that
+    ``OperationImplementation`` to the ``.imp`` parameter of the
+    function it decorates.
+
+    If the decorated object is not already a class which is a subclass of
+    ``OperationImplementationContext``, it creates an
+    :py:class:`dffml.df.OperationImplementationContext`
+    and assigns it to the ``CONTEXT`` class parameter of the
+    ``OperationImplementation`` which was created.
+
+    Upon context entry into the ``OperationImplementation``, imp_enter is
+    iterated over and the values in that ``dict`` are entered. The value yielded
+    upon entry is assigned to a parameter in the ``OperationImplementation``
+    instance named after the respective key.
+    """
     def wrap(func):
         if not "name" in kwargs:
             kwargs["name"] = func.__name__
@@ -181,6 +198,14 @@ def op(imp_enter=None, ctx_enter=None, config_cls=None, **kwargs):
             for name, param in sig.parameters.items():
                 if param.annotation is config_cls:
                     uses_config = name
+
+        # Create the test method which creates the contexts and runs
+        async def test(**kwargs):
+            async with func.imp(BaseConfig()) as obj:
+                async with obj(None, None) as ctx:
+                    return await ctx.run(kwargs)
+        func.test = test
+
 
         class Implementation(
             context_stacker(OperationImplementation, imp_enter)

@@ -1,7 +1,7 @@
-DataFlows - shouldi
-===================
+Operations
+==========
 
-This example will explain what operations are and how you can use them. In the
+This tutorial will explain what operations are and how you can use them. In the
 process we'll create a meta static analysis tool, ``shouldi``.
 
 Operations are the core of DFFML, they have inputs and outputs, are configurable
@@ -167,13 +167,10 @@ dependences. For packages, we can declare our dependencies right in our
 
 **setup.py**
 
-.. code-block:: python
+.. TODO Update lines for setup.py
 
-    SETUP_KWARGS["install_requires"] += [
-        "aiohttp>=3.5.4",
-        "bandit>=1.6.2",
-        "safety>=1.8.5"
-    ]
+.. literalinclude:: /../examples/shouldi/setup.py
+    :lines: 1-100
 
 .. note::
 
@@ -316,12 +313,21 @@ So far ``shouldi`` uses two tools.
 
   - Which checks if there are any open CVEs in a package
 
-We're only planning on providing our tool with the package name though, and
-we'll need the package version to run ``safety`` and the source code of the
-package to run ``bandit``.
+We're only planning on providing our tool with the package name. So we'll need
+to find the package version to run ``safety``, and download the source code
+of the package to run ``bandit``.
 
-Let's outline what else needs to happen to get the package version and source
-code of the package to those operations.
+This is the directed graph that defines the dataflow of operations that make
+up ``shouldi`` it shows us how all the operations we talked about above are
+connected using other opertions which grabbed the package version and source
+code from PyPi.
+
+.. TODO Autogenerate this from the dataflow
+
+.. image:: /images/shouldi-dataflow-processing.svg
+    :alt: Diagram showing DataFlow for processing stage
+
+The DataFlow above describes the following process:
 
 - In the processing stage we run all our data collection operations
 
@@ -352,15 +358,6 @@ code of the package to those operations.
 
   - Run the ``get_single`` operation which selects data matching the definitions
     we care about.
-
-This is the directed graph that defines the dataflow of operations that make
-up ``shouldi`` it shows us how all the operation we talked about above are
-connected.
-
-.. TODO Autogenerate this from the dataflow
-
-.. image:: /images/shouldi-dataflow-processing.svg
-    :alt: Diagram showing DataFlow for processing stage
 
 PyPi Operations
 ---------------
@@ -459,9 +456,10 @@ the ``shouldi.cli`` module.
 
 **setup.py**
 
-.. code-block:: python
+.. TODO Update lines for setup.py
 
-    entry_points={"console_scripts": ["shouldi = shouldi.cli:ShouldI.main"]},
+.. literalinclude:: /../examples/shouldi/setup.py
+    :lines: 1-100
 
 Re-install the package via pip
 
@@ -552,100 +550,49 @@ It should render the following SVG showing how all the operations are connected.
 GitLab will render mermaidjs diagrams found in markdown files. There is also a
 sphinx plugin, and a command line utility.
 
+.. _tutorials_operations_registering_opreations:
+
 Registering Operations
 ----------------------
 
-.. TODO Add they operations to setup.py entry_points
+In order to make our operations visible to other plugins and packages using
+DFFML, we need to register them with Python's ``entry_points`` system.
 
-After you've registered the operations with the ``entry_points`` sytem you'll be
-able to deploy them 
+**setup.py**
 
-HTTP Deployment
----------------
+.. TODO Update line numbers
 
-We can take the
+.. literalinclude:: /../examples/shouldi/setup.py
+    :lines: 47-51
 
-.. code-block:: console
+After you've registered the operations, services such as the
+:doc:`/plugins/service/http/index` will have access to your operations.
 
-    $ dffml service http server -insecure -log debug -mc-config shouldi/deploy
-
-.. warning::
-
-    The ``-insecure`` flag is only being used here to speed up this already long
-    tutorial. See documentation on HTTP API security for more information.
+The :doc:`/usage/dataflows` usage example will show you how to expose your new
+meta static analysis tool over an HTTP interface.
 
 .. code-block:: console
 
     $ curl -s \
       --header "Content-Type: application/json" \
       --request POST \
-      --data '[{"value":"insecure-package","definition":"package"}]' \
+      --data '{"insecure-package": [{"value":"insecure-package","definition":"package"}]}' \
       http://localhost:8080/shouldi | python -m json.tool
     {
-        "bandit_output": {
-            "CONFIDENCE.HIGH": 0,
-            "CONFIDENCE.LOW": 0,
-            "CONFIDENCE.MEDIUM": 0,
-            "CONFIDENCE.UNDEFINED": 0,
-            "SEVERITY.HIGH": 0,
-            "SEVERITY.LOW": 0,
-            "SEVERITY.MEDIUM": 0,
-            "SEVERITY.UNDEFINED": 0,
-            "loc": 100,
-            "nosec": 0,
-            "CONFIDENCE.HIGH_AND_SEVERITY.HIGH": 0
-        },
-        "safety_check_number_of_issues": 1
-    }
-
-Extending
----------
-
-
-
-.. code-block:: console
-
-    $ dffml dataflow create -config json \
-      dffml.mapping.create lines_of_code_by_language lines_of_code_to_comments \
-      > shouldi/deploy/override/shouldi.json
-
-**shouldi/deploy/override/shouldi.json**
-
-.. literalinclude:: /../examples/shouldi/shouldi/deploy/override/shouldi.json
-    :language: json
-
-.. code-block:: console
-
-    $ dffml dataflow merge \
-        shouldi/deploy/df/shouldi.json \
-        shouldi/deploy/override/shouldi.json \
-      | dffml dataflow diagram \
-          -display LR -stages processing -simple -config json /dev/stdin
-
-.. image:: /images/shouldi-dataflow-extended.svg
-    :alt: Diagram showing DataFlow with use of comment to code ratio
-
-.. code-block:: console
-
-    $ curl -s \
-      --header "Content-Type: application/json" \
-      --request POST \
-      --data '[{"value":"insecure-package","definition":"package"}]' \
-      http://localhost:8080/shouldi | python -m json.tool
-    {
-        "bandit_output": {
-            "CONFIDENCE.HIGH": 0,
-            "CONFIDENCE.LOW": 0,
-            "CONFIDENCE.MEDIUM": 0,
-            "CONFIDENCE.UNDEFINED": 0,
-            "SEVERITY.HIGH": 0,
-            "SEVERITY.LOW": 0,
-            "SEVERITY.MEDIUM": 0,
-            "SEVERITY.UNDEFINED": 0,
-            "loc": 100,
-            "nosec": 0,
-            "CONFIDENCE.HIGH_AND_SEVERITY.HIGH": 0
-        },
-        "language_to_comment_ratio": 19,
-        "safety_check_number_of_issues": 1
+        "insecure-package": {
+            "safety_check_number_of_issues": 1,
+            "bandit_output": {
+                "CONFIDENCE.HIGH": 0,
+                "CONFIDENCE.LOW": 0,
+                "CONFIDENCE.MEDIUM": 0,
+                "CONFIDENCE.UNDEFINED": 0,
+                "SEVERITY.HIGH": 0,
+                "SEVERITY.LOW": 0,
+                "SEVERITY.MEDIUM": 0,
+                "SEVERITY.UNDEFINED": 0,
+                "loc": 100,
+                "nosec": 0,
+                "CONFIDENCE.HIGH_AND_SEVERITY.HIGH": 0
+            }
+        }
     }

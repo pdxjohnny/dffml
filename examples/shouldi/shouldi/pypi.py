@@ -1,7 +1,8 @@
-import aiohttp
-import tempfile
 import shutil
+import tempfile
 from typing import Dict, Any
+
+import aiohttp
 
 from dffml.df.types import Definition, Stage
 from dffml.df.base import op

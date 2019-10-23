@@ -11,3 +11,4 @@ or operations.
     intro
     source
     model
+    operations

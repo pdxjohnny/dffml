@@ -47,6 +47,6 @@ setup(
     entry_points={
         "dffml.operation": [
             "scrypt = dffml_feature_auth.feature.operations:Scrypt"
-        ],
+        ]
     },
 )
