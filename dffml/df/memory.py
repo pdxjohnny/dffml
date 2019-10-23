@@ -155,7 +155,6 @@ class NotificationSetContext(object):
         Add set_items to set and notification_item to the notification queue
         """
         async with self.parent.lock:
-            map(self.parent.memory.add, set_items)
             self.parent.notification_items.append(notification_item)
             self.parent.event_added.set()
 
@@ -194,7 +193,6 @@ class NotificationSet(object):
 
     def __init__(self) -> None:
         # TODO audit use of memory (should be used sparingly)
-        self.memory = set()
         self.lock = asyncio.Lock()
         self.event_added = asyncio.Event()
         self.event_added_lock = asyncio.Lock()
