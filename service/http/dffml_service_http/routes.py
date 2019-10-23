@@ -613,7 +613,8 @@ class Routes(BaseMultiCommContext):
         self.app["models"] = {}
         self.app["model_contexts"] = {}
         self.app.update(kwargs)
-        self.routes = [
+        # Allow no routes other than pre-registered if in atomic mode
+        self.routes = [] if self.mc_atomic else [
             # HTTP Service specific APIs
             ("POST", "/service/upload/{filepath:.+}", self.service_upload),
             # DFFML APIs

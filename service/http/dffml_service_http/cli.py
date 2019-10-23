@@ -140,7 +140,7 @@ class MultiCommCMD(CMD):
         dest="mc_atomic",
         action="store_true",
         default=False,
-        help="Change all registered routes or not at all",
+        help="No routes other than dataflows registered at startup",
     )
 
 
