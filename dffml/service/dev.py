@@ -257,11 +257,19 @@ class Diagram(CMD):
         required=False,
     )
     arg_dataflow = Arg("dataflow", help="File containing exported DataFlow")
+    arg_config = Arg(
+        "-config",
+        help="ConfigLoader to use for importing",
+        type=BaseConfigLoader.load,
+        default=None,
+    )
 
     async def run(self):
         dataflow_path = Path(self.dataflow)
-        config_type = dataflow_path.suffix.replace(".", "")
-        config_cls = BaseConfigLoader.load(config_type)
+        config_cls = self.config
+        if config_cls is None:
+            config_type = dataflow_path.suffix.replace(".", "")
+            config_cls = BaseConfigLoader.load(config_type)
         async with config_cls.withconfig(self.extra_config) as configloader:
             async with configloader() as loader:
                 exported = await loader.loadb(dataflow_path.read_bytes())
@@ -287,7 +295,7 @@ class Diagram(CMD):
                 if not self.simple:
                     print(f"subgraph {subgraph_node}[{instance_name}]")
                     print(f"style {subgraph_node} fill:#fff4de,stroke:#cece71")
-                print(f"{node}[{operation.name}]")
+                print(f"{node}[{operation.instance_name}]")
                 for input_name in operation.inputs.keys():
                     input_node = hashlib.md5(
                         ("input." + instance_name + "." + input_name).encode()

@@ -22,6 +22,12 @@ from ..util.data import export_dict
 from ..util.entrypoint import Entrypoint, base_entry_point
 
 
+class DefinitionMissing(Exception):
+    """
+    Definition missing from linked DataFlow
+    """
+
+
 class Definition(NamedTuple):
     """
     List[type] is how to specify a list

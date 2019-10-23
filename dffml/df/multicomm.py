@@ -6,7 +6,7 @@ from typing import Union, Tuple, Dict
 from ..util.data import merge
 from ..util.entrypoint import base_entry_point
 from ..config.config import BaseConfigLoader
-from .base import BaseConfig, BaseDataFlowObjectContext, BaseDataFlowObject
+from .base import BaseDataFlowObjectContext, BaseDataFlowObject
 from .types import DataFlow
 
 # Filetypes to ignore (don't try to load as a config)
@@ -74,35 +74,6 @@ class BaseMultiCommContext(BaseDataFlowObjectContext, abc.ABC):
                 continue
             yield path
 
-    async def _load_file(
-        self,
-        parsers: Dict[str, BaseConfigLoader],
-        exit_stack: contextlib.AsyncExitStack,
-        base_dir: pathlib.Path,
-        path: pathlib.Path,
-    ) -> Dict:
-        """
-        Load one file and load the ConfigLoader for it if necessary, using the
-        AsyncExitStack provided.
-        """
-        filetype = path.suffix.replace(".", "")
-        # Load the parser for the filetype if it isn't already loaded
-        if not filetype in parsers:
-            # TODO Get configs for loaders from somewhere, probably the
-            # config of the multicomm
-            loader_cls = BaseConfigLoader.load(filetype)
-            loader = await exit_stack.enter_async_context(
-                loader_cls(BaseConfig())
-            )
-            parsers[filetype] = await exit_stack.enter_async_context(loader())
-        # The config will be stored by its unique filepath split on dirs
-        config_path = list(path.parts[len(base_dir.parts) :])
-        # Get rid of suffix for last member of path
-        config_path[-1] = path.stem
-        config_path = tuple(config_path)
-        # Load the file
-        return config_path, await parsers[filetype].loadb(path.read_bytes())
-
     async def register_directory(
         self, directory: Union[pathlib.Path, str]
     ) -> None:
@@ -127,9 +98,9 @@ class BaseMultiCommContext(BaseDataFlowObjectContext, abc.ABC):
             mc_dir = pathlib.Path(directory, "mc", self.ENTRY_POINT_LABEL)
             if not mc_dir.is_dir():
                 raise NoConfigsForMultiComm(f"In {mc_dir!s}")
-            for path in mc_dir.rglob("*"):
-                config_path, config = await self._load_file(
-                    parsers, exit_stack, mc_dir, path
+            for path in self._iter_configs(mc_dir):
+                config_path, config = await BaseConfigLoader.load_file(
+                    parsers, exit_stack, path, base_dir=mc_dir
                 )
                 mc_configs[config_path] = config
             # Grab all files containing DataFlows
@@ -137,9 +108,9 @@ class BaseMultiCommContext(BaseDataFlowObjectContext, abc.ABC):
             if not df_dir.is_dir():
                 raise NoDataFlows(f"In {df_dir!s}")
             # Load all the DataFlows
-            for path in df_dir.rglob("*"):
-                config_path, config = await self._load_file(
-                    parsers, exit_stack, df_dir, path
+            for path in self._iter_configs(df_dir):
+                config_path, config = await BaseConfigLoader.load_file(
+                    parsers, exit_stack, path, base_dir=df_dir
                 )
                 df_configs[config_path] = config
                 # Now that we have all the dataflow, add it to its respective
@@ -148,8 +119,8 @@ class BaseMultiCommContext(BaseDataFlowObjectContext, abc.ABC):
             # Load all overrides
             override_dir = pathlib.Path(directory, "override")
             for path in self._iter_configs(override_dir):
-                config_path, config = await self._load_file(
-                    parsers, exit_stack, override_dir, path
+                config_path, config = await BaseConfigLoader.load_file(
+                    parsers, exit_stack, path, base_dir=override_dir
                 )
                 if not config_path in df_configs:
                     self.logger.info(

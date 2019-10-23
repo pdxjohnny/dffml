@@ -614,6 +614,18 @@ Extending
 
 .. code-block:: console
 
+    $ dffml dataflow create -config json \
+      dffml dataflow merge \
+        shouldi/deploy/df/shouldi.json \
+        shouldi/deploy/override/shouldi.json \
+      | dffml service dev diagram \
+          -display LR -stages processing -simple -config json /dev/stdin
+
+.. image:: /images/shouldi-dataflow-extended.svg
+    :alt: Diagram showing DataFlow with use of comment to code ratio
+
+.. code-block:: console
+
     $ curl -s \
       --header "Content-Type: application/json" \
       --request POST \

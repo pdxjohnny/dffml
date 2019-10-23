@@ -7,10 +7,12 @@ import os
 import sys
 import pdb
 import json
+import pathlib
 import asyncio
 import logging
 import inspect
 import argparse
+import contextlib
 import pkg_resources
 
 from .log import LOGGER
@@ -27,6 +29,7 @@ from .df.types import Input, Operation, DataFlow
 from .df.base import StringInputSetContext
 from .df.memory import MemoryInputSet, MemoryInputSetConfig
 from .util.entrypoint import load
+from .util.data import merge
 from .util.cli.arg import Arg
 from .util.cli.cmd import CMD
 from .util.cli.cmds import (
@@ -460,6 +463,44 @@ class Export(ImportExportCMD):
                 return await self.port.export_to_file(sctx, self.filename)
 
 
+class DataflowMerge(CMD):
+    arg_dataflows = Arg(
+        "dataflows", help="DataFlows to merge", nargs="+", type=pathlib.Path
+    )
+    arg_config = Arg(
+        "-config",
+        help="ConfigLoader to use for exporting",
+        type=BaseConfigLoader.load,
+        default=JSONConfigLoader,
+    )
+    arg_not_linked = Arg(
+        "-not-linked",
+        dest="not_linked",
+        help="Do not export dataflows as linked",
+        default=False,
+        action="store_true",
+    )
+
+    async def run(self):
+        # The merged dataflow
+        merged: Dict[str, Any] = {}
+        # For entering ConfigLoader contexts
+        async with contextlib.AsyncExitStack() as exit_stack:
+            # Load config loaders we'll need as we see their file types
+            parsers: Dict[str, BaseConfigLoader] = {}
+            for path in self.dataflows:
+                _, exported = await BaseConfigLoader.load_file(
+                    parsers, exit_stack, path
+                )
+                merge(merged, exported)
+        # Export the dataflow
+        dataflow = DataFlow._fromdict(**merged)
+        async with self.config(BaseConfig()) as configloader:
+            async with configloader() as loader:
+                exported = dataflow.export(linked=not self.not_linked)
+                sys.stdout.buffer.write(await loader.dumpb(exported))
+
+
 class DataflowCreate(CMD):
     arg_operations = Arg(
         "operations", nargs="+", help="Operations to create a dataflow for"
@@ -496,6 +537,7 @@ class DataflowCreate(CMD):
 class Dataflow(CMD):
 
     create = DataflowCreate
+    merge = DataflowMerge
 
 
 def services():
