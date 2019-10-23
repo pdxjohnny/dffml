@@ -1313,35 +1313,6 @@ class MemoryOrchestratorContext(BaseOrchestratorContext):
                 ctx, self, operation, await parameter_set._asdict()
             )
 
-    async def output_subflow(
-        self,
-        dataflow: DataFlow,
-        *,
-        ctx: Optional[BaseInputSetContext] = None,
-        inputs: Optional[List[Input]] = None,
-    ):
-        # TODO(dfass) This doesn't seem do be used, can we remove? Removal,
-        # dependent on making sure remap testcase works within service/http
-        """
-        Run a DataFlow but only run output operations.
-        """
-        ctx = await self.seed_inputs_for_dataflow(
-            dataflow, ctx=ctx, inputs=inputs
-        )
-        self.logger.debug("Running output subflow: %s", dataflow)
-        # Run output operations and create a dict mapping the operation name to
-        # the output of that operation
-        output = {
-            operation.instance_name: results
-            async for operation, results in self.run_stage(ctx, Stage.OUTPUT)
-        }
-        # If there is only one output operation, return only it's result instead
-        # of a dict with it as the only key value pair
-        if len(output) == 1:
-            output = list(output.values())[0]
-        # Return the context along with it's output
-        return ctx, output
-
 
 @entry_point("memory")
 class MemoryOrchestrator(BaseOrchestrator, BaseMemoryDataFlowObject):
