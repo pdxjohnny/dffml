@@ -53,7 +53,6 @@ class Version(CMD):
     async def run(self):
         self.logger.debug("Reporting version")
         devmode = False
-        pkgs: List[str] = []
         for syspath in map(pathlib.Path, sys.path):
             if (syspath / "dffml.egg-link").is_file():
                 devmode = True
