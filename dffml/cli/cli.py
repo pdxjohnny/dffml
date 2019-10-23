@@ -43,6 +43,7 @@ from ..util.cli.cmds import (
 )
 
 from .dataflow import Dataflow
+from .config import Config
 
 
 class Version(CMD):
@@ -508,3 +509,4 @@ class CLI(CMD):
     service = services()
     applicable = Applicable
     dataflow = Dataflow
+    config = Config

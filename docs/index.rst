@@ -48,6 +48,7 @@ include some sources, models, and operations as a part of the main package,
     about
     community
     installation
+    cli
     tutorials/index
     usage/index
     plugins/index

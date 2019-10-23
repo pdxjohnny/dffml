@@ -46,9 +46,6 @@ setup(
     packages=find_packages(),
     entry_points={
         "dffml.operation": [
-            "scrypt = dffml_feature_auth.feature.operations:scrypt"
-        ],
-        "dffml.operation.implementation": [
             "scrypt = dffml_feature_auth.feature.operations:Scrypt"
         ],
     },

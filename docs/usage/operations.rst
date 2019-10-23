@@ -1,13 +1,13 @@
 DataFlows - shouldi
 ===================
 
-This example will show you how to generate a dataset using operations. In the
+This example will explain what operations are and how you can use them. In the
 process we'll create a meta static analysis tool, ``shouldi``.
 
 Operations are the core of DFFML, they have inputs and outputs, are configurable
 and are run by the Orchestrator in what amounts to a large event loop.
 The events in the event loop are pieces of data entering the network. When a
-piece of data which matches the data types of one of the operations inputs
+piece of data which matches the data types of one of the operation's inputs
 enters the network, that operation is then run.
 
 We're going to write a few operations which will run some Python static analysis
@@ -23,32 +23,32 @@ I install Python package X? When it's done it'll look like this
         safety_check_number_of_issues: 1
         bandit_output: {'CONFIDENCE.HIGH': 0.0, 'CONFIDENCE.LOW': 0.0, 'CONFIDENCE.MEDIUM': 0.0, 'CONFIDENCE.UNDEFINED': 0.0, 'SEVERITY.HIGH': 0.0, 'SEVERITY.LOW': 0.0, 'SEVERITY.MEDIUM': 0.0, 'SEVERITY.UNDEFINED': 0.0, 'loc': 100, 'nosec': 0, 'CONFIDENCE.HIGH_AND_SEVERITY.HIGH': 0}
 
-We'll then deploy the tool as an HTTP API endpoint rather than a command line
-application.
-
-.. TODO What about multiple packages over HTTP API?
+In the second half of this tutorial, we'll deploy the tool as an HTTP API
+endpoint rather than a command line application.
 
 .. code-block:: console
 
     $ curl -s \
       --header "Content-Type: application/json" \
       --request POST \
-      --data '[{"value":"insecure-package","definition":"package"}]' \
+      --data '{"insecure-package": [{"value":"insecure-package","definition":"package"}]}' \
       http://localhost:8080/shouldi | python -m json.tool
     {
-        "safety_check_number_of_issues": 1,
-        "bandit_output": {
-            "CONFIDENCE.HIGH": 0,
-            "CONFIDENCE.LOW": 0,
-            "CONFIDENCE.MEDIUM": 0,
-            "CONFIDENCE.UNDEFINED": 0,
-            "SEVERITY.HIGH": 0,
-            "SEVERITY.LOW": 0,
-            "SEVERITY.MEDIUM": 0,
-            "SEVERITY.UNDEFINED": 0,
-            "loc": 100,
-            "nosec": 0,
-            "CONFIDENCE.HIGH_AND_SEVERITY.HIGH": 0
+        "insecure-package": {
+            "safety_check_number_of_issues": 1,
+            "bandit_output": {
+                "CONFIDENCE.HIGH": 0,
+                "CONFIDENCE.LOW": 0,
+                "CONFIDENCE.MEDIUM": 0,
+                "CONFIDENCE.UNDEFINED": 0,
+                "SEVERITY.HIGH": 0,
+                "SEVERITY.LOW": 0,
+                "SEVERITY.MEDIUM": 0,
+                "SEVERITY.UNDEFINED": 0,
+                "loc": 100,
+                "nosec": 0,
+                "CONFIDENCE.HIGH_AND_SEVERITY.HIGH": 0
+            }
         }
     }
 
@@ -496,6 +496,8 @@ We first export the DataFlow to a config file on disk.
 
     Installing the ``dffml-config-yaml`` package will enable the
     ``-config yaml`` option. Allowing you to export to YAML instead of JSON.
+    You can also convert between config file formats with the
+    :ref:`cli_config_convert` command.
 
 We then create the mermaidjs digarm from the DataFlow. The ``-simple`` flag says
 to only show connections between operations, don't show which inputs and outputs
@@ -607,15 +609,14 @@ Extending
       dffml.mapping.create lines_of_code_by_language lines_of_code_to_comments \
       > shouldi/deploy/override/shouldi.json
 
-**shouldi/deploy/override/shouldi.yaml**
+**shouldi/deploy/override/shouldi.json**
 
 .. literalinclude:: /../examples/shouldi/shouldi/deploy/override/shouldi.json
     :language: json
 
 .. code-block:: console
 
-    $ dffml dataflow create -config json \
-      dffml dataflow merge \
+    $ dffml dataflow merge \
         shouldi/deploy/df/shouldi.json \
         shouldi/deploy/override/shouldi.json \
       | dffml dataflow diagram \

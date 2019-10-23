@@ -41,8 +41,12 @@ setup(
     include_package_data=True,
     zip_safe=False,
     extras_require={
-        "models": ["dffml-model-tensorflow", "dffml-model-scratch"],
-        "git": ["dffml-feature-git"],
+        "models": [
+            "dffml-model-tensorflow",
+            "dffml-model-scratch",
+            "dffml-model-scikit",
+        ],
+        "sources": ["dffml-source-mysql"],
         "dev": [
             "coverage",
             "codecov",
