@@ -366,13 +366,38 @@ The DataFlow above describes the following process:
 PyPi Operations
 ---------------
 
-Let's write an operation to grab the version of a package.
+Let's write an operation to grab the JSON information about a package.
 
 **shouldi/pypi.py**
 
 .. literalinclude:: /../examples/shouldi/shouldi/pypi.py
+    :lines: 1-35
 
-Write a test for it
+After we have the package information, we extract the version and URL where we
+can get the source code.
+
+**shouldi/pypi.py**
+
+.. literalinclude:: /../examples/shouldi/shouldi/pypi.py
+    :lines: 38-60
+
+Once we have the URL, we download the package source and extract it to a
+temporary directory.
+
+**shouldi/pypi.py**
+
+.. literalinclude:: /../examples/shouldi/shouldi/pypi.py
+    :lines: 63-80
+
+Finally, we make a ``cleanup`` operation to remove the directory once we're done
+with it.
+
+**shouldi/pypi.py**
+
+.. literalinclude:: /../examples/shouldi/shouldi/pypi.py
+    :lines: 83-88
+
+Now we write tests for each operation.
 
 **tests/test_pypi.py**
 
@@ -390,8 +415,6 @@ CLI
 Writing the CLI is as simple as importing our operations and having the memory
 orchestrator run them. DFFML also provides a quick and dirty CLI abstraction
 based on :py:mod:`argparse` which will speed things up.
-
-.. TODO explain more about writing the CLI and the orchestrator
 
 **shouldi/cli.py**
 
