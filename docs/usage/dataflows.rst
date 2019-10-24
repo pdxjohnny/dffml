@@ -43,10 +43,46 @@ without the need to hardcode in ``import`` statements.
         }
     }
 
+MultiComms
+----------
+
+Another concept in DFFML is the ``MultiComm``, they are contain multiple
+channels of communications. ``MultiComm``'s will typically be protocol based.
+An IRC or Slack ``MultiComm`` channel of communication might be a chat room, or
+when a particular word immediately follows the bots name.
+
+Example:
+
+.. code-block:: log
+
+    myuser    | mybot: shouldi install ...
+
+The HTTP server was the first ``MultiComm`` written for DFFML. It's channels of
+communication are URL paths (Example: ``/some/url/path``).
+
 HTTP Deployment
 ---------------
 
 We can take the
+
+.. code-block:: console
+
+    $ mkdir -p shouldi/deploy/mc/http
+
+**shouldi/deploy/mc/http/shouldi.yaml**
+
+.. literalinclude:: /../examples/shouldi/shouldi/deploy/mc/http/shouldi.yaml
+    :language: yaml
+
+.. note::
+
+    Please install the ``dffml-config-yaml`` package to enable the
+    ``-config yaml`` option. Allowing you to export to YAML instead of JSON.
+    You can also convert between config file formats with the
+    :ref:`cli_config_convert` command.
+
+    JSON files work fine, but they'll take up too much page space in this
+    tutorial.
 
 .. code-block:: console
 
@@ -62,7 +98,7 @@ We can take the
     $ curl -s \
       --header "Content-Type: application/json" \
       --request POST \
-      --data '[{"value":"insecure-package","definition":"package"}]' \
+      --data '{"insecure-package": [{"value":"insecure-package","definition":"package"}]}' \
       http://localhost:8080/shouldi | python -m json.tool
     {
         "bandit_output": {
@@ -86,22 +122,23 @@ Extending
 
 .. code-block:: console
 
-    $ dffml dataflow create -config json \
+    $ mkdir -p shouldi/deploy/override
+    $ dffml dataflow create -config yaml \
       dffml.mapping.create lines_of_code_by_language lines_of_code_to_comments \
-      > shouldi/deploy/override/shouldi.json
+      > shouldi/deploy/override/shouldi.yaml
 
-**shouldi/deploy/override/shouldi.json**
+**shouldi/deploy/override/shouldi.yaml**
 
-.. literalinclude:: /../examples/shouldi/shouldi/deploy/override/shouldi.json
-    :language: json
+.. literalinclude:: /../examples/shouldi/shouldi/deploy/override/shouldi.yaml
+    :language: yaml
 
 .. code-block:: console
 
     $ dffml dataflow merge \
-        shouldi/deploy/df/shouldi.json \
-        shouldi/deploy/override/shouldi.json | \
+        shouldi/deploy/df/shouldi.yaml \
+        shouldi/deploy/override/shouldi.yaml | \
       dffml dataflow diagram \
-        -stages processing -simple -config json /dev/stdin
+        -stages processing -simple -config yaml /dev/stdin
 
 Copy and pasting the graph into the
 `mermaidjs live editor <https://mermaidjs.github.io/mermaid-live-editor>`_
@@ -115,7 +152,7 @@ results in the following graph.
     $ curl -s \
       --header "Content-Type: application/json" \
       --request POST \
-      --data '[{"value":"insecure-package","definition":"package"}]' \
+      --data '{"insecure-package": [{"value":"insecure-package","definition":"package"}]}' \
       http://localhost:8080/shouldi | python -m json.tool
     {
         "bandit_output": {

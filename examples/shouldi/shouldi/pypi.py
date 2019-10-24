@@ -4,14 +4,14 @@ from typing import Dict, Any
 
 import aiohttp
 
-from dffml.df.types import Definition, Stage
 from dffml.df.base import op
+from dffml.df.types import Definition, Stage
 
-package = Definition(name="package", primitive="str")
+from .safety import package, package_version
+from .bandit import package_src_dir
+
 package_json = Definition(name="package_json", primitive="Dict[str, Any]")
-package_version = Definition(name="package_version", primitive="str")
 package_url = Definition(name="package_url", primitive="str")
-package_src_dir = Definition(name="package_src_dir", primitive="str")
 
 
 @op(

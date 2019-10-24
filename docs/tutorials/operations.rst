@@ -155,6 +155,12 @@ Create a new package using the create script.
     `examples/shouldi <https://github.com/intel/dffml/blob/master/examples/shouldi/>`_
     directory of the DFFML source code.
 
+Remove the example files as we won't be needing them
+
+.. code-block:: console
+
+    $ rm shouldi/operations.py shouldi/definitions.py tests/test_operations.py
+
 Installing Static Analysis Tools
 --------------------------------
 
@@ -167,10 +173,8 @@ dependences. For packages, we can declare our dependencies right in our
 
 **setup.py**
 
-.. TODO Update lines for setup.py
-
 .. literalinclude:: /../examples/shouldi/setup.py
-    :lines: 1-100
+    :lines: 5-9
 
 .. note::
 
@@ -456,10 +460,8 @@ the ``shouldi.cli`` module.
 
 **setup.py**
 
-.. TODO Update lines for setup.py
-
 .. literalinclude:: /../examples/shouldi/setup.py
-    :lines: 1-100
+    :lines: 10-13
 
 Re-install the package via pip
 
@@ -483,19 +485,20 @@ Visualizing the DataFlow
 
 DataFlows can be visualized using `mermaidjs <https://mermaidjs.github.io/>`_.
 
-We first export the DataFlow to a config file on disk.
-
-.. code-block:: console
-
-    $ dffml service dev export -config json shouldi.cli:DATAFLOW \
-      > shouldi/deploy/df/shouldi.json
-
 .. note::
 
     Installing the ``dffml-config-yaml`` package will enable the
     ``-config yaml`` option. Allowing you to export to YAML instead of JSON.
     You can also convert between config file formats with the
     :ref:`cli_config_convert` command.
+
+We first export the DataFlow to a config file on disk.
+
+.. code-block:: console
+
+    $ mkdir -p shouldi/deploy/df
+    $ dffml service dev export -config json shouldi.cli:DATAFLOW \
+      > shouldi/deploy/df/shouldi.json
 
 We then create the mermaidjs digarm from the DataFlow. The ``-simple`` flag says
 to only show connections between operations, don't show which inputs and outputs
@@ -560,10 +563,14 @@ DFFML, we need to register them with Python's ``entry_points`` system.
 
 **setup.py**
 
-.. TODO Update line numbers
-
 .. literalinclude:: /../examples/shouldi/setup.py
-    :lines: 47-51
+    :lines: 10-23
+
+Re-install the package via pip to make registrations take effect.
+
+.. code-block:: console
+
+    $ python3.7 -m pip install -e .
 
 After you've registered the operations, services such as the
 :doc:`/plugins/service/http/index` will have access to your operations.
