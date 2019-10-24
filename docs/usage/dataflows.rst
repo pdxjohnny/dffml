@@ -1,8 +1,8 @@
 DataFlow Deployment
 ===================
 
-In the :doc:`/tutorials/operations` tutorial we created a command line meta
-static analysis tool, ``shouldi``.
+In the :doc:`/tutorials/operations` we created a command line meta static
+analysis tool, ``shouldi``.
 
 .. code-block:: console
 
