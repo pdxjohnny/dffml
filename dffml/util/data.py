@@ -71,11 +71,13 @@ def ignore_args(func):
 def export_value(obj, key, value):
     # export and _asdict are not classmethods
     if inspect.isclass(value):
-        return
-    if hasattr(value, "export"):
+        obj[key] = value.__qualname__
+    elif hasattr(value, "export"):
         obj[key] = value.export()
     elif hasattr(value, "_asdict"):
         obj[key] = value._asdict()
+    elif value.__module__ == typing:
+        return str(value)
 
 
 def export_list(iterable):

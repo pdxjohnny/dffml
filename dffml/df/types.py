@@ -52,11 +52,13 @@ class Definition(NamedTuple):
         if not self.spec:
             del exported["spec"]
         else:
-            exported["spec"] = {
-                "name": exported["spec"].__qualname__,
-                "types": exported["spec"]._field_types,
-                "defaults": exported["spec"]._field_defaults,
-            }
+            exported["spec"] = export_dict(
+                name=exported["spec"].__qualname__,
+                types=exported["spec"]._field_types,
+                defaults=exported["spec"]._field_defaults,
+            )
+            print(exported["spec"])
+            print()
         return exported
 
     @classmethod
