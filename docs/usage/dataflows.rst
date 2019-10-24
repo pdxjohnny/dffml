@@ -53,7 +53,7 @@ when a particular word immediately follows the bots name.
 
 Example:
 
-.. code-block:: log
+::
 
     myuser    | mybot: shouldi install ...
 
