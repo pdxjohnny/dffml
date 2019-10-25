@@ -48,10 +48,10 @@ include some sources, models, and operations as a part of the main package,
     about
     community
     installation
-    tutorials/index
     usage/index
-    cli
+    tutorials/index
     plugins/index
+    cli
     plugins/service/http/index
     api/index
 
