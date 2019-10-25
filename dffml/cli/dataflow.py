@@ -4,9 +4,11 @@ import hashlib
 import contextlib
 
 from ..base import BaseConfig
-from ..df.types import DataFlow, Stage, Operation
+from ..df.types import DataFlow, Stage, Operation, Input
+from ..df.memory import MemoryInputSet, MemoryInputSetConfig, StringInputSetContext
 from ..config.config import BaseConfigLoader
 from ..config.json import JSONConfigLoader
+from ..source.source import SubsetSources
 from ..util.data import merge
 from ..util.entrypoint import load
 from ..util.cli.arg import Arg
@@ -152,17 +154,17 @@ class RunAllRepos(RunCMD):
 
                 repo_inputs = []
                 for value, def_name in self.inputs:
-                    inputs.append(
+                    repo_inputs.append(
                         Input(
                             value=value,
-                            definition=datafow.definitions[def_name],
+                            definition=dataflow.definitions[def_name],
                         )
                     )
                 if self.repo_def:
-                    inputs.append(
+                    repo_inputs.append(
                         Input(
                             value=repo.src_url,
-                            definition=datafow.definitions[self.repo_def],
+                            definition=dataflow.definitions[self.repo_def],
                         )
                     )
 

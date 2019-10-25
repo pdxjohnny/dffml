@@ -1,6 +1,7 @@
 """
 Various helper functions for manipulating python data structures and values
 """
+import pydoc
 import inspect
 from functools import wraps
 
@@ -74,6 +75,16 @@ STANDARD_TYPES = {
     "List": "array",
     "Any": "generic",
 }
+STANDARD_TYPES_REVERSED = dict(zip(STANDARD_TYPES.values(), STANDARD_TYPES.keys()))
+
+def type_lookup(typename):
+    if typename in STANDARD_TYPES_REVERSED:
+        typename = f"typing.{STANDARD_TYPES_REVERSED[typename]}"
+    # TODO(security) Make sure pydoc.locate won't blow up in our face ever
+    typeof = pydoc.locate(typename)
+    if typeof is None:
+        raise TypeError(typename)
+    return typeof
 
 
 def export_value(obj, key, value):

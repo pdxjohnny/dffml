@@ -252,12 +252,15 @@ seed:
     authors:
       by: quarter
       group: author_count
+      fill: 0
     work:
       by: quarter
       group: work_spread
+      fill: 0
     commits:
       by: quarter
       group: commit_count
+      fill: 0
 - definition: quarter_start_date
   value: 2019-03-29 13:24
 - definition: quarter

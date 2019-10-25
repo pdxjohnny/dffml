@@ -434,17 +434,23 @@ class MemoryInputNetworkContext(BaseInputNetworkContext):
                                 continue
                             # Generate parameters from inputs
                             for item in by_origin[origin]:
+                                # TODO(p2) We favored comparing names to
+                                # deifnitions because sometimes we create
+                                # defintions which have specs which create new
+                                # types which will not equal each other. We
+                                # maybe want to consider switching to comparing
+                                # exported Defintions
                                 if isinstance(input_source, str):
                                     if (
-                                        item.definition
-                                        != operation.inputs[input_name]
+                                        item.definition.name
+                                        != operation.inputs[input_name].name
                                     ):
                                         continue
                                 elif (
-                                    item.definition
+                                    item.definition.name
                                     != dataflow.operations[origin[0]].outputs[
                                         origin[1]
-                                    ]
+                                    ].name
                                 ):
                                     continue
                                 gather[input_name].append(

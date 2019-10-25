@@ -1,4 +1,5 @@
 import uuid
+import copy
 import pydoc
 import inspect
 import itertools
@@ -18,7 +19,7 @@ from typing import (
 )
 
 from ..base import BaseConfig
-from ..util.data import export_dict
+from ..util.data import export_dict, type_lookup
 from ..util.entrypoint import Entrypoint, base_entry_point
 
 
@@ -53,14 +54,16 @@ class Definition(NamedTuple):
             del exported["spec"]
         else:
             exported["spec"] = export_dict(
-                name=exported["spec"].__qualname__,
-                types=exported["spec"]._field_types,
-                defaults=exported["spec"]._field_defaults,
+                name=self.spec.__qualname__,
+                types=self.spec._field_types,
+                defaults=self.spec._field_defaults,
             )
         return exported
 
     @classmethod
     def _fromdict(cls, **kwargs):
+        # TODO(p5) We should avoid coping here, i think
+        kwargs = copy.deepcopy(kwargs)
         if "spec" in kwargs:
             # Alright this is horrible. But bear with me here. The
             # typing.NamedTuple API as of 3.7 does not provide a clean way to
@@ -70,8 +73,11 @@ class Definition(NamedTuple):
             # https://github.com/python/cpython/blob/3.7/Lib/typing.py#L1360
             # and seeing that we can hijack the __annotations__ property to
             # allow us to set default values
-            def_tuple = kwargs["spec"]["types"]
-            def_tuple["__annotations__"] = kwargs["spec"]["defaults"]
+            def_tuple = kwargs["spec"]["defaults"]
+            annotations = {}
+            for key, typename in kwargs["spec"]["types"].items():
+                annotations[key] = cls.type_lookup(typename)
+            def_tuple["__annotations__"] = annotations
             kwargs["spec"] = type(
                 kwargs["spec"]["name"], (NamedTuple,), def_tuple
             )
@@ -83,8 +89,7 @@ class Definition(NamedTuple):
         if typename in ["Definition"]:
             # TODO More types
             return cls
-        # TODO(security) Make sure this won't blow up in our face ever
-        return pydoc.locate(typename)
+        return type_lookup(typename)
 
 
 class Stage(Enum):
