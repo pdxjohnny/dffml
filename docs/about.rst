@@ -72,8 +72,8 @@ own plugins.
 Team
 ----
 
-We have a team of volunteers working on the project. We hold weekly meetings
-and have a mailing list and chat. If you want to get involved, ask questions, or
+We have an awesome team working on the project. We hold weekly meetings
+and have a mailing list and chat! If you want to get involved, ask questions, or
 get help getting started, see :doc:`community`.
 
 We participated in Google Summer of Code 2019 under the Python Software
@@ -90,4 +90,4 @@ using DFFML, see the :doc:`community` page.
 
 - Intel
 
-  - Open Source Software dependency security viability analysis
+  - Security analysis of Open Source Software dependencies.
