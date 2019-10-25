@@ -6,6 +6,21 @@ command line interface too.
 
 .. contents:: Command Line Interface
 
+DataFlow
+--------
+
+Commands to create, modify, run, and visualize DataFlows.
+
+Create
+~~~~~~
+
+Ouput the dataflow description to standard output using the specified config
+format.
+
+.. code-block:: console
+
+    $ dffml dataflow create -config yaml get_single clone_git_repo
+
 Config
 ------
 

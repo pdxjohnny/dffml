@@ -16,9 +16,6 @@ class GroupBySpec(NamedTuple):
     group: Definition
     by: Definition
     fill: Any
-    # TODO Add single and ismap attributes
-    # single: bool = False
-    # ismap: bool = False
 
     @classmethod
     async def resolve(
@@ -105,10 +102,10 @@ class GroupBy(OperationImplementationContext):
             return want
 
 
-get_single_spec = Definition(name="get_single_spec", primitive="List[str]")
+get_single_spec = Definition(name="get_single_spec", primitive="array")
 
 get_single_output = Definition(
-    name="get_single_output", primitive="Dict[str, Any]"
+    name="get_single_output", primitive="map"
 )
 
 
