@@ -6,10 +6,48 @@ command line interface too.
 
 .. contents:: Command Line Interface
 
+Model
+-----
+
+Train, asses accuracy, and use models for prediction.
+
 DataFlow
 --------
 
-Commands to create, modify, run, and visualize DataFlows.
+Create, modify, run, and visualize DataFlows.
+
+Create
+~~~~~~
+
+Ouput the dataflow description to standard output using the specified config
+format.
+
+.. code-block:: console
+
+    $ dffml dataflow create -config yaml get_single clone_git_repo
+
+Merge
+~~~~~
+
+Combine two dataflows into one. Dataflows must either be all linked or all not
+linked.
+
+.. code-block:: console
+
+    $ dffml dataflow merge base.yaml overrides.yaml
+
+Diagram
+~~~~~~~
+
+Output a mermaidjs graph description of a DataFlow.
+
+.. code-block:: console
+
+    $ dffml dataflow diagram -simple shouldi.json
+
+You can now copy the graph description and paste it in the
+`mermaidjs live editor <https://mermaidjs.github.io/mermaid-live-editor>`_ (or
+use the CLI tool) to generate an SVG or other format of the graph.
 
 Create
 ~~~~~~
@@ -38,13 +76,15 @@ Convert one config file format into another.
 Service
 -------
 
-Services are various for a complete list of services maintained within the core
-codebase see the :doc:`/plugins/dffml_service_cli` plugin docs.
+Services are various command line utilities that are associated with DFFML.
+
+For a complete list of services maintained within the core codebase see the
+:doc:`/plugins/dffml_service_cli` plugin docs.
 
 Dev
 ~~~
 
-Development utilites for creating new packages or hacking on the core codebase.
+Development utilities for creating new packages or hacking on the core codebase.
 
 Export
 ++++++
@@ -61,9 +101,10 @@ using the given config format.
 Entrypoints
 +++++++++++
 
-We make heavy use of the Python
+DFFML makes heavy use of the Python
 `entrypoint <https://packaging.python.org/specifications/entry-points/>`_
-system.
+system. The following tools will help you with development and use of the
+entrypoints system.
 
 List
 ____

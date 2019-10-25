@@ -89,11 +89,11 @@ No description
 
 **Inputs**
 
-- spec: get_single_spec(type: List[str])
+- spec: get_single_spec(type: array)
 
 **Outputs**
 
-- output: get_single_output(type: Dict[str, Any])
+- output: get_single_output(type: map)
 
 group_by
 ~~~~~~~~
