@@ -219,10 +219,19 @@ class Operation(NamedTuple, Entrypoint):
     @classmethod
     def _fromdict(cls, **kwargs):
         for prop in ["inputs", "outputs"]:
+            if not prop in kwargs:
+                continue
             kwargs[prop] = {
                 argument_name: Definition._fromdict(**definition)
                 for argument_name, definition in kwargs[prop].items()
             }
+        for prop in ["conditions"]:
+            if not prop in kwargs:
+                continue
+            kwargs[prop] = [
+                Definition._fromdict(**definition)
+                for definition in kwargs[prop]
+            ]
         if "stage" in kwargs:
             kwargs["stage"] = Stage[kwargs["stage"].upper()]
         return cls(**kwargs)
@@ -380,6 +389,7 @@ class DataFlow:
                         itertools.chain(
                             operation.inputs.values(),
                             operation.outputs.values(),
+                            operation.conditions
                         )
                         for operation in operations
                     ]

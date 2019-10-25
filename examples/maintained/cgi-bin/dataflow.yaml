@@ -45,6 +45,9 @@ definitions:
         by: Definition
         fill: generic
         group: Definition
+  no_git_branch_given:
+    name: no_git_branch_given
+    primitive: boolean
   quarter:
     name: quarter
     primitive: int
