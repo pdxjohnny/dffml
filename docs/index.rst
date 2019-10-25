@@ -48,9 +48,9 @@ include some sources, models, and operations as a part of the main package,
     about
     community
     installation
-    cli
     tutorials/index
     usage/index
+    cli
     plugins/index
     plugins/service/http/index
     api/index
