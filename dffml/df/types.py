@@ -57,8 +57,6 @@ class Definition(NamedTuple):
                 types=exported["spec"]._field_types,
                 defaults=exported["spec"]._field_defaults,
             )
-            print(exported["spec"])
-            print()
         return exported
 
     @classmethod

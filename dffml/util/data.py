@@ -67,6 +67,14 @@ def ignore_args(func):
 
     return wrapper
 
+# STANDARD_TYPES Will be the type names which are applicable across languages
+# used to transform types from one language into anothers
+STANDARD_TYPES = {
+    "Dict": "map",
+    "List": "array",
+    "Any": "generic",
+}
+
 
 def export_value(obj, key, value):
     # export and _asdict are not classmethods
@@ -76,8 +84,8 @@ def export_value(obj, key, value):
         obj[key] = value.export()
     elif hasattr(value, "_asdict"):
         obj[key] = value._asdict()
-    elif value.__module__ == typing:
-        return str(value)
+    elif getattr(value, "__module__", None) == "typing":
+        obj[key] = STANDARD_TYPES.get(str(value).replace('typing.', ''), 'generic')
 
 
 def export_list(iterable):
