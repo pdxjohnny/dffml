@@ -4,6 +4,7 @@ import secrets
 import hashlib
 import inspect
 import itertools
+import traceback
 from datetime import datetime
 from itertools import product, chain
 from contextlib import asynccontextmanager, AsyncExitStack
@@ -1289,12 +1290,20 @@ class MemoryOrchestratorContext(BaseOrchestratorContext):
                 ctx, Stage.CLEANUP
             ):
                 pass
+        # Set output to empty dict in case output operations fail
+        output = {}
         # Run output operations and create a dict mapping the operation name to
         # the output of that operation
-        output = {
-            operation.instance_name: results
-            async for operation, results in self.run_stage(ctx, Stage.OUTPUT)
-        }
+        try:
+            output = {
+                operation.instance_name: results
+                async for operation, results in self.run_stage(ctx, Stage.OUTPUT)
+            }
+        except:
+            if strict:
+                raise
+            else:
+                self.logger.error("%s", traceback.format_exc().rstrip())
         # If there is only one output operation, return only it's result instead
         # of a dict with it as the only key value pair
         if len(output) == 1:

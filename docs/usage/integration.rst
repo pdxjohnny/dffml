@@ -238,7 +238,8 @@ This command runs the dataflow on a set of repos, that set being the URLs in
         -repo-def URL \
         -dataflow cgi-bin/dataflow.yaml \
         -sources gathered=json \
-        -source-filename /tmp/data.json
+        -source-filename /tmp/data.json \
+        -no-strict
     [
         ... results ...
         {
