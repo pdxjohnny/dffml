@@ -119,11 +119,12 @@ maintenance, we can then feed that data into a machine learning model.
 
 The operations we're going to use are a part of ``dffml-feature-git``, which is
 a separate Python package from DFFML (although maintained within the same repo)
-which we can install via ``pip``.
+which we can install via ``pip``. We'll also use the ``yaml`` config loader,
+since that creates much more user friendly configs than ``json``.
 
 .. code-block:: bash
 
-    $ pip install -U dffml-feature-git
+    $ pip install -U dffml-feature-git dffml-config-yaml
 
 Operations are just Python functions, or classes. They define a routine which
 will be run concurrently with other operations. Here's an example of the
@@ -193,6 +194,13 @@ our dataset. First we'll define which operations we are going to use.
     count_authors
     cleanup_git_repo
     EOF
+
+We then create a ``DataFlow`` description of how they all link together.
+
+.. code-block:: bash
+
+    $ dffml dataflow create -config yaml $(cat /tmp/operations) \
+        > examples/maintained/cgi-bin/dataflow.yaml
 
 We then run the defined operations through the orchestrator. ``remap`` and
 ``group_by_spec`` are re-labeling the output's to the feature data names we
