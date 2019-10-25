@@ -771,6 +771,6 @@ class BaseOrchestratorContext(BaseDataFlowObjectContext):
         """
 
 
-@base_entry_point("dffml.orchestrator", "dff")
+@base_entry_point("dffml.orchestrator", "orchestrator")
 class BaseOrchestrator(BaseDataFlowObject):
     pass  # pragma: no cov

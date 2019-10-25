@@ -113,6 +113,17 @@ class RunCMD(OrchestratorCMD, SourcesCMD):
         default=False,
         action="store_true",
     )
+    arg_dataflow = Arg(
+        "-dataflow",
+        help="File containing exported DataFlow",
+        required=True
+    )
+    arg_config = Arg(
+        "-config",
+        help="ConfigLoader to use for importing DataFlow",
+        type=BaseConfigLoader.load,
+        default=None,
+    )
 
 
 class RunAllRepos(RunCMD):
@@ -120,14 +131,14 @@ class RunAllRepos(RunCMD):
 
     async def repos(self, sctx):
         """
-        This method exists so that it can be overriden by RunSingleRepo
+        This method exists so that it can be overriden by RunRepoSet
         """
         async for repo in sctx.repos():
             yield repo
 
-    async def run_dataflow(self, orchestrator, sources):
+    async def run_dataflow(self, orchestrator, sources, dataflow):
         # Orchestrate the running of these operations
-        async with orchestrator() as octx, sources() as sctx:
+        async with orchestrator(dataflow) as octx, sources() as sctx:
             # Add our inputs to the input network with the context being the
             # repo src_url
             async for repo in self.repos(sctx):
@@ -175,12 +186,21 @@ class RunAllRepos(RunCMD):
                     await sctx.update(repo)
 
     async def run(self):
-        async with self.dff as dff, self.sources as sources:
-            async for repo in self.run_dataflow(dff, sources):
+        dataflow_path = pathlib.Path(self.dataflow)
+        config_cls = self.config
+        if config_cls is None:
+            config_type = dataflow_path.suffix.replace(".", "")
+            config_cls = BaseConfigLoader.load(config_type)
+        async with config_cls.withconfig(self.extra_config) as configloader:
+            async with configloader() as loader:
+                exported = await loader.loadb(dataflow_path.read_bytes())
+                dataflow = DataFlow._fromdict(**exported)
+        async with self.orchestrator as orchestrator, self.sources as sources:
+            async for repo in self.run_dataflow(orchestrator, sources, dataflow):
                 yield repo
 
 
-class RunSingleRepo(RunAllRepos, KeysCMD):
+class RunRepoSet(RunAllRepos, KeysCMD):
     """Run dataflow for single repo or set of repos"""
 
     async def repos(self, sctx):
@@ -195,7 +215,7 @@ class RunSingleRepo(RunAllRepos, KeysCMD):
 class RunRepos(CMD):
     """Run DataFlow and assign output to a repo"""
 
-    single = RunSingleRepo
+    _set = RunRepoSet
     _all = RunAllRepos
 
 

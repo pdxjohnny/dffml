@@ -535,7 +535,8 @@ class MemoryOperationNetwork(BaseOperationNetwork, BaseMemoryDataFlowObject):
 
     @classmethod
     def args(cls, args, *above) -> Dict[str, Arg]:
-        cls.config_set(args, above, "ops", Arg(type=Operation.load, nargs="+"))
+        cls.config_set(args, above, "ops", Arg(type=Operation.load, nargs="+",
+            default=[]))
         return args
 
     @classmethod
@@ -942,7 +943,7 @@ class MemoryOperationImplementationNetwork(
             args,
             above,
             "opimps",
-            Arg(type=OperationImplementation.load, nargs="+"),
+            Arg(type=OperationImplementation.load, nargs="+", default=[]),
         )
         # Add orig label to above since we are done loading
         above = cls.add_orig_label(*above)
