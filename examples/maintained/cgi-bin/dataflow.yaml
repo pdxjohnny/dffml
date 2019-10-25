@@ -262,7 +262,7 @@ seed:
       by: quarter
       fill: 0
 - definition: quarter_start_date
-  value: 2019-10-25 01:37
+  value: 2019-03-29 13:24
 - definition: quarter
   value: 0
 - definition: quarter

@@ -47,14 +47,14 @@ Install DFFML.
 
     $ pip install -U dffml
 
-Download the Python 2 client libraries for MariaDB (same as MySQL).
+Download the Python 2 client libraries for MySQL.
 
 .. code-block:: bash
 
     $ python2 -m pip install -U --user \
         https://dev.mysql.com/get/Downloads/Connector-Python/mysql-connector-python-8.0.16.tar.gz
 
-Start MariaDB
+Start MariaDB (functionally very similar to MySQL which its a fork of).
 
 .. code-block:: bash
 
@@ -70,8 +70,9 @@ Import the data. The data was pulled from a couple pages of GitHub search
 results and randomly assigned a maintenance status. It is completely
 meaningless.
 
-You could discard all of this data and use the web app to create a meaningful
-dataset by manually going through and setting the status of repos.
+If you want results that mean anything, you could discard all of this data and
+use the web app to create a meaningful dataset by manually going through and
+setting the status of repos.
 
 .. code-block:: bash
 
@@ -199,61 +200,91 @@ The inputs and outputs of operations within a running DataFlow are organized by
 contexts. The context for our dataset generation will be the source URL to the
 Git repo.
 
-have ``seed`` inputs, which are added 
-We then run the defined operations through the orchestrator. ``remap`` and
-``group_by_spec`` are re-labeling the output's to the feature data names we
-want.
+- We will be providing the source URL to the git repo on a per-repo basis.
+
+- We provide the start date of the zeroith quarter, and 10 instances of quarter,
+  since for each operation, every possible permutation of inputs will be run,
+  ``quarters_back_to_date`` is going to take the start date, and the quarter,
+  and produce a date range for that quarter.
+
+- We'll also need to provide an input to the output operation ``group_by_spec``.
+  Output operations decide what data generated should be used as feature data,
+  and present it in a usable format.
+
+  - Here we're telling the ``group_by`` operation to create feature data where
+    the ``author_count``, ``work_spread`` and ``commit_count`` are grouped by
+    the quarter they were generated for.
 
 **examples/maintained/cgi-bin/dataflow.yaml**
 
 .. literalinclude:: /../examples/maintained/cgi-bin/dataflow.yaml
     :linenos:
-    :lineno-start: 246
-    :lines: 246-279
+    :lineno-start: 249
+    :lines: 249-285
 
 The speed of the following command depends on your internet connection, it may
 take 2 minutes, it may take more. All the git repos in ``/tmp/urls`` will be
 downloaded, this will also take up space in ``/tmp``, they will be cleaned up
 automatically.
 
+This command runs the dataflow on a set of repos, that set being the URLs in
+``/tmp/urls``. The data generated on those repos is then being saved to
+``/tmp/data.json`` (tagged as the ``init`` data source).
+
 .. code-block:: bash
 
-    $ dffml operations repo \
-        -log debug \
-        -sources primary=json \
-        -source-filename /tmp/data.json \
-        -update \
+    $ dffml dataflow run repos set \
         -keys $(cat /tmp/urls) \
         -repo-def URL \
-        -remap \
-          group_by.work=work \
-          group_by.commits=commits \
-          group_by.authors=authors \
-        -dff-memory-operation-network-ops $(cat /tmp/operations) \
-        -dff-memory-opimp-network-opimps $(cat /tmp/operations) \
-        -inputs \
-          {0,1,2,3,4,5,6,7,8,9}=quarter \
-          "'2019-03-29 13:24'=quarter_start_date" \
-          True=no_git_branch_given \
-        -output-specs '{
-            "authors": {
-              "group": "quarter",
-              "by": "author_count",
-              "fill": 0
+        -dataflow examples/maintained/cgi-bin/dataflow.yaml \
+        -sources init=json \
+        -source-filename /tmp/data.json
+    [
+        ... results ...
+        {
+            "extra": {},
+            "features": {
+                "authors": [
+                    0,
+                    2,
+                    0,
+                    0,
+                    0,
+                    0,
+                    0,
+                    0,
+                    0,
+                    0
+                ],
+                "commits": [
+                    0,
+                    12,
+                    0,
+                    0,
+                    0,
+                    0,
+                    0,
+                    0,
+                    0,
+                    0
+                ],
+                "work": [
+                    0,
+                    4,
+                    0,
+                    0,
+                    0,
+                    0,
+                    0,
+                    0,
+                    0,
+                    0
+                ]
             },
-            "work": {
-              "group": "quarter",
-              "by": "work_spread",
-              "fill": 0
-            },
-            "commits": {
-              "group": "quarter",
-              "by": "commit_count",
-              "fill": 0
-            }
-          }=group_by_spec'
-
-We saved the gathered data to ``/tmp/data.json``.
+            "last_updated": "2019-10-25T01:44:50Z",
+            "src_url": "https://github.com/AntoineMaillard06/Tetris.git"
+        }
+    ]
 
 Pulling from the Database
 -------------------------
@@ -265,7 +296,9 @@ By copying the example source implementation
 ``examples/source/custom_source.py`` we can quickly modify it to use the
 ``aiomysql`` connector rather than sqlite.
 
-.. TODO Add more explination here
+**examples/maintained/demoapp/source.py**
+
+.. literalinclude:: /../examples/maintained/demoapp/source.py
 
 Let's now install it so we can use it within the DFFML CLI.
 
