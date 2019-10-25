@@ -104,7 +104,7 @@ class RunCMD(OrchestratorCMD, SourcesCMD):
         "-no-update",
         help="Update repo with sources",
         required=False,
-        default=True,
+        default=False,
         action="store_true",
     )
     arg_no_strict = Arg(
