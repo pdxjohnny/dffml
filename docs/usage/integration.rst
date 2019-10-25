@@ -508,83 +508,10 @@ database.
 
 **cgi-bin/api.py**
 
-.. code-block:: python
-
-    # Add the imports we'll be using to the top of api.py
-    import subprocess
-    from datetime import datetime
-
-    # ...
-
-    elif action == 'predict':
-        today = datetime.now().strftime('%Y-%m-%d %H:%M')
-        operations = [
-            'group_by',
-            'quarters_back_to_date',
-            'check_if_valid_git_repository_URL',
-            'clone_git_repo',
-            'git_repo_default_branch',
-            'git_repo_checkout',
-            'git_repo_commit_from_date',
-            'git_repo_author_lines_for_dates',
-            'work',
-            'git_repo_release',
-            'git_commits',
-            'count_authors',
-            'cleanup_git_repo'
-            ]
-        subprocess.check_call(([
-            'dffml', 'operations', 'repo',
-            '-log', 'debug',
-            '-sources', 'db=demoapp',
-            '-update',
-            '-keys', query['URL'],
-            '-repo-def', 'URL',
-            '-remap',
-            'group_by.work=work',
-            'group_by.commits=commits',
-            'group_by.authors=authors',
-            '-dff-memory-operation-network-ops'] + operations + [
-            '-dff-memory-opimp-network-opimps'] + operations + [
-            '-inputs'] + \
-            ['%d=quarter' % (i,) for i in range(0, 10)] + [
-            '\'%s\'=quarter_start_date' % (today,),
-            'True=no_git_branch_given',
-            '-output-specs', '''{
-                "authors": {
-                  "group": "quarter",
-                  "by": "author_count",
-                  "fill": 0
-                },
-                "work": {
-                  "group": "quarter",
-                  "by": "work_spread",
-                  "fill": 0
-                },
-                "commits": {
-                  "group": "quarter",
-                  "by": "commit_count",
-                  "fill": 0
-                }
-              }=group_by_spec''']))
-        result = subprocess.check_output([
-            'dffml', 'predict', 'repo',
-            '-keys', query['URL'],
-            '-model', 'tfdnnc',
-            '-model-classification', 'maintained',
-            '-model-classifications', '0', '1',
-            '-sources', 'db=demoapp',
-            '-features',
-            'def:authors:int:10',
-            'def:commits:int:10',
-            'def:work:int:10',
-            '-log', 'critical',
-            '-update'])
-        result = json.loads(result)
-        cursor.execute("REPLACE INTO status (src_url, maintained) VALUES(%s, %s)",
-                       (query['URL'], result[0]['prediction']['value'],))
-        cnx.commit()
-        print json.dumps(dict(success=True))
+.. literalinclude:: /../examples/maintained/cgi-bin/api-ml.py
+    :linenos:
+    :lineno-start: 40
+    :lines: 40-66
 
 Hook up the predict button to call our new API.
 
