@@ -194,7 +194,7 @@ We then create a ``DataFlow`` description of how they all link together.
 .. code-block:: console
 
     $ dffml dataflow create -config yaml $(cat /tmp/operations) \
-        > examples/maintained/cgi-bin/dataflow.yaml
+        > cgi-bin/dataflow.yaml
 
 The inputs and outputs of operations within a running DataFlow are organized by
 contexts. The context for our dataset generation will be the source URL to the
@@ -236,7 +236,7 @@ This command runs the dataflow on a set of repos, that set being the URLs in
     $ dffml dataflow run repos set \
         -keys $(cat /tmp/urls) \
         -repo-def URL \
-        -dataflow examples/maintained/cgi-bin/dataflow.yaml \
+        -dataflow cgi-bin/dataflow.yaml \
         -sources gathered=json \
         -source-filename /tmp/data.json
     [
@@ -411,7 +411,7 @@ Run the operations on the new repo: ``https://github.com/intel/dffml.git``
     $ dffml dataflow run repos set \
         -keys https://github.com/intel/dffml.git \
         -repo-def URL \
-        -dataflow examples/maintained/cgi-bin/dataflow.yaml \
+        -dataflow cgi-bin/dataflow.yaml \
         -sources db=demoapp
 
 Now that we have the data for the new repo, ask the model for a prediction.
