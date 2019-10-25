@@ -8,6 +8,7 @@ import asyncio
 import inspect
 import logging
 import unittest
+import contextlib
 
 
 class AsyncTestCase(unittest.TestCase):
@@ -25,6 +26,22 @@ class AsyncTestCase(unittest.TestCase):
 
     # The event loop to run test_ functions in
     loop = asyncio.get_event_loop()
+
+    @classmethod
+    def setUpClass(cls):
+        cls.cls_exit_stack = contextlib.ExitStack().__enter__()
+
+    @classmethod
+    def tearDownClass(cls):
+        cls.cls_exit_stack.__exit__(None, None, None)
+
+    async def setUp(self):
+        self.exit_stack = contextlib.ExitStack().__enter__()
+        self.async_exit_stack = await contextlib.AsyncExitStack().__aenter__()
+
+    async def tearDown(self):
+        await cls.async_exit_stack.__exit__(None, None, None)
+        cls.exit_stack.__exit__(None, None, None)
 
     def async_wrapper(self, coro):
         """
