@@ -1,8 +1,8 @@
 import copy
 import collections
-from typing import Dict, Any, NamedTuple
+from typing import Dict, Any, NamedTuple, List
 
-from ..df.types import Definition, Operation, Stage
+from ..df.types import Definition, Operation, Stage, DataFlow
 from ..df.base import (
     op,
     OperationImplementationContext,
@@ -10,6 +10,7 @@ from ..df.base import (
     BaseInputNetworkContext,
 )
 from ..df.exceptions import DefinitionNotInContext
+from ..util.data import traverse_get
 
 
 class GroupBySpec(NamedTuple):
@@ -177,3 +178,51 @@ class Associate(OperationImplementationContext):
                         want[parent.value] = item.value
                         break
             return {value.name: want}
+
+
+class RemapConfig(NamedTuple):
+    dataflow: DataFlow
+
+    @classmethod
+    def _fromdict(cls, **kwargs):
+        kwargs["dataflow"] = DataFlow._fromdict(**kwargs["dataflow"])
+        return cls(**kwargs)
+
+
+class RemapFailure(Exception):
+    """
+    Raised whem results of a dataflow could not be remapped.
+    """
+
+
+# TODO Make it so that only one output operation gets run, the result of that
+# operation is the result of the dataflow
+@op(
+    inputs={"spec": Definition(name="remap_spec", primitive="map")},
+    outputs={"response": Definition(name="remap_output", primitive="map")},
+    stage=Stage.OUTPUT,
+    config_cls=RemapConfig,
+)
+async def remap(
+    self: OperationImplementationContext, spec: Dict[str, List[str]]
+):
+    # Create a new orchestrator context. Specify that it should use the existing
+    # input set context, this way the output operations we'll be running have
+    # access to the data from this data flow rather than a new sub flow.
+    async with self.octx.parent(
+        self.config.dataflow, ictx=self.octx.ictx
+    ) as octx:
+        _ctx, result = [result async for result in octx.run(ctx=self.ctx)][0]
+    # Remap the output operations to their feature (copied logic
+    # from CLI)
+    remap = {}
+    for (feature_name, traverse) in spec.items():
+        try:
+            remap[feature_name] = traverse_get(result, *traverse)
+        except KeyError as error:
+            raise RemapFailure(
+                "failed to remap %r. Results do not contain %r: %s"
+                % (feature_name, ".".join(traverse), result)
+            ) from error
+    # Results have been remapped
+    return remap
