@@ -250,19 +250,19 @@ seed:
 - definition: group_by_spec
   value:
     authors:
-      by: quarter
       group: author_count
+      by: quarter
       fill: 0
     work:
-      by: quarter
       group: work_spread
+      by: quarter
       fill: 0
     commits:
-      by: quarter
       group: commit_count
+      by: quarter
       fill: 0
 - definition: quarter_start_date
-  value: 2019-03-29 13:24
+  value: 2019-10-25 01:37
 - definition: quarter
   value: 0
 - definition: quarter

@@ -70,11 +70,11 @@ class GroupBy(OperationImplementationContext):
                 # by the values of the output.group definition as seen in the
                 # input network context
                 group_by = {}
-                async for item in od.inputs(output.group):
+                async for item in od.inputs(output.by):
                     group_by[item.value] = (item, {})
                 group_by = collections.OrderedDict(sorted(group_by.items()))
                 # Find all inputs within the input network for the by definition
-                async for item in od.inputs(output.by):
+                async for item in od.inputs(output.group):
                     # Get all the parents of the input
                     parents = list(item.get_parents())
                     for group, related in group_by.values():
