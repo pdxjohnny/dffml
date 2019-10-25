@@ -305,7 +305,6 @@ class TestDataflowRunAllRepos(ReposTestCase):
                 "-inputs",
                 '["result"]=get_single_spec',
             )
-            print(results)
             results = {
                 result.src_url: result.feature("result")
                 for result in results
@@ -329,31 +328,40 @@ class TestDataflowRunRepoSet(ReposTestCase):
                     await sctx.update(repo)
         with patch.object(
             OperationImplementation, "load", opimp_load
-        ), patch.object(Operation, "load", op_load):
-            results = await Dataflow.run.repos._set.cli(
+        ), patch.object(Operation, "load", op_load), \
+        tempfile.NamedTemporaryFile(suffix='.json') as dataflow_file:
+            dataflow = io.StringIO()
+            with contextlib.redirect_stdout(dataflow):
+                await Dataflow.cli(
+                    "create",
+                    "-config",
+                    "json",
+                    *map(lambda op: op.name, OPERATIONS),
+                )
+            dataflow_file.write(dataflow.getvalue().encode())
+            dataflow_file.seek(0)
+            results = await Dataflow.cli(
+                "run",
+                "repos",
+                "set",
+                "-keys",
+                test_key,
+                "-dataflow",
+                dataflow_file.name,
+                "primary=json",
                 "-sources",
                 "primary=json",
                 "-source-filename",
                 self.temp_filename,
-                "-keys",
-                test_key,
                 "-repo-def",
                 "calc_string",
-                "-remap",
-                "get_single.result=string_calculator",
-                "-output-specs",
+                "-inputs",
                 '["result"]=get_single_spec',
-                "-dff-memory-operation-network-ops",
-                *map(lambda op: op.name, OPERATIONS),
-                "-dff-memory-opimp-network-opimps",
-                *map(lambda imp: imp.op.name, OPIMPS),
             )
             self.assertEqual(len(results), 1)
             self.assertEqual(
                 self.repo_keys[test_key],
-                results[0].features(["string_calculator"])[
-                    "string_calculator"
-                ],
+                results[0].feature("result")
             )
 
 
