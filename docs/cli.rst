@@ -81,6 +81,13 @@ Services are various command line utilities that are associated with DFFML.
 For a complete list of services maintained within the core codebase see the
 :doc:`/plugins/dffml_service_cli` plugin docs.
 
+HTTP
+~~~~
+
+Everything you can do via the Python library or command line interface you can
+also do over an HTTP interface. See the
+:doc:`/plugins/service/http/index` docs for more information.
+
 Dev
 ~~~
 
@@ -97,6 +104,34 @@ using the given config format.
 .. code-block:: console
 
     $ dffml service dev export -config json shouldi.cli:DATAFLOW
+
+.. _cli_service_dev_create:
+
+Create
+++++++
+
+You can create a new python package and start implementing a new plugin for
+DFFML right away with the ``create`` command of ``dev``.
+
+.. code-block:: console
+
+    $ dffml service dev create model cool-ml-model
+    $ cd cool-ml-model
+    $ python setup.py test
+
+When you're done you can upload it to PyPi and it'll be ``pip`` installable so
+that other DFFML users can use it in their code or via the CLI. If you don't
+want to mess with uploading to ``PyPi``, you can install it from your git repo
+(wherever it may be that you upload it to).
+
+.. code-block:: console
+
+    $ python -m pip install -U git+https://github.com/user/cool-ml-model
+
+Make sure to look in ``setup.py`` and edit the ``entry_points`` to match
+whatever you've edited. This way whatever you make will be usable by others
+within the DFFML CLI and HTTP API as soon as they ``pip`` install your package,
+nothing else required.
 
 Entrypoints
 +++++++++++

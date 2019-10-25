@@ -39,7 +39,6 @@ from ..util.cli.cmds import (
     PortCMD,
     KeysCMD,
     ListEntrypoint,
-    OrchestratorCMD,
 )
 
 from .dataflow import Dataflow
@@ -186,138 +185,6 @@ class Merge(CMD):
                     repo.merge(src)
                     repo.merge(await dctx.repo(repo.src_url))
                     await dctx.update(repo)
-
-
-class OperationsCMD(OrchestratorCMD, SourcesCMD):
-
-    arg_sources = SourcesCMD.arg_sources.modify(required=False)
-    arg_caching = Arg(
-        "-caching",
-        help="Re-run operations or use last",
-        required=False,
-        default=False,
-        action="store_true",
-    )
-    arg_cacheless = Arg(
-        "-cacheless",
-        help="Do not re-run operations if these features are missing",
-        required=False,
-        default=[],
-        nargs="+",
-    )
-    arg_update = Arg(
-        "-update",
-        help="Update repo with sources",
-        required=False,
-        default=False,
-        action="store_true",
-    )
-
-
-class OperationsAll(OperationsCMD):
-    """Operations all repos in sources"""
-
-    async def repos(self, sctx):
-        async for repo in sctx.repos():
-            yield repo
-
-    async def run_operations(self, dff, sources):
-        # Orchestrate the running of these operations
-        async with dff() as dffctx, sources() as sctx:
-            # Create the inputs for the ouput operations
-            output_specs = [
-                Input(
-                    value=value,
-                    definition=self.definitions[def_name],
-                    parents=None,
-                )
-                for value, def_name in self.output_specs
-            ]
-
-            # Add our inputs to the input network with the context being the
-            # repo src_url
-            async for repo in self.repos(sctx):
-                inputs = []
-                for value, def_name in self.inputs:
-                    inputs.append(
-                        Input(
-                            value=value,
-                            definition=self.definitions[def_name],
-                            parents=None,
-                        )
-                    )
-                if self.repo_def:
-                    inputs.append(
-                        Input(
-                            value=repo.src_url,
-                            definition=self.definitions[self.repo_def],
-                            parents=None,
-                        )
-                    )
-
-                await dffctx.ictx.add(
-                    MemoryInputSet(
-                        MemoryInputSetConfig(
-                            ctx=StringInputSetContext(repo.src_url),
-                            inputs=inputs + output_specs,
-                        )
-                    )
-                )
-
-            async for ctx, results in dffctx.run_operations(strict=True):
-                ctx_str = (await ctx.handle()).as_string()
-                # TODO Make a RepoInputSetContext which would let us store the
-                # repo instead of recalling it by the URL
-                repo = await sctx.repo(ctx_str)
-                # Remap the output operations to their feature
-                remap = {}
-                for output_operation_name, sub, feature_name in self.remap:
-                    if not output_operation_name in results:
-                        self.logger.error(
-                            "[%s] results do not contain %s: %s",
-                            ctx_str,
-                            output_operation_name,
-                            results,
-                        )
-                        continue
-                    if not sub in results[output_operation_name]:
-                        self.logger.error(
-                            "[%s] %r is not in: %s",
-                            ctx_str,
-                            sub,
-                            results[output_operation_name],
-                        )
-                        continue
-                    remap[feature_name] = results[output_operation_name][sub]
-                # Store the results
-                repo.evaluated(remap)
-                yield repo
-                if self.update:
-                    await sctx.update(repo)
-
-    async def run(self):
-        async with self.dff as dff, self.sources as sources:
-            async for repo in self.run_operations(dff, sources):
-                yield repo
-
-
-class OperationsRepo(OperationsAll, KeysCMD):
-    """Operations features on individual repos"""
-
-    async def repos(self, sctx):
-        for src_url in self.keys:
-            yield await sctx.repo(src_url)
-
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        self.sources = SubsetSources(*self.sources, keys=self.keys)
-
-
-class Operations(CMD):
-    """Run operations for repos"""
-
-    repo = OperationsRepo
-    _all = OperationsAll
 
 
 class EvaluateCMD(FeaturesCMD, SourcesCMD):
@@ -504,7 +371,6 @@ class CLI(CMD):
     train = Train
     accuracy = Accuracy
     predict = Predict
-    operations = Operations
     evaluate = Evaluate
     service = services()
     applicable = Applicable

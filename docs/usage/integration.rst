@@ -117,10 +117,17 @@ tell the orchestrator to run certain ``Operations`` on each one of the URLs.
 Those ``Operations`` will scrape data that is representative of the repo's
 maintenance, we can then feed that data into a machine learning model.
 
+.. note::
+
+     This example is centered around machine learning. We'll be using DataFlows
+     to collect a dataset for training, testing, and prediction. For a deeper
+     understanding of Operations and DataFlows, see the
+     :doc:`/tutorials/operations`.
+
 The operations we're going to use are a part of ``dffml-feature-git``, which is
 a separate Python package from DFFML (although maintained within the same repo)
 which we can install via ``pip``. We'll also use the ``yaml`` config loader,
-since that creates much more user friendly configs than ``json``.
+since that creates more user friendly configs than ``json``.
 
 .. code-block:: bash
 
@@ -131,29 +138,12 @@ will be run concurrently with other operations. Here's an example of the
 ``git_commits`` operation, which will find the number of commits within a date
 range.
 
-.. code-block:: python
+**feature/git/dffml_feature_git/feature/operations.py**
 
-    @op(inputs={
-            'repo': git_repository,
-            'branch': git_branch,
-            'start_end': date_pair
-            },
-        outputs={
-            'commits': commit_count
-            })
-    async def git_commits(repo: Dict[str, str], branch: str, start_end: List[str]):
-        start, end = start_end
-        commit_count = 0
-        proc = await create('git', 'log', '--oneline', '--before', start,
-                '--after', end, branch, cwd=repo['directory'])
-        while not proc.stdout.at_eof():
-            line = await proc.stdout.readline()
-            if line != b'':
-                commit_count += 1
-        await stop(proc)
-        return {
-                'commits': commit_count
-                }
+.. literalinclude:: /../feature/git/dffml_feature_git/feature/operations.py
+    :linenos:
+    :lineno-start: 367
+    :lines: 367-394
 
 Since operations are run concurrently with each other, DFFML manages locking of
 input data, such as git repositories. This is done via ``Definitions`` which are
@@ -168,6 +158,8 @@ operations. Arrows show how data moves between operations.
     :alt: Diagram showing Dataflow
 
 We can also visualize how the individual inputs and outputs are linked together.
+Inputs and outputs of the same ``Definition`` can be linked together
+automatically.
 
 .. TODO Autogenerate this from the dataflow
 
@@ -175,7 +167,8 @@ We can also visualize how the individual inputs and outputs are linked together.
     :alt: Diagram showing detailed version of Dataflow
 
 We're going to use the operations provided in ``dffml-feature-git`` to gather
-our dataset. First we'll define which operations we are going to use.
+our dataset. The following command writes all the operations we're using to the
+file ``/tmp/operations``.
 
 .. code-block:: bash
 
@@ -202,9 +195,21 @@ We then create a ``DataFlow`` description of how they all link together.
     $ dffml dataflow create -config yaml $(cat /tmp/operations) \
         > examples/maintained/cgi-bin/dataflow.yaml
 
+The inputs and outputs of operations within a running DataFlow are organized by
+contexts. The context for our dataset generation will be the source URL to the
+Git repo.
+
+have ``seed`` inputs, which are added 
 We then run the defined operations through the orchestrator. ``remap`` and
 ``group_by_spec`` are re-labeling the output's to the feature data names we
 want.
+
+**examples/maintained/cgi-bin/dataflow.yaml**
+
+.. literalinclude:: /../examples/maintained/cgi-bin/dataflow.yaml
+    :linenos:
+    :lineno-start: 246
+    :lines: 246-279
 
 The speed of the following command depends on your internet connection, it may
 take 2 minutes, it may take more. All the git repos in ``/tmp/urls`` will be

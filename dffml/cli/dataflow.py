@@ -7,10 +7,15 @@ from ..base import BaseConfig
 from ..df.types import DataFlow, Stage, Operation
 from ..config.config import BaseConfigLoader
 from ..config.json import JSONConfigLoader
-from ..util.cli.arg import Arg
-from ..util.cli.cmd import CMD
 from ..util.data import merge
 from ..util.entrypoint import load
+from ..util.cli.arg import Arg
+from ..util.cli.cmd import CMD
+from ..util.cli.cmds import (
+    SourcesCMD,
+    KeysCMD,
+    OrchestratorCMD,
+)
 
 
 class Merge(CMD):
@@ -81,6 +86,123 @@ class Create(CMD):
                 dataflow = DataFlow.auto(*operations)
                 exported = dataflow.export(linked=not self.not_linked)
                 sys.stdout.buffer.write(await loader.dumpb(exported))
+
+
+class RunCMD(OrchestratorCMD, SourcesCMD):
+
+    arg_sources = SourcesCMD.arg_sources.modify(required=False)
+    arg_caching = Arg(
+        "-caching",
+        help="Skip running DataFlow if a repo already contains these features",
+        nargs="+",
+        required=False,
+        default=[],
+    )
+    arg_no_update = Arg(
+        "-no-update",
+        help="Update repo with sources",
+        required=False,
+        default=True,
+        action="store_true",
+    )
+    arg_no_strict = Arg(
+        "-no-strict",
+        help="Do not exit on operation exceptions, just log errors",
+        dest="no_strict",
+        required=False,
+        default=False,
+        action="store_true",
+    )
+
+
+class RunAllRepos(RunCMD):
+    """Run dataflow for all repos in sources"""
+
+    async def repos(self, sctx):
+        """
+        This method exists so that it can be overriden by RunSingleRepo
+        """
+        async for repo in sctx.repos():
+            yield repo
+
+    async def run_dataflow(self, orchestrator, sources):
+        # Orchestrate the running of these operations
+        async with orchestrator() as octx, sources() as sctx:
+            # Add our inputs to the input network with the context being the
+            # repo src_url
+            async for repo in self.repos(sctx):
+                # Skip running DataFlow if repo already has features
+                existing_features = repo.features()
+                if self.caching and all(map(
+                        lambda cached: cached in existing_features,
+                        self.caching)):
+                    break
+
+                inputs = []
+                for value, def_name in self.inputs:
+                    inputs.append(
+                        Input(
+                            value=value,
+                            definition=datafow.definitions[def_name],
+                        )
+                    )
+                if self.repo_def:
+                    inputs.append(
+                        Input(
+                            value=repo.src_url,
+                            definition=datafow.definitions[self.repo_def],
+                        )
+                    )
+
+                await octx.ictx.add(
+                    MemoryInputSet(
+                        MemoryInputSetConfig(
+                            ctx=StringInputSetContext(repo.src_url),
+                            inputs=inputs,
+                        )
+                    )
+                )
+
+            async for ctx, results in octx.run(dataflow, strict=not self.no_strict):
+                ctx_str = (await ctx.handle()).as_string()
+                # TODO Make a RepoInputSetContext which would let us store the
+                # repo instead of recalling it by the URL
+                repo = await sctx.repo(ctx_str)
+                # Store the results
+                repo.evaluated(results)
+                yield repo
+                if self.update:
+                    await sctx.update(repo)
+
+    async def run(self):
+        async with self.dff as dff, self.sources as sources:
+            async for repo in self.run_dataflow(dff, sources):
+                yield repo
+
+
+class RunSingleRepo(RunAllRepos, KeysCMD):
+    """Run dataflow for single repo or set of repos"""
+
+    async def repos(self, sctx):
+        for src_url in self.keys:
+            yield await sctx.repo(src_url)
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.sources = SubsetSources(*self.sources, keys=self.keys)
+
+
+class RunRepos(CMD):
+    """Run DataFlow and assign output to a repo"""
+
+    single = RunSingleRepo
+    _all = RunAllRepos
+
+
+class Run(CMD):
+    """Run dataflow"""
+
+    repos = RunRepos
 
 
 class Diagram(CMD):
@@ -223,4 +345,5 @@ class Dataflow(CMD):
 
     merge = Merge
     create = Create
+    run = Run
     diagram = Diagram

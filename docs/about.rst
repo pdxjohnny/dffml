@@ -11,7 +11,8 @@ This project is for your if:
   for, so you need to generate it.
 
 - You want to harness the power of directed graph execution to write testable,
-  maintainable code.
+  maintainable code that runs concurrently or in parallel without the need for
+  you to deal with locking.
 
 Machine Learning
 ----------------
