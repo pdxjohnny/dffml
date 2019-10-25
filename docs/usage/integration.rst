@@ -30,33 +30,33 @@ package manager should have it if not.
 Navigate to the ``maintained`` example, starting at the top directory of the
 ``dffml`` source.
 
-.. code-block:: bash
+.. code-block:: console
 
     $ cd examples/maintained/
 
 Create a virtual environment for Python 3.7.
 
-.. code-block:: bash
+.. code-block:: console
 
     $ virtualenv -p python3.7 .venv
     $ . .venv/bin/activate
 
 Install DFFML.
 
-.. code-block:: bash
+.. code-block:: console
 
     $ pip install -U dffml
 
 Download the Python 2 client libraries for MySQL.
 
-.. code-block:: bash
+.. code-block:: console
 
     $ python2 -m pip install -U --user \
         https://dev.mysql.com/get/Downloads/Connector-Python/mysql-connector-python-8.0.16.tar.gz
 
 Start MariaDB (functionally very similar to MySQL which its a fork of).
 
-.. code-block:: bash
+.. code-block:: console
 
     $ docker run --rm -d --name maintained_db \
         -e MYSQL_RANDOM_ROOT_PASSWORD=yes \
@@ -74,7 +74,7 @@ If you want results that mean anything, you could discard all of this data and
 use the web app to create a meaningful dataset by manually going through and
 setting the status of repos.
 
-.. code-block:: bash
+.. code-block:: console
 
     $ docker run -i --rm --net=host mariadb mysql \
         -h127.0.0.1 \
@@ -87,7 +87,7 @@ was a legacy setup in place, the CGI server could just as well have been running
 PHP. In fact a php app that does the same thing would follow these same
 integration steps.
 
-.. code-block:: bash
+.. code-block:: console
 
     $ python -m http.server --cgi 8000
 
@@ -103,7 +103,7 @@ repos.
 
 Lets pull down that list of repos.
 
-.. code-block:: bash
+.. code-block:: console
 
     $ curl 'http://127.0.0.1:8000/cgi-bin/api.py?action=dump' \
         | jq -r 'keys[]' | tee /tmp/urls
@@ -130,7 +130,7 @@ a separate Python package from DFFML (although maintained within the same repo)
 which we can install via ``pip``. We'll also use the ``yaml`` config loader,
 since that creates more user friendly configs than ``json``.
 
-.. code-block:: bash
+.. code-block:: console
 
     $ pip install -U dffml-feature-git dffml-config-yaml
 
@@ -171,7 +171,7 @@ We're going to use the operations provided in ``dffml-feature-git`` to gather
 our dataset. The following command writes all the operations we're using to the
 file ``/tmp/operations``.
 
-.. code-block:: bash
+.. code-block:: console
 
     $ cat > /tmp/operations <<EOF
     group_by
@@ -191,7 +191,7 @@ file ``/tmp/operations``.
 
 We then create a ``DataFlow`` description of how they all link together.
 
-.. code-block:: bash
+.. code-block:: console
 
     $ dffml dataflow create -config yaml $(cat /tmp/operations) \
         > examples/maintained/cgi-bin/dataflow.yaml
@@ -215,7 +215,7 @@ Git repo.
     the ``author_count``, ``work_spread`` and ``commit_count`` are grouped by
     the quarter they were generated for.
 
-**examples/maintained/cgi-bin/dataflow.yaml**
+**cgi-bin/dataflow.yaml**
 
 .. literalinclude:: /../examples/maintained/cgi-bin/dataflow.yaml
     :linenos:
@@ -229,15 +229,15 @@ automatically.
 
 This command runs the dataflow on a set of repos, that set being the URLs in
 ``/tmp/urls``. The data generated on those repos is then being saved to
-``/tmp/data.json`` (tagged as the ``init`` data source).
+``/tmp/data.json`` (tagged as the ``gathered`` data source).
 
-.. code-block:: bash
+.. code-block:: console
 
     $ dffml dataflow run repos set \
         -keys $(cat /tmp/urls) \
         -repo-def URL \
         -dataflow examples/maintained/cgi-bin/dataflow.yaml \
-        -sources init=json \
+        -sources gathered=json \
         -source-filename /tmp/data.json
     [
         ... results ...
@@ -296,23 +296,40 @@ By copying the example source implementation
 ``examples/source/custom_source.py`` we can quickly modify it to use the
 ``aiomysql`` connector rather than sqlite.
 
-**examples/maintained/demoapp/source.py**
+.. note::
+
+    The following source code is one of many examples of how you might write a
+    source to interact with your existing database. If you don't have any
+    existing logic and just want to store data in MySQL, you chould check out
+    the MySQL :doc:`/plugins/dffml_source` plugin.
+
+**demoapp/source.py**
 
 .. literalinclude:: /../examples/maintained/demoapp/source.py
 
+We then make sure to register our new source with Pythons ``entrypoint`` system,
+to make it accessable to the command line interface.
+
+**setup.py**
+
+.. literalinclude:: /../examples/maintained/setup.py
+    :lines: 32
+
 Let's now install it so we can use it within the DFFML CLI.
 
-.. code-block:: bash
+.. code-block:: console
 
     $ pip install -e .
 
 The source we've written uses a new table in the database. Lets create it.
 
+**db_ml.sql**
+
 .. literalinclude:: /../examples/maintained/db_ml.sql
 
 You can pipe that query in with bash like we did the first time.
 
-.. code-block:: bash
+.. code-block:: console
 
     $ docker run -i --rm --net=host mariadb mysql \
         -h127.0.0.1 \
@@ -323,7 +340,7 @@ You can pipe that query in with bash like we did the first time.
 Now we'll take the data we stored in the json file and merge it back into the
 database.
 
-.. code-block:: bash
+.. code-block:: console
 
     $ dffml merge db=demoapp gathered=json \
         -source-gathered-filename /tmp/data.json -log debug
@@ -331,7 +348,7 @@ database.
 List all the repos in the database to confirm all data and classifications show
 up as expected.
 
-.. code-block:: bash
+.. code-block:: console
 
     $ dffml list repos -sources db=demoapp
 
@@ -342,14 +359,14 @@ The model we'll be using is a part of ``dffml-model-tensorflow``, which is anoth
 separate Python package from DFFML (although maintained within the same repo)
 which we can install via ``pip``.
 
-.. code-block:: bash
+.. code-block:: console
 
     $ pip install -U dffml-model-tensorflow
 
 The model is a generic wrapper around Tensorflow's DNN estimator. We can use it
 to train on our dataset.
 
-.. code-block:: bash
+.. code-block:: console
 
     $ dffml train all \
         -model tfdnnc \
@@ -368,7 +385,7 @@ to train on our dataset.
 Now let's assess the accuracy, remember, this is bogus data so this number is
 meaningless unless you threw out the dataset and put in real classifications.
 
-.. code-block:: bash
+.. code-block:: console
 
     $ dffml accuracy \
         -model tfdnnc \
@@ -380,9 +397,6 @@ meaningless unless you threw out the dataset and put in real classifications.
           def:commits:int:10 \
           def:work:int:10 \
         -log critical
-    2019-05-23 10:23:40.056553: I tensorflow/core/platform/profile_utils/cpu_utils.cc:94] CPU Frequency: 3491950000 Hz
-    2019-05-23 10:23:40.057065: I tensorflow/compiler/xla/service/service.cc:150] XLA service 0x24fe3c0 executing computations on platform Host. Devices:
-    2019-05-23 10:23:40.057087: I tensorflow/compiler/xla/service/service.cc:158]   StreamExecutor device (0): <undefined>, <undefined>
     0.4722222089767456
 
 The accuracy is 47.22%.
@@ -390,47 +404,19 @@ The accuracy is 47.22%.
 Making a Prediction
 -------------------
 
-Run the operations on the new repo (https://github.com/intel/dffml.git).
+Run the operations on the new repo: ``https://github.com/intel/dffml.git``
 
-.. code-block:: bash
+.. code-block:: console
 
-    $ dffml operations repo \
-        -log debug \
-        -sources db=demoapp \
-        -update \
+    $ dffml dataflow run repos set \
         -keys https://github.com/intel/dffml.git \
         -repo-def URL \
-        -remap \
-          group_by.work=work \
-          group_by.commits=commits \
-          group_by.authors=authors \
-        -dff-memory-operation-network-ops $(cat /tmp/operations) \
-        -dff-memory-opimp-network-opimps $(cat /tmp/operations) \
-        -inputs \
-          {0,1,2,3,4,5,6,7,8,9}=quarter \
-          "'2019-03-29 13:24'=quarter_start_date" \
-          True=no_git_branch_given \
-        -output-specs '{
-            "authors": {
-              "group": "quarter",
-              "by": "author_count",
-              "fill": 0
-            },
-            "work": {
-              "group": "quarter",
-              "by": "work_spread",
-              "fill": 0
-            },
-            "commits": {
-              "group": "quarter",
-              "by": "commit_count",
-              "fill": 0
-            }
-          }=group_by_spec'
+        -dataflow examples/maintained/cgi-bin/dataflow.yaml \
+        -sources db=demoapp
 
 Now that we have the data for the new repo, ask the model for a prediction.
 
-.. code-block:: bash
+.. code-block:: console
 
     $ dffml predict repo \
         -keys https://github.com/intel/dffml.git \
@@ -444,9 +430,6 @@ Now that we have the data for the new repo, ask the model for a prediction.
           def:work:int:10 \
         -log critical \
         -update
-    2019-05-23 10:33:03.468591: I tensorflow/core/platform/profile_utils/cpu_utils.cc:94] CPU Frequency: 3491950000 Hz
-    2019-05-23 10:33:03.469217: I tensorflow/compiler/xla/service/service.cc:150] XLA service 0x4394920 executing computations on platform Host. Devices:
-    2019-05-23 10:33:03.469235: I tensorflow/compiler/xla/service/service.cc:158]   StreamExecutor device (0): <undefined>, <undefined>
     [
         {
             "extra": {},
@@ -505,7 +488,7 @@ operations to be run on the new URL, and then the prediction. The demo app will
 then take the predicted classification and record that as the classification in
 the database.
 
-**examples/maintained/index.html**
+**index.html**
 
 .. code-block:: html
 
@@ -522,7 +505,7 @@ run the same commands we just ran on the command line, and parse the output,
 which is in JSON format, and set the resulting prediction classification in the
 database.
 
-**examples/maintained/cgi-bin/api.py**
+**cgi-bin/api.py**
 
 .. code-block:: python
 
@@ -604,7 +587,7 @@ database.
 
 Hook up the predict button to call our new API.
 
-**examples/maintained/ml.js**
+**ml.js**
 
 .. code-block:: javascript
 
@@ -632,7 +615,7 @@ Hook up the predict button to call our new API.
 
 Finally, import the new script into the main page.
 
-**examples/maintained/index.html**
+**index.html**
 
 .. code-block:: html
 
