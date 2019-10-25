@@ -24,7 +24,7 @@ Service
 -------
 
 Services are various for a complete list of services maintained within the core
-codebase see the :doc:`/plugins/dffml_service` plugin docs.
+codebase see the :doc:`/plugins/dffml_service_cli` plugin docs.
 
 Dev
 ~~~
