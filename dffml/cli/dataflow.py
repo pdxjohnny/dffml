@@ -141,6 +141,7 @@ class RunAllRepos(RunCMD):
         async with orchestrator(dataflow) as octx, sources() as sctx:
             # Add our inputs to the input network with the context being the
             # repo src_url
+            inputs = []
             async for repo in self.repos(sctx):
                 # Skip running DataFlow if repo already has features
                 existing_features = repo.features()
@@ -149,7 +150,7 @@ class RunAllRepos(RunCMD):
                         self.caching)):
                     break
 
-                inputs = []
+                repo_inputs = []
                 for value, def_name in self.inputs:
                     inputs.append(
                         Input(
@@ -165,24 +166,29 @@ class RunAllRepos(RunCMD):
                         )
                     )
 
-                await octx.ictx.add(
+                # TODO(p1) When OrchestratorContext is fixed to accept an
+                # asyncgenerator we won't have to build a list
+                inputs.append(
                     MemoryInputSet(
                         MemoryInputSetConfig(
                             ctx=StringInputSetContext(repo.src_url),
-                            inputs=inputs,
+                            inputs=repo_inputs,
                         )
                     )
                 )
 
-            async for ctx, results in octx.run(dataflow, strict=not self.no_strict):
+            if not inputs:
+                return
+
+            async for ctx, results in octx.run(*inputs, strict=not self.no_strict):
                 ctx_str = (await ctx.handle()).as_string()
-                # TODO Make a RepoInputSetContext which would let us store the
-                # repo instead of recalling it by the URL
+                # TODO(p4) Make a RepoInputSetContext which would let us
+                # store the repo instead of recalling it by the URL
                 repo = await sctx.repo(ctx_str)
                 # Store the results
                 repo.evaluated(results)
                 yield repo
-                if self.update:
+                if not self.no_update:
                     await sctx.update(repo)
 
     async def run(self):
