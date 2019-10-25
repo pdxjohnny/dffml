@@ -55,7 +55,7 @@ class Merge(CMD):
         async with self.config(BaseConfig()) as configloader:
             async with configloader() as loader:
                 exported = dataflow.export(linked=not self.not_linked)
-                sys.stdout.buffer.write(await loader.dumpb(exported))
+                print((await loader.dumpb(exported)).decode())
 
 
 class Create(CMD):
@@ -87,7 +87,7 @@ class Create(CMD):
             async with configloader() as loader:
                 dataflow = DataFlow.auto(*operations)
                 exported = dataflow.export(linked=not self.not_linked)
-                sys.stdout.buffer.write(await loader.dumpb(exported))
+                print((await loader.dumpb(exported)).decode())
 
 
 class RunCMD(OrchestratorCMD, SourcesCMD):
@@ -150,7 +150,7 @@ class RunAllRepos(RunCMD):
                 if self.caching and all(map(
                         lambda cached: cached in existing_features,
                         self.caching)):
-                    break
+                    continue
 
                 repo_inputs = []
                 for value, def_name in self.inputs:

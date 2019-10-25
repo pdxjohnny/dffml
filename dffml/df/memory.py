@@ -398,24 +398,23 @@ class MemoryInputNetworkContext(BaseInputNetworkContext):
                 # Grab the input flow to check for definition overrides
                 input_flow = dataflow.flow[operation.instance_name]
                 # Check that all conditions are present and logicly True
-                for condition_sources in input_flow.conditions:
-                    for condition_source in condition_sources:
-                        # Create a list of places this input originates from
-                        origins = []
-                        if isinstance(condition_source, dict):
-                            for origin in condition_sources.items():
-                                origins.append(origin)
-                        else:
-                            origins.append(condition_source)
-                        # Ensure all conditions from all origins are True
-                        for origin in origins:
-                            # Bail if the condition doesn't exist
-                            if not origin in by_origin:
+                for condition_source in input_flow.conditions:
+                    # Create a list of places this input originates from
+                    origins = []
+                    if isinstance(condition_source, dict):
+                        for origin in condition_source.items():
+                            origins.append(origin)
+                    else:
+                        origins.append(condition_source)
+                    # Ensure all conditions from all origins are True
+                    for origin in origins:
+                        # Bail if the condition doesn't exist
+                        if not origin in by_origin:
+                            return
+                        # Bail if the condition is not True
+                        for item in by_origin[origin]:
+                            if not bool(item.value):
                                 return
-                            # Bail if the condition is not True
-                            for item in by_origin[origin]:
-                                if not bool(item.value):
-                                    return
                 # Gather all inputs with matching definitions and contexts
                 for input_name, input_sources in input_flow.inputs.items():
                     for input_source in input_sources:
@@ -436,7 +435,7 @@ class MemoryInputNetworkContext(BaseInputNetworkContext):
                             # Generate parameters from inputs
                             for item in by_origin[origin]:
                                 # TODO(p2) We favored comparing names to
-                                # deifnitions because sometimes we create
+                                # defintions because sometimes we create
                                 # defintions which have specs which create new
                                 # types which will not equal each other. We
                                 # maybe want to consider switching to comparing

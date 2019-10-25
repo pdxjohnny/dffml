@@ -540,6 +540,28 @@ class DataFlow:
                     flow_dict[operation.instance_name].inputs[
                         internal_name
                     ] = ["seed"]
+            # Now do conditions
+            for definition in operation.conditions:
+                if definition.name in output_dict:
+                    # Grab the dict of operations that produce this definition
+                    # as an output
+                    producing_operations = output_dict[definition.name]
+                    # We look through the outputs and add any one that matches
+                    # the definition and add it to the list in format of
+                    # operation_name . internal_name (of output)
+                    for producting_operation in producing_operations.values():
+                        for (
+                            internal_name_of_output,
+                            output_definition,
+                        ) in producting_operation.outputs.items():
+                            if output_definition == definition:
+                                flow_dict[operation.instance_name].conditions.append(
+                                    {
+                                        producting_operation.instance_name: internal_name_of_output
+                                    }
+                                )
+                else:
+                    flow_dict[operation.instance_name].conditions = ["seed"]
         return flow_dict
 
     @classmethod
