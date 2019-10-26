@@ -88,7 +88,7 @@ class TestRunner(AsyncTestCase):
                 "https://github.com/intel/dffml",
                 "https://github.com/pdxjohnny/dffml",
             ]
-        repos = repos[:1]
+        repos = repos[:2]
         urls = [
             Input(value=URL, definition=dataflow.definitions["URL"], parents=None)
             for URL in repos

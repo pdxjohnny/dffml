@@ -419,8 +419,24 @@ class DataFlow:
         for instance_name, input_flow in self.flow.items():
             operation = self.operations[instance_name]
             self.by_origin.setdefault(operation.stage, {})
+            # TODO(p5) Make stanardize this so that seed is also a dict?
+            for output_source in input_flow.conditions:
+                if isinstance(output_source, str):
+                    self.by_origin[operation.stage].setdefault(
+                        output_source, []
+                    )
+                    self.by_origin[operation.stage][output_source].append(
+                        operation
+                    )
+                else:
+                    for origin in output_source.items():
+                        self.by_origin[operation.stage].setdefault(
+                            origin, []
+                        )
+                        self.by_origin[operation.stage][origin].append(
+                            operation
+                        )
             for output_name, output_sources in input_flow.inputs.items():
-                # TODO Make stanardize this so that seed is also a dict
                 for output_source in output_sources:
                     if isinstance(output_source, str):
                         self.by_origin[operation.stage].setdefault(

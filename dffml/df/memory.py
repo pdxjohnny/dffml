@@ -398,7 +398,7 @@ class MemoryInputNetworkContext(BaseInputNetworkContext):
                 # Grab the input flow to check for definition overrides
                 input_flow = dataflow.flow[operation.instance_name]
                 # Check that all conditions are present and logicly True
-                for condition_source in input_flow.conditions:
+                for i, condition_source in enumerate(input_flow.conditions):
                     # Create a list of places this input originates from
                     origins = []
                     if isinstance(condition_source, dict):
@@ -413,6 +413,24 @@ class MemoryInputNetworkContext(BaseInputNetworkContext):
                             return
                         # Bail if the condition is not True
                         for item in by_origin[origin]:
+                            # TODO(p2) Alright, this shits fucked, way not clean
+                            # / clear. We're just trying to skip any conditions
+                            # (and inputs for input_flow.inputs.items()) where
+                            # the definition doesn't match, but it's within the
+                            # correct origin.
+                            if isinstance(condition_source, str):
+                                if (
+                                    item.definition.name
+                                    != operation.conditions[i].name
+                                ):
+                                    continue
+                            elif (
+                                item.definition.name
+                                != dataflow.operations[origin[0]].outputs[
+                                    origin[1]
+                                ].name
+                            ):
+                                continue
                             if not bool(item.value):
                                 return
                 # Gather all inputs with matching definitions and contexts
