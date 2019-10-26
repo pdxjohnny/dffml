@@ -85,12 +85,13 @@ class ScryptContext(OperationImplementationContext):
             writing) Also its just the example I copy pasted from the docs to
             illustrate threading. 100000 is probably not enough iterations!!!
 
-            """)
+            """
+        )
 
         # TODO(p2) Provide hash (sha) option within operation config, correct
         # name to pbkdf2_hmac, also make salt and iterations configurable and
         # clean this up in general
-        hashed_password = hashlib.pbkdf2_hmac('sha384', password, salt, 100000)
+        hashed_password = hashlib.pbkdf2_hmac("sha384", password, salt, 100000)
 
         hashed_password = hashed_password.hex()
         salt = salt.hex()

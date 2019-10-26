@@ -277,8 +277,11 @@ class TestDataflowRunAllRepos(ReposTestCase):
                     await sctx.update(repo)
         with patch.object(
             OperationImplementation, "load", opimp_load
-        ), patch.object(Operation, "load", op_load), \
-        tempfile.NamedTemporaryFile(suffix='.json') as dataflow_file:
+        ), patch.object(
+            Operation, "load", op_load
+        ), tempfile.NamedTemporaryFile(
+            suffix=".json"
+        ) as dataflow_file:
             dataflow = io.StringIO()
             with contextlib.redirect_stdout(dataflow):
                 await Dataflow.cli(
@@ -306,8 +309,7 @@ class TestDataflowRunAllRepos(ReposTestCase):
                 '["result"]=get_single_spec',
             )
             results = {
-                result.src_url: result.feature("result")
-                for result in results
+                result.src_url: result.feature("result") for result in results
             }
             for repo in self.repos:
                 self.assertIn(repo.src_url, results)
@@ -328,8 +330,11 @@ class TestDataflowRunRepoSet(ReposTestCase):
                     await sctx.update(repo)
         with patch.object(
             OperationImplementation, "load", opimp_load
-        ), patch.object(Operation, "load", op_load), \
-        tempfile.NamedTemporaryFile(suffix='.json') as dataflow_file:
+        ), patch.object(
+            Operation, "load", op_load
+        ), tempfile.NamedTemporaryFile(
+            suffix=".json"
+        ) as dataflow_file:
             dataflow = io.StringIO()
             with contextlib.redirect_stdout(dataflow):
                 await Dataflow.cli(
@@ -360,8 +365,7 @@ class TestDataflowRunRepoSet(ReposTestCase):
             )
             self.assertEqual(len(results), 1)
             self.assertEqual(
-                self.repo_keys[test_key],
-                results[0].feature("result")
+                self.repo_keys[test_key], results[0].feature("result")
             )
 
 

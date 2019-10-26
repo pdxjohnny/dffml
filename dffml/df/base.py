@@ -169,6 +169,7 @@ def op(imp_enter=None, ctx_enter=None, config_cls=None, **kwargs):
     upon entry is assigned to a parameter in the ``OperationImplementation``
     instance named after the respective key.
     """
+
     def wrap(func):
         if not "name" in kwargs:
             kwargs["name"] = func.__name__
@@ -204,8 +205,8 @@ def op(imp_enter=None, ctx_enter=None, config_cls=None, **kwargs):
             async with func.imp(BaseConfig()) as obj:
                 async with obj(None, None) as ctx:
                     return await ctx.run(kwargs)
-        func.test = test
 
+        func.test = test
 
         class Implementation(
             context_stacker(OperationImplementation, imp_enter)

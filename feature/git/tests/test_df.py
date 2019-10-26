@@ -90,7 +90,9 @@ class TestRunner(AsyncTestCase):
             ]
         repos = repos[:2]
         urls = [
-            Input(value=URL, definition=dataflow.definitions["URL"], parents=None)
+            Input(
+                value=URL, definition=dataflow.definitions["URL"], parents=None
+            )
             for URL in repos
         ]
         no_git_branch_given = Input(
@@ -104,7 +106,11 @@ class TestRunner(AsyncTestCase):
             parents=None,
         )
         quarters = [
-            Input(value=i, definition=dataflow.definitions["quarter"], parents=None)
+            Input(
+                value=i,
+                definition=dataflow.definitions["quarter"],
+                parents=None,
+            )
             for i in range(0, 10)
         ]
 
@@ -140,14 +146,16 @@ class TestRunner(AsyncTestCase):
         async with MemoryOrchestrator.basic_config() as orchestrator:
             async with orchestrator(dataflow) as octx:
                 # Add our inputs to the input network with the context being the URL
-                async for ctx, results in octx.run({
-                    url.value: [
-                        url,
-                        no_git_branch_given,
-                        date_spec,
-                        group_by_spec,
-                        *quarters,
-                    ]
-                    for url in urls
-                }):
+                async for ctx, results in octx.run(
+                    {
+                        url.value: [
+                            url,
+                            no_git_branch_given,
+                            date_spec,
+                            group_by_spec,
+                            *quarters,
+                        ]
+                        for url in urls
+                    }
+                ):
                     self.assertTrue(results)

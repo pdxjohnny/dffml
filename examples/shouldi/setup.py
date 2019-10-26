@@ -8,9 +8,7 @@ SETUP_KWARGS["install_requires"] += [
     "safety>=1.8.5",
 ]
 SETUP_KWARGS["entry_points"] = {
-    "console_scripts": [
-        "shouldi = shouldi.cli:ShouldI.main",
-    ],
+    "console_scripts": ["shouldi = shouldi.cli:ShouldI.main"],
     "dffml.operation": [
         "run_bandit = shouldi.bandit:run_bandit",
         "safety_check = shouldi.safety:safety_check",

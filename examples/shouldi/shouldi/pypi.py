@@ -74,7 +74,9 @@ async def pypi_package_contents(self, url: str) -> str:
     package_src_dir = tempfile.mkdtemp(prefix="pypi-")
     async with self.parent.session.get(url) as resp:
         # Create a temporary file to extract to
-        with tempfile.NamedTemporaryFile(prefix="pypi-", suffix=".tar.gz") as package_src_file:
+        with tempfile.NamedTemporaryFile(
+            prefix="pypi-", suffix=".tar.gz"
+        ) as package_src_file:
             package_src_file.write(await resp.read())
             shutil.unpack_archive(package_src_file.name, package_src_dir)
             return {"directory": package_src_dir}

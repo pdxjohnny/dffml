@@ -106,9 +106,7 @@ class GroupBy(OperationImplementationContext):
 
 get_single_spec = Definition(name="get_single_spec", primitive="array")
 
-get_single_output = Definition(
-    name="get_single_output", primitive="map"
-)
+get_single_output = Definition(name="get_single_output", primitive="map")
 
 
 @op(

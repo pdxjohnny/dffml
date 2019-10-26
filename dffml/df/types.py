@@ -374,13 +374,16 @@ class DataFlow:
                 getattr(value, "ENTRY_POINT_NAME", ["not-opimp"]) == ["opimp"]
             )
             if (
-                (getattr(value, "imp", None) is not None
-                or is_opimp_non_decorated)
-                and getattr(value, "op", None) is not None
-            ):
+                getattr(value, "imp", None) is not None
+                or is_opimp_non_decorated
+            ) and getattr(value, "op", None) is not None:
                 # Get the operation and implementation from the wrapped object
                 operation = getattr(value, "op", None)
-                opimp = value if is_opimp_non_decorated else getattr(value, "imp", None)
+                opimp = (
+                    value
+                    if is_opimp_non_decorated
+                    else getattr(value, "imp", None)
+                )
                 # Set the implementation if not explicitly set
                 self.implementations.setdefault(operation.name, opimp)
                 # Change this entry to the instance of Operation associated with
@@ -400,7 +403,7 @@ class DataFlow:
                         itertools.chain(
                             operation.inputs.values(),
                             operation.outputs.values(),
-                            operation.conditions
+                            operation.conditions,
                         )
                         for operation in operations
                     ]
@@ -430,9 +433,7 @@ class DataFlow:
                     )
                 else:
                     for origin in output_source.items():
-                        self.by_origin[operation.stage].setdefault(
-                            origin, []
-                        )
+                        self.by_origin[operation.stage].setdefault(origin, [])
                         self.by_origin[operation.stage][origin].append(
                             operation
                         )
@@ -577,7 +578,9 @@ class DataFlow:
                             output_definition,
                         ) in producting_operation.outputs.items():
                             if output_definition == definition:
-                                flow_dict[operation.instance_name].conditions.append(
+                                flow_dict[
+                                    operation.instance_name
+                                ].conditions.append(
                                     {
                                         producting_operation.instance_name: internal_name_of_output
                                     }

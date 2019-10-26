@@ -5,7 +5,11 @@ import contextlib
 
 from ..base import BaseConfig
 from ..df.types import DataFlow, Stage, Operation, Input
-from ..df.memory import MemoryInputSet, MemoryInputSetConfig, StringInputSetContext
+from ..df.memory import (
+    MemoryInputSet,
+    MemoryInputSetConfig,
+    StringInputSetContext,
+)
 from ..config.config import BaseConfigLoader
 from ..config.json import JSONConfigLoader
 from ..source.source import SubsetSources
@@ -13,11 +17,7 @@ from ..util.data import merge
 from ..util.entrypoint import load
 from ..util.cli.arg import Arg
 from ..util.cli.cmd import CMD
-from ..util.cli.cmds import (
-    SourcesCMD,
-    KeysCMD,
-    OrchestratorCMD,
-)
+from ..util.cli.cmds import SourcesCMD, KeysCMD, OrchestratorCMD
 
 
 class Merge(CMD):
@@ -116,9 +116,7 @@ class RunCMD(OrchestratorCMD, SourcesCMD):
         action="store_true",
     )
     arg_dataflow = Arg(
-        "-dataflow",
-        help="File containing exported DataFlow",
-        required=True
+        "-dataflow", help="File containing exported DataFlow", required=True
     )
     arg_config = Arg(
         "-config",
@@ -147,9 +145,12 @@ class RunAllRepos(RunCMD):
             async for repo in self.repos(sctx):
                 # Skip running DataFlow if repo already has features
                 existing_features = repo.features()
-                if self.caching and all(map(
+                if self.caching and all(
+                    map(
                         lambda cached: cached in existing_features,
-                        self.caching)):
+                        self.caching,
+                    )
+                ):
                     continue
 
                 repo_inputs = []
@@ -182,7 +183,9 @@ class RunAllRepos(RunCMD):
             if not inputs:
                 return
 
-            async for ctx, results in octx.run(*inputs, strict=not self.no_strict):
+            async for ctx, results in octx.run(
+                *inputs, strict=not self.no_strict
+            ):
                 ctx_str = (await ctx.handle()).as_string()
                 # TODO(p4) Make a RepoInputSetContext which would let us
                 # store the repo instead of recalling it by the URL
@@ -204,7 +207,9 @@ class RunAllRepos(RunCMD):
                 exported = await loader.loadb(dataflow_path.read_bytes())
                 dataflow = DataFlow._fromdict(**exported)
         async with self.orchestrator as orchestrator, self.sources as sources:
-            async for repo in self.run_dataflow(orchestrator, sources, dataflow):
+            async for repo in self.run_dataflow(
+                orchestrator, sources, dataflow
+            ):
                 yield repo
 
 

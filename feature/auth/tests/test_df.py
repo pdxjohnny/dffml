@@ -44,10 +44,12 @@ class TestRunner(AsyncTestCase):
 
             async with orchestrator(dataflow) as octx:
                 try:
-                    async for _ctx, results in octx.run({
-                        password.value: [password, output_spec]
-                        for password in passwords
-                    }):
+                    async for _ctx, results in octx.run(
+                        {
+                            password.value: [password, output_spec]
+                            for password in passwords
+                        }
+                    ):
                         self.assertTrue(results)
                 except AttributeError as error:
                     raise

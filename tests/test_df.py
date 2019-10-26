@@ -32,7 +32,14 @@ from typing import (
     Iterator,
 )
 
-from dffml.df.types import Operation, Definition, Input, FailedToLoadOperation, DefinitionMissing, DataFlow
+from dffml.df.types import (
+    Operation,
+    Definition,
+    Input,
+    FailedToLoadOperation,
+    DefinitionMissing,
+    DataFlow,
+)
 from dffml.df.base import (
     op,
     opwraped_in,
@@ -44,7 +51,7 @@ from dffml.df.base import (
     BaseRedundancyCheckerConfig,
     StringInputSetContext,
     OperationImplementationNotInstantiable,
-    OperationImplementationNotInstantiated
+    OperationImplementationNotInstantiated,
 )
 from dffml.df.memory import (
     MemoryInputNetwork,
@@ -127,7 +134,9 @@ class TestMemoryKeyValueStore(AsyncTestCase):
 
 class TestMemoryOperationImplementationNetwork(AsyncTestCase):
     async def setUp(self):
-        self.operationsNetwork = MemoryOperationImplementationNetwork.withconfig({})
+        self.operationsNetwork = MemoryOperationImplementationNetwork.withconfig(
+            {}
+        )
         self.operationsNetworkCtx = await self.operationsNetwork.__aenter__()
 
     async def tearDown(self):
@@ -162,11 +171,11 @@ class TestMemoryOperationImplementationNetwork(AsyncTestCase):
     async def test_instantiable_but_not_instantiated(self):
         async def return_true(*args, **kwargs):
             return True
+
         async with self.operationsNetworkCtx() as ctx:
             with self.assertRaises(OperationImplementationNotInstantiated):
                 with patch.object(ctx, "instantiable", new=return_true):
                     await ctx.run(None, None, add.op, {"numbers": [40, 2]})
-
 
 
 class TestOrchestrator(AsyncTestCase):
@@ -179,8 +188,7 @@ class TestOrchestrator(AsyncTestCase):
             "dict": {
                 to_calc: [
                     Input(
-                        value=to_calc,
-                        definition=parse_line.op.inputs["line"],
+                        value=to_calc, definition=parse_line.op.inputs["line"]
                     ),
                     Input(
                         value=[add.op.outputs["sum"].name],
@@ -210,8 +218,7 @@ class TestOrchestrator(AsyncTestCase):
             "uctx": [
                 [
                     Input(
-                        value=to_calc,
-                        definition=parse_line.op.inputs["line"],
+                        value=to_calc, definition=parse_line.op.inputs["line"]
                     ),
                     Input(
                         value=[add.op.outputs["sum"].name],
@@ -219,7 +226,7 @@ class TestOrchestrator(AsyncTestCase):
                     ),
                 ]
                 for to_calc in calc_strings_check.keys()
-            ]
+            ],
         }
         async with MemoryOrchestrator.withconfig({}) as orchestrator:
             async with orchestrator(dataflow) as octx:
@@ -234,7 +241,12 @@ class TestOrchestrator(AsyncTestCase):
                             if callstyle == "uctx":
                                 self.assertIn(
                                     results[add.op.outputs["sum"].name],
-                                    dict(zip(calc_strings_check.values(), calc_strings_check.keys())),
+                                    dict(
+                                        zip(
+                                            calc_strings_check.values(),
+                                            calc_strings_check.keys(),
+                                        )
+                                    ),
                                 )
                             else:
                                 self.assertEqual(
@@ -283,8 +295,8 @@ class TestOperation(MockIterEntryPoints):
         self.assertEqual(mult.op, Operation.load("mult"))
         self.assertEqual(parse_line.op, Operation.load("parse_line"))
 
-class TestDataFlow(MockIterEntryPoints):
 
+class TestDataFlow(MockIterEntryPoints):
     def test_export(self):
         exported = DataFlow.auto(add).export(linked=True)
         # Operations
@@ -316,7 +328,9 @@ class TestDataFlow(MockIterEntryPoints):
     def test_resolve_missing_condition_definition(self):
         exported = DataFlow.auto(add).export(linked=True)
         del exported["definitions"]["is_add"]
-        with self.assertRaisesRegex(DefinitionMissing, "add.conditions.*is_add"):
+        with self.assertRaisesRegex(
+            DefinitionMissing, "add.conditions.*is_add"
+        ):
             DataFlow._fromdict(**exported)
 
     def test_resolve_missing_input_output_definition(self):

@@ -7,7 +7,7 @@ SETUP_KWARGS["entry_points"] = {
         f"calc_add = {IMPORT_NAME}.operations:calc_add",
         f"calc_mult = {IMPORT_NAME}.operations:calc_mult",
         f"calc_parse_line = {IMPORT_NAME}.operations:calc_parse_line",
-    ],
+    ]
 }
 
 setup(**SETUP_KWARGS)

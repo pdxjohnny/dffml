@@ -427,9 +427,9 @@ class MemoryInputNetworkContext(BaseInputNetworkContext):
                                     continue
                             elif (
                                 item.definition.name
-                                != dataflow.operations[origin[0]].outputs[
-                                    origin[1]
-                                ].name
+                                != dataflow.operations[origin[0]]
+                                .outputs[origin[1]]
+                                .name
                             ):
                                 continue
                             if not bool(item.value):
@@ -467,9 +467,9 @@ class MemoryInputNetworkContext(BaseInputNetworkContext):
                                         continue
                                 elif (
                                     item.definition.name
-                                    != dataflow.operations[origin[0]].outputs[
-                                        origin[1]
-                                    ].name
+                                    != dataflow.operations[origin[0]]
+                                    .outputs[origin[1]]
+                                    .name
                                 ):
                                     continue
                                 gather[input_name].append(
@@ -560,8 +560,9 @@ class MemoryOperationNetwork(BaseOperationNetwork, BaseMemoryDataFlowObject):
 
     @classmethod
     def args(cls, args, *above) -> Dict[str, Arg]:
-        cls.config_set(args, above, "ops", Arg(type=Operation.load, nargs="+",
-            default=[]))
+        cls.config_set(
+            args, above, "ops", Arg(type=Operation.load, nargs="+", default=[])
+        )
         return args
 
     @classmethod
@@ -1165,7 +1166,10 @@ class MemoryOrchestratorContext(BaseOrchestratorContext):
             # Helper to quickly add inputs under string context
             for ctx_string, input_set in input_sets[0].items():
                 ctxs.append(
-                    await self.seed_inputs(ctx=StringInputSetContext(ctx_string), input_set=input_set)
+                    await self.seed_inputs(
+                        ctx=StringInputSetContext(ctx_string),
+                        input_set=input_set,
+                    )
                 )
         else:
             # For inputs sets that are of type BaseInputSetContext or list
@@ -1322,7 +1326,9 @@ class MemoryOrchestratorContext(BaseOrchestratorContext):
         try:
             output = {
                 operation.instance_name: results
-                async for operation, results in self.run_stage(ctx, Stage.OUTPUT)
+                async for operation, results in self.run_stage(
+                    ctx, Stage.OUTPUT
+                )
             }
         except:
             if strict:

@@ -109,7 +109,10 @@ class TestJSONEncoder(unittest.TestCase):
         class UnregisteredObject(object):
             pass
 
-        self.assertIn("UnregisteredObject", json.dumps(UnregisteredObject, cls=JSONEncoder))
+        self.assertIn(
+            "UnregisteredObject",
+            json.dumps(UnregisteredObject, cls=JSONEncoder),
+        )
 
     def test_repo(self):
         self.assertIn("face", json.dumps(Repo("face"), cls=JSONEncoder))
