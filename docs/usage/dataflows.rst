@@ -43,6 +43,16 @@ without the need to hardcode in ``import`` statements.
         }
     }
 
+.. note::
+
+    Please install the ``dffml-config-yaml`` package to enable the
+    ``-config yaml`` option. Allowing you to export to YAML instead of JSON.
+    You can also convert between config file formats with the
+    :ref:`cli_config_convert` command.
+
+    JSON files work fine, but they'll take up too much page space in this
+    tutorial.
+
 MultiComms
 ----------
 
@@ -63,7 +73,18 @@ communication are URL paths (Example: ``/some/url/path``).
 HTTP Deployment
 ---------------
 
-We can take the
+We'll be working from the top level directory of the ``shouldi`` package we
+created in the :doc:`/tutorials/operations`.
+
+The source for that package is also available under the ``examples/shouldi``
+directory of the DFFML source code.
+
+.. code-block:: console
+
+    $ cd examples/shouldi
+
+The first step is to create a config file for the ``MultiComm`` we'll be using.
+Config files for 
 
 .. code-block:: console
 
@@ -74,24 +95,15 @@ We can take the
 .. literalinclude:: /../examples/shouldi/shouldi/deploy/mc/http/shouldi.yaml
     :language: yaml
 
-.. note::
-
-    Please install the ``dffml-config-yaml`` package to enable the
-    ``-config yaml`` option. Allowing you to export to YAML instead of JSON.
-    You can also convert between config file formats with the
-    :ref:`cli_config_convert` command.
-
-    JSON files work fine, but they'll take up too much page space in this
-    tutorial.
-
 .. code-block:: console
 
     $ dffml service http server -insecure -log debug -mc-config shouldi/deploy
 
 .. warning::
 
-    The ``-insecure`` flag is only being used here to speed up this already long
-    tutorial. See documentation on HTTP API security for more information.
+    The ``-insecure`` flag is only being used here to speed up this
+    tutorial. See documentation on HTTP API
+    :doc:`/plugins/service/http/security` for more information.
 
 .. code-block:: console
 
@@ -126,6 +138,38 @@ Extending
     $ dffml dataflow create -config yaml \
       dffml.mapping.create lines_of_code_by_language lines_of_code_to_comments \
       > shouldi/deploy/override/shouldi.yaml
+
+The final directory structure should look like this
+
+.. code-block:: console
+
+    $ tree shouldi
+    shouldi
+    ├── bandit.py
+    ├── cli.py
+    ├── deploy
+    │   ├── df
+    │   │   └── shouldi.json
+    │   ├── mc
+    │   │   └── http
+    │   │       └── shouldi.yaml
+    │   └── override
+    │       └── shouldi.yaml
+    ├── __init__.py
+    ├── pypi.py
+    ├── safety.py
+    └── version.py
+
+    5 directories, 9 files
+
+We now have
+
+- The ``shouldi`` dataflow
+
+- A config file for the ``http`` multicomm, using the dataflow named ``shouldi``
+
+- A dataflow containing modififactions to the ``shouldi`` dataflow
+
 
 **shouldi/deploy/override/shouldi.yaml**
 

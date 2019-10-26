@@ -48,8 +48,8 @@ include some sources, models, and operations as a part of the main package,
     about
     community
     installation
-    usage/index
     tutorials/index
+    usage/index
     plugins/index
     cli
     plugins/service/http/index
