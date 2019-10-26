@@ -23,7 +23,7 @@ without the need to hardcode in ``import`` statements.
       --header "Content-Type: application/json" \
       --request POST \
       --data '{"insecure-package": [{"value":"insecure-package","definition":"package"}]}' \
-      http://localhost:8080/shouldi | python -m json.tool
+      http://localhost:8080/shouldi | python3.7 -m json.tool
     {
         "insecure-package": {
             "safety_check_number_of_issues": 1,
@@ -43,15 +43,44 @@ without the need to hardcode in ``import`` statements.
         }
     }
 
-.. note::
+Config Files
+------------
 
-    Please install the ``dffml-config-yaml`` package to enable the
-    ``-config yaml`` option. Allowing you to export to YAML instead of JSON.
-    You can also convert between config file formats with the
-    :ref:`cli_config_convert` command.
+As we saw before, DataFlows can be serialized to config files. JSON
+representations of DataFlows are not fun to hand edit. YAML looks a lot cleaner.
 
-    JSON files work fine, but they'll take up too much page space in this
-    tutorial.
+We're going to install the ``dffml-config-yaml`` package so that we don't have
+to look at JSON.
+
+.. code-block:: console
+
+    $ python3.7 -m pip install dffml-config-yaml
+
+We'll be working from the top level directory of the ``shouldi`` package we
+created in the :doc:`/tutorials/operations`.
+
+The source for that package is also available under the ``examples/shouldi``
+directory of the DFFML source code.
+
+.. code-block:: console
+
+    $ cd examples/shouldi
+
+Config files are named after the dataflow they are associated with. In the
+:ref:`tutorials_operations_visualizing_the_dataflow` section of the
+:doc:`/tutorials/operations`, we serialized the ``shouldi`` dataflow to the
+``shouldi/deploy/df`` directory.
+
+The ``df`` directory is contains the main dataflows to be deployed.
+
+.. code-block:: console
+
+    $ tree shouldi/deploy/
+    shouldi/deploy/
+    └── df
+        └── shouldi.json
+
+    1 directory, 1 file
 
 MultiComms
 ----------
@@ -70,34 +99,39 @@ Example:
 The HTTP server was the first ``MultiComm`` written for DFFML. It's channels of
 communication are URL paths (Example: ``/some/url/path``).
 
-HTTP Deployment
----------------
-
-We'll be working from the top level directory of the ``shouldi`` package we
-created in the :doc:`/tutorials/operations`.
-
-The source for that package is also available under the ``examples/shouldi``
-directory of the DFFML source code.
+Let's install the HTTP API service.
 
 .. code-block:: console
 
-    $ cd examples/shouldi
+    $ python3.7 -m pip install dffml-service-http
 
-The first step is to create a config file for the ``MultiComm`` we'll be using.
-Config files for 
+HTTP Channel Config
+-------------------
+
+To deploy our ``shouldi`` dataflow via the HTTP API, we need to register a
+communication channel, which is the association of a URL path to the dataflow.
+
+We create a config file for the ``MultiComm`` we'll be using. ``MultiComm``
+config files go under the ``mc`` directory of the directory being
+used to deploy. Then config file itself then goes under the name of the
+``MultiComm`` its associated with, ``http`` in this instance.
 
 .. code-block:: console
 
     $ mkdir -p shouldi/deploy/mc/http
+
+The file is populated with the URL path that should trigger the dataflow, how to
+present the output data, and if the dataflow should return when all outputs
+exist, or if it should continue waiting for more inputs (``asynchronous``, used
+for websockets / http2).
 
 **shouldi/deploy/mc/http/shouldi.yaml**
 
 .. literalinclude:: /../examples/shouldi/shouldi/deploy/mc/http/shouldi.yaml
     :language: yaml
 
-.. code-block:: console
-
-    $ dffml service http server -insecure -log debug -mc-config shouldi/deploy
+Serving the DataFlow
+--------------------
 
 .. warning::
 
@@ -105,13 +139,23 @@ Config files for
     tutorial. See documentation on HTTP API
     :doc:`/plugins/service/http/security` for more information.
 
+We now start the http server and tell it that the ``MultiComm`` configuration
+directory can be found in ``shouldi/deploy``.
+
+.. code-block:: console
+
+    $ dffml service http server -insecure -mc-config shouldi/deploy
+
+In another terminal, you can send a ``POST`` request containing the ``Input``
+items that you want evaluated.
+
 .. code-block:: console
 
     $ curl -s \
       --header "Content-Type: application/json" \
       --request POST \
       --data '{"insecure-package": [{"value":"insecure-package","definition":"package"}]}' \
-      http://localhost:8080/shouldi | python -m json.tool
+      http://localhost:8080/shouldi | python3.7 -m json.tool
     {
         "bandit_output": {
             "CONFIDENCE.HIGH": 0,
@@ -129,8 +173,50 @@ Config files for
         "safety_check_number_of_issues": 1
     }
 
-Extending
----------
+Combining Operations
+--------------------
+
+If you've gone through the :doc:`/usage/integration` example, you've seen the
+Git and source code analysis related operations (a list of all available
+operations can be found on the :doc:`/plugins/dffml_operation` plugins page).
+
+We'll be using those operations, so we need to install them
+
+.. code-block:: console
+
+    $ python3.7 -m pip install dffml-feature-git
+
+The ``lines_of_code_to_comments`` operation will give use the ratio of the
+number of lines of comments to the number of lines of code.
+
+.. note::
+
+    You need to install `tokei <https://github.com/XAMPPRocky/tokei>`_ before
+    you can use ``lines_of_code_to_comments``.
+
+The ``lines_of_code_to_comments`` operation needs the output given by
+``lines_of_code_by_language``, which needs a Git repos source code.
+
+.. image:: /images/comments_to_code.svg
+    :alt: Diagram showing DataFlow of comment to code ratio operations
+
+A ``git_repository_checked_out`` is defined as:
+
+ - repo: git_repository_checked_out(type: Dict[str, str])
+
+  - URL: str
+  - directory: str
+  - commit: str
+
+``lines_of_code_by_language`` just runs ``tokei`` on the ``directory``, so if we
+create ``dict`` (the programming language agnostic term is ``mapping`` /
+``map``) with the property of ``directory`` pointing at the source code of the ,
+Python package we downloaded for ``bandit``, we'll be able to use the Git
+operations within the ``shouldi`` dataflow.
+
+Let's create the ``override`` directory which will contain the operations we
+want to add to the ``shouldi`` dataflow, and how we want to connect those
+operations with the existing ones.
 
 .. code-block:: console
 
@@ -143,53 +229,69 @@ The final directory structure should look like this
 
 .. code-block:: console
 
-    $ tree shouldi
-    shouldi
-    ├── bandit.py
-    ├── cli.py
-    ├── deploy
-    │   ├── df
-    │   │   └── shouldi.json
-    │   ├── mc
-    │   │   └── http
-    │   │       └── shouldi.yaml
-    │   └── override
+    $ tree shouldi/deploy
+    shouldi/deploy
+    ├── df
+    │   └── shouldi.json
+    ├── mc
+    │   └── http
     │       └── shouldi.yaml
-    ├── __init__.py
-    ├── pypi.py
-    ├── safety.py
-    └── version.py
+    └── override
+        └── shouldi.yaml
 
     5 directories, 9 files
 
-We now have
+It contains the following files.
 
-- The ``shouldi`` dataflow
+- ``df/shouldi.json``
 
-- A config file for the ``http`` multicomm, using the dataflow named ``shouldi``
+  - The ``shouldi`` dataflow
 
-- A dataflow containing modififactions to the ``shouldi`` dataflow
+- ``mc/http/shouldi.yaml``
 
+  - A config file for the ``http`` multicomm, using the dataflow named ``shouldi``
+
+- ``override/shouldi.yaml``
+
+  - A dataflow containing modififactions to the ``shouldi`` dataflow
+
+The override dataflow file looks like this:
 
 **shouldi/deploy/override/shouldi.yaml**
 
 .. literalinclude:: /../examples/shouldi/shouldi/deploy/override/shouldi.yaml
     :language: yaml
 
+We've modified the flow to create the following dataflow
+
+.. image:: /images/shouldi-dataflow-extended.svg
+    :alt: Diagram showing DataFlow with use of comment to code ratio
+
+The diagram above can be re-generated with the following commands
+
 .. code-block:: console
 
     $ dffml dataflow merge \
-        shouldi/deploy/df/shouldi.yaml \
+        shouldi/deploy/df/shouldi.json \
         shouldi/deploy/override/shouldi.yaml | \
       dffml dataflow diagram \
         -stages processing -simple -config yaml /dev/stdin
 
 Copy and pasting the graph into the
 `mermaidjs live editor <https://mermaidjs.github.io/mermaid-live-editor>`_
-results in the following graph.
+results in the graph.
 
-.. image:: /images/shouldi-dataflow-extended.svg
-    :alt: Diagram showing DataFlow with use of comment to code ratio
+Redeploying
+-----------
+
+We can now stop the server we had running, and start it again with the new
+configs.
+
+.. code-block:: console
+
+    $ dffml service http server -insecure -mc-config shouldi/deploy
+
+Here's an example of evaluating two packages using the new DataFlow.
 
 .. code-block:: console
 
@@ -197,7 +299,7 @@ results in the following graph.
       --header "Content-Type: application/json" \
       --request POST \
       --data '{"insecure-package": [{"value":"insecure-package","definition":"package"}], "dffml": [{"value":"dffml","definition":"package"}]}' \
-      http://localhost:8080/shouldi | python -m json.tool
+      http://localhost:8080/shouldi | python3.7 -m json.tool
     {
         "dffml": {
             "bandit_output": {

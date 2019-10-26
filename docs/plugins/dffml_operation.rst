@@ -160,6 +160,9 @@ No description
 
 - repo: git_repository(type: Dict[str, str])
 
+  - URL: str
+  - directory: str
+
 clone_git_repo
 ~~~~~~~~~~~~~~
 
@@ -178,6 +181,9 @@ No description
 **Outputs**
 
 - repo: git_repository(type: Dict[str, str])
+
+  - URL: str
+  - directory: str
 
 **Conditions**
 
@@ -216,6 +222,9 @@ No description
 **Inputs**
 
 - repo: git_repository(type: Dict[str, str])
+
+  - URL: str
+  - directory: str
 - branch: git_branch(type: str)
 - start_end: date_pair(type: List[date])
 
@@ -237,6 +246,9 @@ No description
 **Inputs**
 
 - repo: git_repository(type: Dict[str, str])
+
+  - URL: str
+  - directory: str
 - branch: git_branch(type: str)
 - start_end: date_pair(type: List[date])
 
@@ -258,11 +270,18 @@ No description
 **Inputs**
 
 - repo: git_repository(type: Dict[str, str])
+
+  - URL: str
+  - directory: str
 - commit: git_commit(type: string)
 
 **Outputs**
 
 - repo: git_repository_checked_out(type: Dict[str, str])
+
+  - URL: str
+  - directory: str
+  - commit: str
 
 git_repo_commit_from_date
 ~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -278,6 +297,9 @@ No description
 **Inputs**
 
 - repo: git_repository(type: Dict[str, str])
+
+  - URL: str
+  - directory: str
 - branch: git_branch(type: str)
 - date: date(type: string)
 
@@ -299,6 +321,9 @@ No description
 **Inputs**
 
 - repo: git_repository(type: Dict[str, str])
+
+  - URL: str
+  - directory: str
 
 **Outputs**
 
@@ -322,6 +347,9 @@ Was there a release within this date range
 **Inputs**
 
 - repo: git_repository(type: Dict[str, str])
+
+  - URL: str
+  - directory: str
 - branch: git_branch(type: str)
 - start_end: date_pair(type: List[date])
 
@@ -343,6 +371,10 @@ No description
 **Inputs**
 
 - repo: git_repository_checked_out(type: Dict[str, str])
+
+  - URL: str
+  - directory: str
+  - commit: str
 
 **Outputs**
 

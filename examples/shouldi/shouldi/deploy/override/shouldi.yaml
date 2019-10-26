@@ -4,6 +4,13 @@ definitions:
     lock: true
     name: git_repository_checked_out
     primitive: Dict[str, str]
+    spec:
+      defaults: {}
+      name: GitRepoCheckedOutSpec
+      types:
+        URL: str
+        commit: str
+        directory: str
   key:
     name: key
     primitive: str
