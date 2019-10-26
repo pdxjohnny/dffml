@@ -398,6 +398,8 @@ class MemoryInputNetworkContext(BaseInputNetworkContext):
             for ctx, _, by_origin in contexts:
                 # Grab the input flow to check for definition overrides
                 input_flow = dataflow.flow[operation.instance_name]
+                # TODO(p1) This only checks that Inputs that are present are
+                # true. If there are none present, the operation will run
                 # Check that all conditions are present and logicly True
                 for i, condition_source in enumerate(input_flow.conditions):
                     # Create a list of places this input originates from
