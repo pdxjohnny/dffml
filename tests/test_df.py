@@ -32,7 +32,7 @@ from typing import (
     Iterator,
 )
 
-from dffml.df.types import Operation, Definition, Input, FailedToLoadOperation
+from dffml.df.types import Operation, Definition, Input, FailedToLoadOperation, DefinitionMissing, DataFlow
 from dffml.df.base import (
     op,
     opwraped_in,
@@ -251,16 +251,16 @@ class TestDataFlow(MockIterEntryPoints):
         self.assertEqual("int", exported["definitions"]["result"]["primitive"])
 
     def test_resolve_missing_condition_definition(self):
-        exported = add.op.export()
+        exported = DataFlow.auto(add).export(linked=True)
         del exported["definitions"]["is_add"]
-        with self.assertRaisesRegex(KeyError, "Definition missing"):
-            Operation._fromdict(**exported)
+        with self.assertRaisesRegex(DefinitionMissing, "add.conditions.*is_add"):
+            DataFlow._fromdict(**exported)
 
     def test_resolve_missing_input_output_definition(self):
-        exported = add.op.export()
+        exported = DataFlow.auto(add).export(linked=True)
         del exported["definitions"]["result"]
-        with self.assertRaisesRegex(KeyError, "Definition missing"):
-            Operation._fromdict(**exported)
+        with self.assertRaisesRegex(DefinitionMissing, "add.outputs.*result"):
+            DataFlow._fromdict(**exported)
 
 
 class TestOperationImplementation(MockIterEntryPoints):
