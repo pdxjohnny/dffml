@@ -28,10 +28,23 @@ definitions:
     lock: true
     name: git_repository
     primitive: Dict[str, str]
+    spec:
+      defaults: {}
+      name: GitRepoSpec
+      types:
+        URL: str
+        directory: str
   git_repository_checked_out:
     lock: true
     name: git_repository_checked_out
     primitive: Dict[str, str]
+    spec:
+      defaults: {}
+      name: GitRepoCheckedOutSpec
+      types:
+        URL: str
+        commit: str
+        directory: str
   group_by_output:
     name: group_by_output
     primitive: Dict[str, List[Any]]
@@ -73,6 +86,8 @@ flow:
       repo:
       - clone_git_repo: repo
   clone_git_repo:
+    conditions:
+    - check_if_valid_git_repository_URL: valid
     inputs:
       URL:
       - seed
@@ -111,6 +126,8 @@ flow:
       repo:
       - clone_git_repo: repo
   git_repo_default_branch:
+    conditions:
+    - seed
     inputs:
       repo:
       - clone_git_repo: repo
