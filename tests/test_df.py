@@ -154,30 +154,78 @@ class TestMemoryOperationImplementationNetwork(AsyncTestCase):
 
 
 
-class TestRunner(AsyncTestCase):
+class TestOrchestrator(AsyncTestCase):
     async def test_run(self):
         calc_strings_check = {"add 40 and 2": 42, "multiply 42 and 10": 420}
-        async with MemoryOrchestrator.basic_config(*OPIMPS) as orchestrator:
-            async with orchestrator() as octx:
-                for to_calc in calc_strings_check.keys():
-                    await octx.ictx.sadd(
-                        to_calc,
-                        Input(
-                            value=to_calc,
-                            definition=parse_line.op.inputs["line"],
-                        ),
-                        Input(
-                            value=[add.op.outputs["sum"].name],
-                            definition=GetSingle.op.inputs["spec"],
-                        ),
+        dataflow = DataFlow.auto(*OPIMPS)
+        # TODO(p0) Implement and test asyncgenerator
+        callstyles_no_expand = ["asyncgenerator", "dict"]
+        callstyles = {
+            "dict": {
+                to_calc: [
+                    Input(
+                        value=to_calc,
+                        definition=parse_line.op.inputs["line"],
+                    ),
+                    Input(
+                        value=[add.op.outputs["sum"].name],
+                        definition=GetSingle.op.inputs["spec"],
+                    ),
+                ]
+                for to_calc in calc_strings_check.keys()
+            },
+            "list_input_sets": [
+                MemoryInputSet(
+                    MemoryInputSetConfig(
+                        ctx=StringInputSetContext(to_calc),
+                        inputs=[
+                            Input(
+                                value=to_calc,
+                                definition=parse_line.op.inputs["line"],
+                            ),
+                            Input(
+                                value=[add.op.outputs["sum"].name],
+                                definition=GetSingle.op.inputs["spec"],
+                            ),
+                        ],
                     )
-                async for ctx, results in octx.run_operations():
-                    ctx_str = (await ctx.handle()).as_string()
-                    results = results[GetSingle.op.name]
-                    self.assertEqual(
-                        calc_strings_check[ctx_str],
-                        results[add.op.outputs["sum"].name],
-                    )
+                )
+                for to_calc in calc_strings_check.keys()
+            ],
+            "uctx": [
+                [
+                    Input(
+                        value=to_calc,
+                        definition=parse_line.op.inputs["line"],
+                    ),
+                    Input(
+                        value=[add.op.outputs["sum"].name],
+                        definition=GetSingle.op.inputs["spec"],
+                    ),
+                ]
+                for to_calc in calc_strings_check.keys()
+            ]
+        }
+        async with MemoryOrchestrator.withconfig({}) as orchestrator:
+            async with orchestrator(dataflow) as octx:
+                for callstyle, inputs in callstyles.items():
+                    with self.subTest(callstyle=callstyle):
+                        if callstyle in callstyles_no_expand:
+                            run_coro = octx.run(inputs)
+                        else:
+                            run_coro = octx.run(*inputs)
+                        async for ctx, results in run_coro:
+                            ctx_str = (await ctx.handle()).as_string()
+                            if callstyle == "uctx":
+                                self.assertIn(
+                                    results[add.op.outputs["sum"].name],
+                                    dict(zip(calc_strings_check.values(), calc_strings_check.keys())),
+                                )
+                            else:
+                                self.assertEqual(
+                                    calc_strings_check[ctx_str],
+                                    results[add.op.outputs["sum"].name],
+                                )
 
 
 class MockIterEntryPoints(AsyncTestCase):
