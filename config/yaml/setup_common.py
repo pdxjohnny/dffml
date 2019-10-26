@@ -6,8 +6,8 @@ from pathlib import Path
 from setuptools import find_packages
 
 ORG = "intel"
-NAME = "shouldi"
-DESCRIPTION = "Meta static analysis tool for Python packages"
+NAME = "dffml-config-yaml"
+DESCRIPTION = "DFFML config dffml-config-yaml"
 AUTHOR_NAME = "John Andersen"
 AUTHOR_EMAIL = "john.s.andersen@intel.com"
 # Install dffml if it is not installed in development mode
@@ -50,7 +50,7 @@ VERSION = ast.literal_eval(
 
 README = Path(SELF_PATH, "README.md").read_text()
 
-SETUP_KWARGS = dict(
+KWARGS = dict(
     name=NAME,
     version=VERSION,
     description=DESCRIPTION,
@@ -60,7 +60,7 @@ SETUP_KWARGS = dict(
     author_email=AUTHOR_EMAIL,
     maintainer=AUTHOR_NAME,
     maintainer_email=AUTHOR_EMAIL,
-    url=f"https://github.com/{ORG}/dffml/blob/master/examples/{NAME}/README.md",
+    url="https://github.com/intel/dffml/blob/master/config/yaml/README.md",
     license="MIT",
     keywords=["dffml"],
     classifiers=[

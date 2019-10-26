@@ -174,7 +174,7 @@ dependences. For packages, we can declare our dependencies right in our
 **setup.py**
 
 .. literalinclude:: /../examples/shouldi/setup.py
-    :lines: 5-9
+    :lines: 12-16
 
 .. note::
 
@@ -443,7 +443,7 @@ the ``shouldi.cli`` module.
 **setup.py**
 
 .. literalinclude:: /../examples/shouldi/setup.py
-    :lines: 10-11
+    :lines: 17-18
 
 Re-install the package via pip
 
@@ -546,7 +546,7 @@ DFFML, we need to register them with Python's ``entry_points`` system.
 **setup.py**
 
 .. literalinclude:: /../examples/shouldi/setup.py
-    :lines: 10-21
+    :lines: 17-28
 
 Re-install the package via pip to make registrations take effect.
 

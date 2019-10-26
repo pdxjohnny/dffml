@@ -1,13 +1,20 @@
+import os
+import importlib.util
 from setuptools import setup
 
-from dffml_setup_common import SETUP_KWARGS
+# Boilerplate to load commonalities
+spec = importlib.util.spec_from_file_location(
+    "setup_common", os.path.join(os.path.dirname(__file__), "setup_common.py")
+)
+common = importlib.util.module_from_spec(spec)
+spec.loader.exec_module(common)
 
-SETUP_KWARGS["install_requires"] += [
+common.KWARGS["install_requires"] += [
     "aiohttp>=3.5.4",
     "bandit>=1.6.2",
     "safety>=1.8.5",
 ]
-SETUP_KWARGS["entry_points"] = {
+common.KWARGS["entry_points"] = {
     "console_scripts": ["shouldi = shouldi.cli:ShouldI.main"],
     "dffml.operation": [
         "run_bandit = shouldi.bandit:run_bandit",
@@ -20,4 +27,4 @@ SETUP_KWARGS["entry_points"] = {
     ],
 }
 
-setup(**SETUP_KWARGS)
+setup(**common.KWARGS)
