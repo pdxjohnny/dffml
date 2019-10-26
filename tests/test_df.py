@@ -33,7 +33,6 @@ from typing import (
 )
 
 from dffml.df.types import Operation, Definition, Input, FailedToLoadOperation
-from dffml.df.linker import Linker
 from dffml.df.base import (
     op,
     opwraped_in,
@@ -153,53 +152,6 @@ class TestMemoryOperationImplementationNetwork(AsyncTestCase):
             )
 
 
-class TestLinker(unittest.TestCase):
-    @classmethod
-    def setUpClass(cls):
-        cls.linker = Linker()
-
-    def test_resolve(self):
-        self.linker.resolve(self.linker.export(add.op))
-
-    def test_export(self):
-        exported = self.linker.export(add.op)
-        # Operations
-        self.assertIn("operations", exported)
-        self.assertIn("add", exported["operations"])
-        self.assertIn("inputs", exported["operations"]["add"])
-        self.assertIn("outputs", exported["operations"]["add"])
-        self.assertIn("conditions", exported["operations"]["add"])
-        self.assertIn("is_add", exported["operations"]["add"]["conditions"])
-        self.assertIn("numbers", exported["operations"]["add"]["inputs"])
-        self.assertEqual(
-            "numbers", exported["operations"]["add"]["inputs"]["numbers"]
-        )
-        self.assertIn("sum", exported["operations"]["add"]["outputs"])
-        self.assertEqual(
-            "result", exported["operations"]["add"]["outputs"]["sum"]
-        )
-        # Definitions
-        self.assertIn("definitions", exported)
-        self.assertIn("numbers", exported["definitions"])
-        self.assertIn("primitive", exported["definitions"]["numbers"])
-        self.assertEqual(
-            "List[int]", exported["definitions"]["numbers"]["primitive"]
-        )
-        self.assertIn("result", exported["definitions"])
-        self.assertIn("primitive", exported["definitions"]["result"])
-        self.assertEqual("int", exported["definitions"]["result"]["primitive"])
-
-    def test_resolve_missing_condition_definition(self):
-        exported = self.linker.export(add.op)
-        del exported["definitions"]["is_add"]
-        with self.assertRaisesRegex(KeyError, "Definition missing"):
-            self.linker.resolve(exported)
-
-    def test_resolve_missing_input_output_definition(self):
-        exported = self.linker.export(add.op)
-        del exported["definitions"]["result"]
-        with self.assertRaisesRegex(KeyError, "Definition missing"):
-            self.linker.resolve(exported)
 
 
 class TestRunner(AsyncTestCase):
@@ -267,6 +219,48 @@ class TestOperation(MockIterEntryPoints):
         self.assertEqual(add.op, Operation.load("add"))
         self.assertEqual(mult.op, Operation.load("mult"))
         self.assertEqual(parse_line.op, Operation.load("parse_line"))
+
+class TestDataFlow(MockIterEntryPoints):
+
+    def test_export(self):
+        exported = DataFlow.auto(add).export(linked=True)
+        # Operations
+        self.assertIn("operations", exported)
+        self.assertIn("add", exported["operations"])
+        self.assertIn("inputs", exported["operations"]["add"])
+        self.assertIn("outputs", exported["operations"]["add"])
+        self.assertIn("conditions", exported["operations"]["add"])
+        self.assertIn("is_add", exported["operations"]["add"]["conditions"])
+        self.assertIn("numbers", exported["operations"]["add"]["inputs"])
+        self.assertEqual(
+            "numbers", exported["operations"]["add"]["inputs"]["numbers"]
+        )
+        self.assertIn("sum", exported["operations"]["add"]["outputs"])
+        self.assertEqual(
+            "result", exported["operations"]["add"]["outputs"]["sum"]
+        )
+        # Definitions
+        self.assertIn("definitions", exported)
+        self.assertIn("numbers", exported["definitions"])
+        self.assertIn("primitive", exported["definitions"]["numbers"])
+        self.assertEqual(
+            "List[int]", exported["definitions"]["numbers"]["primitive"]
+        )
+        self.assertIn("result", exported["definitions"])
+        self.assertIn("primitive", exported["definitions"]["result"])
+        self.assertEqual("int", exported["definitions"]["result"]["primitive"])
+
+    def test_resolve_missing_condition_definition(self):
+        exported = add.op.export()
+        del exported["definitions"]["is_add"]
+        with self.assertRaisesRegex(KeyError, "Definition missing"):
+            Operation._fromdict(**exported)
+
+    def test_resolve_missing_input_output_definition(self):
+        exported = add.op.export()
+        del exported["definitions"]["result"]
+        with self.assertRaisesRegex(KeyError, "Definition missing"):
+            Operation._fromdict(**exported)
 
 
 class TestOperationImplementation(MockIterEntryPoints):
