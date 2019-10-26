@@ -23,7 +23,6 @@ from ..util.data import traverse_config_get
 from ..df.types import Input, DataFlow, Stage
 from ..df.base import Operation
 from ..df.memory import MemoryOrchestrator
-from ..df.linker import Linker
 from ..config.config import BaseConfigLoader
 from ..config.json import JSONConfigLoader
 from ..operation.output import GetSingle

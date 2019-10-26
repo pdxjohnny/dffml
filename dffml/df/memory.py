@@ -1141,8 +1141,14 @@ class MemoryOrchestratorContext(BaseOrchestratorContext):
             # the dataflow to the context.
             # TODO(dfass) Grab inputs from asyncgen, combine with seed
             raise NotImplementedError("asyncgen not yet supported")
+        elif len(input_sets) == 1 and isinstance(input_sets[0], dict):
+            # Helper to quickly add inputs under string context
+            for ctx_string, input_set in input_sets[0].items():
+                ctxs.append(
+                    await self.seed_inputs(ctx=StringInputSetContext(ctx_string), input_set=input_set)
+                )
         else:
-            # Add each input set in the list of input sets if given
+            # For inputs sets that are of type BaseInputSetContext or list
             for input_set in input_sets:
                 ctxs.append(
                     await self.seed_inputs(ctx=ctx, input_set=input_set)

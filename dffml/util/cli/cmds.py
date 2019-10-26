@@ -18,7 +18,6 @@ from ...source.file import FileSourceConfig
 from ...model import Model
 
 from ...df.types import Operation
-from ...df.linker import Linker
 from ...df.base import (
     Input,
     BaseInputNetwork,

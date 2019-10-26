@@ -368,13 +368,19 @@ class DataFlow:
         # given operations and replace any which have been decorated with their
         # operation. Add the implementation to our dict of implementations.
         for instance_name, value in self.operations.items():
+            # TODO(p4) We can't do isinstance because its defined in base, maybe
+            # we should move it in here. This is a hack.
+            is_opimp_non_decorated = bool(
+                getattr(value, "ENTRY_POINT_NAME", ["not-opimp"]) == ["opimp"]
+            )
             if (
-                getattr(value, "imp", None) is not None
+                (getattr(value, "imp", None) is not None
+                or is_opimp_non_decorated)
                 and getattr(value, "op", None) is not None
             ):
                 # Get the operation and implementation from the wrapped object
                 operation = getattr(value, "op", None)
-                opimp = getattr(value, "imp", None)
+                opimp = value if is_opimp_non_decorated else getattr(value, "imp", None)
                 # Set the implementation if not explicitly set
                 self.implementations.setdefault(operation.name, opimp)
                 # Change this entry to the instance of Operation associated with
