@@ -586,9 +586,13 @@ class OperationImplementationNotInstantiable(Exception):
     """
 
 
-class OperationImplementationNotInNetwork(Exception):
+class OperationImplementationNotInstantiated(Exception):
     """
-    OperationImplementation is not in the network and was required to continue.
+    OperationImplementation is instantiable, but is not has not been
+    instantiated within the network and was required to continue.
+
+    Attempted to run operation which could be instantiated, but has not yet
+    been.
     """
 
 

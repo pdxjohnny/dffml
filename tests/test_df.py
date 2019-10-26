@@ -43,6 +43,8 @@ from dffml.df.base import (
     BaseConfig,
     BaseRedundancyCheckerConfig,
     StringInputSetContext,
+    OperationImplementationNotInstantiable,
+    OperationImplementationNotInstantiated
 )
 from dffml.df.memory import (
     MemoryInputNetwork,
@@ -125,22 +127,24 @@ class TestMemoryKeyValueStore(AsyncTestCase):
 
 class TestMemoryOperationImplementationNetwork(AsyncTestCase):
     async def setUp(self):
-        self.operationsNetwork = MemoryOperationImplementationNetwork(
-            MemoryOperationImplementationNetworkConfig(
-                operations={"add": add.imp(BaseConfig())}
-            )
-        )
+        self.operationsNetwork = MemoryOperationImplementationNetwork.withconfig({})
         self.operationsNetworkCtx = await self.operationsNetwork.__aenter__()
 
     async def tearDown(self):
         await self.operationsNetwork.__aexit__(None, None, None)
 
-    async def test_contains(self):
+    async def test_contains_true(self):
         async with self.operationsNetworkCtx() as ctx:
+            await ctx.instantiate(add.op, BaseConfig(), opimp=add.imp)
             self.assertTrue(await ctx.contains(add.op))
+
+    async def test_contains_false(self):
+        async with self.operationsNetworkCtx() as ctx:
+            self.assertFalse(await ctx.contains(add.op))
 
     async def test_run(self):
         async with self.operationsNetworkCtx() as ctx:
+            await ctx.instantiate(add.op, BaseConfig(), opimp=add.imp)
             # No input set context and input network context required to test
             # the add operation
             self.assertEqual(
@@ -150,6 +154,18 @@ class TestMemoryOperationImplementationNetwork(AsyncTestCase):
                 ],
             )
 
+    async def test_not_instantiable(self):
+        async with self.operationsNetworkCtx() as ctx:
+            with self.assertRaises(OperationImplementationNotInstantiable):
+                await ctx.run(None, None, add.op, {"numbers": [40, 2]})
+
+    async def test_instantiable_but_not_instantiated(self):
+        async def return_true(*args, **kwargs):
+            return True
+        async with self.operationsNetworkCtx() as ctx:
+            with self.assertRaises(OperationImplementationNotInstantiated):
+                with patch.object(ctx, "instantiable", new=return_true):
+                    await ctx.run(None, None, add.op, {"numbers": [40, 2]})
 
 
 

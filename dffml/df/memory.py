@@ -24,6 +24,7 @@ from .exceptions import ContextNotPresent, DefinitionNotInContext
 from .types import Input, Parameter, Definition, Operation, Stage, DataFlow
 from .base import (
     OperationImplementation,
+    FailedToLoadOperationImplementation,
     BaseDataFlowObject,
     BaseDataFlowObjectContext,
     BaseConfig,
@@ -44,7 +45,7 @@ from .base import (
     BaseRedundancyChecker,
     BaseLockNetworkContext,
     BaseLockNetwork,
-    OperationImplementationNotInNetwork,
+    OperationImplementationNotInstantiated,
     OperationImplementationNotInstantiable,
     BaseOperationImplementationNetworkContext,
     BaseOperationImplementationNetwork,
@@ -763,7 +764,7 @@ class MemoryOperationImplementationNetworkContext(
             return True
         try:
             opimp = OperationImplementation.load(operation.name)
-        except EntrypointNotFound as error:
+        except FailedToLoadOperationImplementation as error:
             self.logger.debug(
                 "OperationImplementation %r is not instantiable: %s",
                 operation.name,
@@ -783,13 +784,14 @@ class MemoryOperationImplementationNetworkContext(
         Instantiate class registered with ____ entrypoint using pkg_resources.
         Return true if instantiation was successful.
         """
+        if opimp is None:
+            if await self.instantiable(operation):
+                opimp = OperationImplementation.load(operation.name)
+            else:
+                raise OperationImplementationNotInstantiable(operation.name)
         self.operations[
             operation.instance_name
-        ] = await self._stack.enter_async_context(
-            opimp(config)
-            if opimp is not None
-            else OperationImplementation.load(operation.name)(config)
-        )
+        ] = await self._stack.enter_async_context(opimp(config))
 
     async def ensure_contains(self, operation: Operation):
         """
@@ -800,7 +802,7 @@ class MemoryOperationImplementationNetworkContext(
             if not await self.instantiable(operation):
                 raise OperationImplementationNotInstantiable(operation.name)
             else:
-                raise OperationImplementationNotInNetwork(
+                raise OperationImplementationNotInstantiated(
                     operation.instance_name
                 )
 
