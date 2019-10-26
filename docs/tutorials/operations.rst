@@ -433,47 +433,6 @@ Run the all the tests this time
 
     $ python3.7 setup.py test
 
-If you have coverage installed (``pip install coverage``) you can also check the
-code coverage.
-
-.. code-block:: console
-
-    $ python3.7 -m coverage run setup.py test
-    running test
-    running egg_info
-    writing shouldi.egg-info/PKG-INFO
-    writing dependency_links to shouldi.egg-info/dependency_links.txt
-    writing entry points to shouldi.egg-info/entry_points.txt
-    writing requirements to shouldi.egg-info/requires.txt
-    writing top-level names to shouldi.egg-info/top_level.txt
-    reading manifest file 'shouldi.egg-info/SOURCES.txt'
-    reading manifest template 'MANIFEST.in'
-    writing manifest file 'shouldi.egg-info/SOURCES.txt'
-    running build_ext
-    test_run (tests.test_safety.TestSafetyCheck) ... ok
-    test_install (tests.test_cli.TestCLI) ... ok
-    test_run (tests.test_pypi.TestPyPiLatestPackageVersion) ... ok
-
-    ----------------------------------------------------------------------
-    Ran 3 tests in 1.282s
-
-    OK
-    $ python3.7 -m coverage report -m
-    Name                     Stmts   Miss Branch BrPart  Cover   Missing
-    --------------------------------------------------------------------
-    shouldi/__init__.py          0      0      0      0   100%
-    shouldi/cli.py              27      0      6      0   100%
-    shouldi/definitions.py       5      0      2      0   100%
-    shouldi/pypi.py             12      0      2      0   100%
-    shouldi/safety.py           18      0      0      0   100%
-    shouldi/version.py           1      0      0      0   100%
-    tests/__init__.py            0      0      0      0   100%
-    tests/test_cli.py           11      0      0      0   100%
-    tests/test_pypi.py           9      0      0      0   100%
-    tests/test_safety.py         9      0      0      0   100%
-    --------------------------------------------------------------------
-    TOTAL                       92      0     10      0   100%
-
 We want this to be usable as a command line utility, Python's
 :py:mod:`setuptools` allows us to define console ``entry_points``. All we have
 to do is tell :py:mod:`setuptools` what Python function we want it to call when
@@ -484,7 +443,7 @@ the ``shouldi.cli`` module.
 **setup.py**
 
 .. literalinclude:: /../examples/shouldi/setup.py
-    :lines: 10-13
+    :lines: 10-11
 
 Re-install the package via pip
 
@@ -587,7 +546,7 @@ DFFML, we need to register them with Python's ``entry_points`` system.
 **setup.py**
 
 .. literalinclude:: /../examples/shouldi/setup.py
-    :lines: 10-23
+    :lines: 10-21
 
 Re-install the package via pip to make registrations take effect.
 
@@ -597,6 +556,27 @@ Re-install the package via pip to make registrations take effect.
 
 After you've registered the operations, services such as the
 :doc:`/plugins/service/http/index` will have access to your operations.
+
+To make sure your operations were registered, you can use the development
+service's ``entrypoints list`` command. You should see the ``get_single``
+operation we used to get our output as comming from ``dffml``. You'll also see
+your own operations as coming from ``shouldi``.
+
+.. code-block:: console
+
+    $ dffml service dev entrypoints list dffml.operation
+    associate = dffml.operation.output:Associate -> dffml 0.2.1 (/usr/local/lib/python3.7/dist-packages)
+    dffml.mapping.create = dffml.operation.mapping:create_mapping -> dffml 0.2.1 (/usr/local/lib/python3.7/dist-packages)
+    dffml.mapping.extract = dffml.operation.mapping:mapping_extract_value -> dffml 0.2.1 (/usr/local/lib/python3.7/dist-packages)
+    get_single = dffml.operation.output:GetSingle -> dffml 0.2.1 (/usr/local/lib/python3.7/dist-packages)
+    group_by = dffml.operation.output:GroupBy -> dffml 0.2.1 (/usr/local/lib/python3.7/dist-packages)
+    cleanup_pypi_package = shouldi.pypi:cleanup_pypi_package -> shouldi 0.0.1 (/home/user/shouldi)
+    pypi_latest_package_version = shouldi.pypi:pypi_latest_package_version -> shouldi 0.0.1 (/home/user/shouldi)
+    pypi_package_contents = shouldi.pypi:pypi_package_contents -> shouldi 0.0.1 (/home/user/shouldi)
+    pypi_package_json = shouldi.pypi:pypi_package_json -> shouldi 0.0.1 (/home/user/shouldi)
+    pypi_package_url = shouldi.pypi:pypi_package_url -> shouldi 0.0.1 (/home/user/shouldi)
+    run_bandit = shouldi.bandit:run_bandit -> shouldi 0.0.1 (/home/user/shouldi)
+    safety_check = shouldi.safety:safety_check -> shouldi 0.0.1 (/home/user/shouldi)
 
 The :doc:`/usage/dataflows` usage example will show you how to expose your new
 meta static analysis tool over an HTTP interface.
