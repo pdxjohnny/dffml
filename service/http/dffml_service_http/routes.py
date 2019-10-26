@@ -151,8 +151,8 @@ class Routes(BaseMultiCommContext):
 
     async def multicomm_dataflow(self, config, request):
         # Seed the network with inputs given by caller
-        # TODO allow list of valid definitions to seed (set Input.origin to
-        # something other than seed)
+        # TODO(p0,security) allowlist of valid definitions to seed (set
+        # Input.origin to something other than seed)
         inputs = []
         # If data was sent add those inputs
         if request.method == "POST":
