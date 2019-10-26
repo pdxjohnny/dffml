@@ -54,6 +54,7 @@ include some sources, models, and operations as a part of the main package,
     cli
     plugins/service/http/index
     api/index
+    publications
 
 Indices and tables
 ==================
