@@ -975,8 +975,12 @@ class MemoryOperationImplementationNetwork(
         # Add orig label to above since we are done loading
         above = cls.add_orig_label(*above)
         # Load all the opimps and add the arguments they might require
+        # TODO(p4) Should we do this? If someone messes up their entrypoints in
+        # one package it will mess up loading anytime this is called.
+        """
         for loaded in OperationImplementation.load():
             loaded.args(args, *above)
+        """
         return args
 
     @classmethod

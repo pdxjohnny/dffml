@@ -387,7 +387,7 @@ temporary directory.
 **shouldi/pypi.py**
 
 .. literalinclude:: /../examples/shouldi/shouldi/pypi.py
-    :lines: 63-80
+    :lines: 63-82
 
 Finally, we make a ``cleanup`` operation to remove the directory once we're done
 with it.
@@ -395,7 +395,7 @@ with it.
 **shouldi/pypi.py**
 
 .. literalinclude:: /../examples/shouldi/shouldi/pypi.py
-    :lines: 83-88
+    :lines: 85-90
 
 Now we write tests for each operation.
 

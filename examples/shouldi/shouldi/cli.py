@@ -1,12 +1,13 @@
-from dffml.df.types import DataFlow, Input
-from dffml.df.memory import (
-    MemoryOrchestrator,
-    MemoryInputSet,
-    MemoryInputSetConfig,
-    StringInputSetContext,
-)
+# Command line interface helpers
 from dffml.util.cli.cmd import CMD
 from dffml.util.cli.arg import Arg
+
+# DataFlow specific classes
+from dffml.df.types import DataFlow, Input
+from dffml.df.memory import MemoryOrchestrator
+
+# The GetSingle operation will grab the data we want from the ouputs of our
+# operations and present it as the result
 from dffml.operation.output import GetSingle
 
 # Import all the operations we wrote
@@ -52,7 +53,7 @@ class Install(CMD):
 
     async def run(self):
         # Create an Orchestrator which will manage the running of our operations
-        async with MemoryOrchestrator.basic_config() as orchestrator:
+        async with MemoryOrchestrator.withconfig({}) as orchestrator:
             # Create a orchestrator context, everything in DFFML follows this
             # one-two context entry pattern
             async with orchestrator(DATAFLOW) as octx:
@@ -60,29 +61,22 @@ class Install(CMD):
                 # when all inputs are exhausted for a context, the output
                 # operations are then run and their results are yielded
                 async for package_name, results in octx.run(
-                    # For each package add a new input set to the input network
-                    *[
-                        MemoryInputSet(
-                            MemoryInputSetConfig(
-                                # The context operations execute under is the
-                                # package name to evaluate. Contexts ensure that
-                                # data pertaining to package A doesn't mingle
-                                # with data pertaining to package B
-                                ctx=StringInputSetContext(package_name),
-                                inputs=[
-                                    # The only input to the operations is the
-                                    # package name.
-                                    Input(
-                                        value=package_name,
-                                        definition=pypi_package_json.op.inputs[
-                                            "package"
-                                        ],
-                                    )
+                    {
+                        # For each package add a new input set to the input network
+                        # The context operations execute under is the package name
+                        # to evaluate. Contexts ensure that data pertaining to
+                        # package A doesn't mingle with data pertaining to package B
+                        package_name: [
+                            # The only input to the operations is the package name.
+                            Input(
+                                value=package_name,
+                                definition=pypi_package_json.op.inputs[
+                                    "package"
                                 ],
                             )
-                        )
+                        ]
                         for package_name in self.packages
-                    ]
+                    }
                 ):
                     # Grab the number of safety issues and the bandit report
                     # from the results dict
