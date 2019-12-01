@@ -93,7 +93,19 @@ class LoggingLogger(object):
         return logger
 
 
-class BaseConfig(object):
+def config(cls):
+    """
+    Decorator to create a dataclass
+    """
+    datacls = dataclasses.dataclass(eq=True, frozen=True)(cls)
+    datacls._replace = lambda self, *args, **kwargs: dataclasses.replace(
+        self, *args, **kwargs
+    )
+    return datacls
+
+
+@config
+class BaseConfig:
     """
     All DFFML Base Objects should take an object (likely a typing.NamedTuple) as
     as their config.
@@ -104,17 +116,6 @@ class BaseConfig(object):
 
     def __str__(self):
         return repr(self)
-
-
-def config(cls):
-    """
-    Decorator to create a dataclass
-    """
-    datacls = dataclasses.dataclass(eq=True, frozen=True)(cls)
-    datacls._replace = lambda self, *args, **kwargs: dataclasses.replace(
-        self, *args, **kwargs
-    )
-    return datacls
 
 
 class ConfigurableParsingNamespace(object):
@@ -294,7 +295,7 @@ class BaseConfigurable(abc.ABC):
                 arg["nargs"] = "+"
             if "help" in field.metadata:
                 arg["help"] = field.metadata["help"]
-            cls.config_set(args, above, field.name, arg)
+            cls.config_set(args, above, *field.name.split("_"), arg)
         return args
 
     @classmethod
@@ -311,7 +312,7 @@ class BaseConfigurable(abc.ABC):
         kwargs: Dict[str, Any] = {}
         for field in dataclasses.fields(cls.CONFIG):
             kwargs[field.name] = got = cls.config_get(
-                config, above, field.name
+                config, above, *field.name.split("_")
             )
             if inspect.isclass(got) and issubclass(got, BaseConfigurable):
                 try:

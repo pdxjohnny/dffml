@@ -20,6 +20,7 @@ from .types import Operation, Input, Parameter, Stage, Definition
 from .log import LOGGER
 
 from ..base import (
+    config,
     BaseConfig,
     BaseDataFlowFacilitatorObjectContext,
     BaseDataFlowFacilitatorObject,
@@ -49,13 +50,7 @@ class BaseDataFlowObject(BaseDataFlowFacilitatorObject):
     argument to the child's __init__ (of type BaseDataFlowObjectContext).
     """
 
-    @classmethod
-    def args(cls, args, *above) -> Dict[str, Arg]:
-        return args
-
-    @classmethod
-    def config(cls, config, *above) -> BaseConfig:
-        return BaseConfig()
+    CONFIG = BaseConfig
 
 
 class OperationImplementationContext(BaseDataFlowObjectContext):
@@ -758,7 +753,8 @@ class BaseOperationImplementationNetwork(BaseDataFlowObject):
     """
 
 
-class BaseOrchestratorConfig(BaseConfig, NamedTuple):
+@config
+class BaseOrchestratorConfig:
     input_network: BaseInputNetwork
     operation_network: BaseOperationNetwork
     lock_network: BaseLockNetwork

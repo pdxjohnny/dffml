@@ -24,6 +24,7 @@ from typing import (
 from .exceptions import ContextNotPresent, DefinitionNotInContext
 from .types import Input, Parameter, Definition, Operation, Stage, DataFlow
 from .base import (
+    config,
     OperationImplementation,
     FailedToLoadOperationImplementation,
     BaseDataFlowObject,
@@ -1059,10 +1060,13 @@ class MemoryOperationImplementationNetwork(
         )
 
 
-class MemoryOrchestratorConfig(BaseOrchestratorConfig):
-    """
-    Same as base orchestrator config
-    """
+@config
+class MemoryOrchestratorConfig:
+    input_network: BaseInputNetwork = MemoryInputNetwork
+    operation_network: BaseOperationNetwork = MemoryOperationNetwork
+    opimp_network: BaseOperationImplementationNetwork = MemoryOperationImplementationNetwork
+    lock_network: BaseLockNetwork = MemoryLockNetwork
+    rchecker_network: BaseRedundancyChecker = MemoryRedundancyChecker
 
 
 class MemoryOrchestratorContextConfig(NamedTuple):
@@ -1098,7 +1102,7 @@ class MemoryOrchestratorContext(BaseOrchestratorContext):
         # created new contexts, then there would be no inputs in them, so that
         # would be pointless.
         enter = {
-            "rctx": self.parent.rchecker,
+            "rctx": self.parent.rchecker_network,
             "ictx": self.parent.input_network,
             "octx": self.parent.operation_network,
             "lctx": self.parent.lock_network,
@@ -1433,6 +1437,7 @@ class MemoryOrchestratorContext(BaseOrchestratorContext):
 class MemoryOrchestrator(BaseOrchestrator, BaseMemoryDataFlowObject):
 
     CONTEXT = MemoryOrchestratorContext
+    CONFIG = MemoryOrchestratorConfig
 
     def __init__(self, config: "BaseConfig") -> None:
         super().__init__(config)
@@ -1442,7 +1447,7 @@ class MemoryOrchestrator(BaseOrchestrator, BaseMemoryDataFlowObject):
         self._stack = await aenter_stack(
             self,
             {
-                "rchecker": self.config.rchecker,
+                "rchecker_network": self.config.rchecker_network,
                 "input_network": self.config.input_network,
                 "operation_network": self.config.operation_network,
                 "lock_network": self.config.lock_network,
@@ -1466,81 +1471,6 @@ class MemoryOrchestrator(BaseOrchestrator, BaseMemoryDataFlowObject):
         )
 
     @classmethod
-    def args(cls, args, *above) -> Dict[str, Arg]:
-        # Extending above is done right before loading args of subclasses
-        cls.config_set(
-            args,
-            above,
-            "input",
-            "network",
-            Arg(type=BaseInputNetwork.load, default=MemoryInputNetwork),
-        )
-        cls.config_set(
-            args,
-            above,
-            "operation",
-            "network",
-            Arg(
-                type=BaseOperationNetwork.load, default=MemoryOperationNetwork
-            ),
-        )
-        cls.config_set(
-            args,
-            above,
-            "opimp",
-            "network",
-            Arg(
-                type=BaseOperationImplementationNetwork.load,
-                default=MemoryOperationImplementationNetwork,
-            ),
-        )
-        cls.config_set(
-            args,
-            above,
-            "lock",
-            "network",
-            Arg(type=BaseLockNetwork.load, default=MemoryLockNetwork),
-        )
-        cls.config_set(
-            args,
-            above,
-            "rchecker",
-            Arg(
-                type=BaseRedundancyChecker.load,
-                default=MemoryRedundancyChecker,
-            ),
-        )
-        above = cls.add_orig_label(*above)
-        for sub in [
-            BaseInputNetwork,
-            BaseOperationNetwork,
-            BaseOperationImplementationNetwork,
-            BaseLockNetwork,
-            BaseRedundancyChecker,
-        ]:
-            for loaded in sub.load():
-                loaded.args(args, *above)
-        return args
-
-    @classmethod
-    def config(cls, config, *above):
-        input_network = cls.config_get(config, above, "input", "network")
-        operation_network = cls.config_get(
-            config, above, "operation", "network"
-        )
-        opimp_network = cls.config_get(config, above, "opimp", "network")
-        lock_network = cls.config_get(config, above, "lock", "network")
-        rchecker = cls.config_get(config, above, "rchecker")
-        above = cls.add_label(*above)
-        return MemoryOrchestratorConfig(
-            input_network=input_network.withconfig(config, *above),
-            operation_network=operation_network.withconfig(config, *above),
-            lock_network=lock_network.withconfig(config, *above),
-            opimp_network=opimp_network.withconfig(config, *above),
-            rchecker=rchecker.withconfig(config, *above),
-        )
-
-    @classmethod
     def basic_config(
         cls, *args: OperationImplementation, config: Dict[str, Any] = None
     ):
@@ -1559,7 +1489,7 @@ class MemoryOrchestrator(BaseOrchestrator, BaseMemoryDataFlowObject):
                     )
                 ),
                 lock_network=MemoryLockNetwork(BaseConfig()),
-                rchecker=MemoryRedundancyChecker(
+                rchecker_network=MemoryRedundancyChecker(
                     BaseRedundancyCheckerConfig(
                         key_value_store=MemoryKeyValueStore(BaseConfig())
                     )
