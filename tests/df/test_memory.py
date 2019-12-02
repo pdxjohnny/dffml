@@ -6,7 +6,7 @@ from dffml.util.data import traverse_config_set
 from dffml.util.cli.arg import Arg, parse_unknown
 from dffml.util.entrypoint import entry_point
 from dffml.df.base import BaseKeyValueStore, BaseRedundancyCheckerConfig
-from dffml.df.memory import MemoryKeyValueStore, MemoryRedundancyChecker
+from dffml.df.memory import MemoryKeyValueStore, MemoryRedundancyCheckerConfig, MemoryRedundancyChecker
 from dffml.util.asynctestcase import AsyncTestCase
 
 
@@ -41,8 +41,9 @@ def load_kvstore_with_args(loading=None):
 
 
 class TestMemoryRedundancyChecker(AsyncTestCase):
-    @patch.object(BaseKeyValueStore, "load", load_kvstore_with_args)
+    @patch.object(MemoryRedundancyCheckerConfig.kvstore, load_kvstore_with_args)
     def test_args(self):
+        self.maxDiff = 99999
         self.assertEqual(
             MemoryRedundancyChecker.args({}),
             {
@@ -86,9 +87,9 @@ class TestMemoryRedundancyChecker(AsyncTestCase):
                 "somefile",
             )
         )
-        self.assertEqual(type(was), BaseRedundancyCheckerConfig)
-        self.assertEqual(type(was.key_value_store), KeyValueStoreWithArguments)
+        self.assertEqual(type(was), MemoryRedundancyCheckerConfig)
+        self.assertEqual(type(was.kvstore), KeyValueStoreWithArguments)
         self.assertEqual(
-            type(was.key_value_store.config), KeyValueStoreWithArgumentsConfig
+            type(was.kvstore.config), KeyValueStoreWithArgumentsConfig
         )
-        self.assertEqual(was.key_value_store.config.filename, "somefile")
+        self.assertEqual(was.kvstore.config.filename, "somefile")

@@ -580,6 +580,10 @@ class MemoryOperationNetwork(BaseOperationNetwork, BaseMemoryDataFlowObject):
             operations=cls.config_get(config, above, "ops")
         )
 
+@config
+class MemoryRedundancyCheckerConfig:
+    kvstore: BaseKeyValueStore = MemoryKeyValueStore
+
 
 class MemoryRedundancyCheckerContext(BaseRedundancyCheckerContext):
     def __init__(
@@ -592,7 +596,7 @@ class MemoryRedundancyCheckerContext(BaseRedundancyCheckerContext):
         self.__stack = AsyncExitStack()
         await self.__stack.__aenter__()
         self.kvctx = await self.__stack.enter_async_context(
-            self.parent.key_value_store()
+            self.parent.kvstore()
         )
         return self
 
@@ -673,6 +677,7 @@ class MemoryRedundancyChecker(BaseRedundancyChecker, BaseMemoryDataFlowObject):
     """
 
     CONTEXT = MemoryRedundancyCheckerContext
+    CONFIG = MemoryRedundancyCheckerConfig
 
     def __init__(self, config):
         super().__init__(config)
@@ -685,8 +690,8 @@ class MemoryRedundancyChecker(BaseRedundancyChecker, BaseMemoryDataFlowObject):
         self.__exit_stack = ExitStack()
         self.__exit_stack.__enter__()
         await self.__stack.__aenter__()
-        self.key_value_store = await self.__stack.enter_async_context(
-            self.config.key_value_store
+        self.kvstore = await self.__stack.enter_async_context(
+            self.config.kvstore
         )
         self.loop = asyncio.get_event_loop()
         self.pool = self.__exit_stack.enter_context(
@@ -697,27 +702,6 @@ class MemoryRedundancyChecker(BaseRedundancyChecker, BaseMemoryDataFlowObject):
     async def __aexit__(self, exc_type, exc_value, traceback):
         self.__exit_stack.__exit__(exc_type, exc_value, traceback)
         await self.__stack.__aexit__(exc_type, exc_value, traceback)
-
-    @classmethod
-    def args(cls, args, *above) -> Dict[str, Arg]:
-        # Enable the user to specify a key value store
-        cls.config_set(
-            args,
-            above,
-            "kvstore",
-            Arg(type=BaseKeyValueStore.load, default=MemoryKeyValueStore),
-        )
-        # Load all the key value stores and add the arguments they might require
-        for loaded in BaseKeyValueStore.load():
-            loaded.args(args, *cls.add_orig_label(*above))
-        return args
-
-    @classmethod
-    def config(cls, config, *above):
-        kvstore = cls.config_get(config, above, "kvstore")
-        return BaseRedundancyCheckerConfig(
-            key_value_store=kvstore.withconfig(config, *cls.add_label(*above))
-        )
 
 
 class MemoryLockNetworkContext(BaseLockNetworkContext):
@@ -1490,8 +1474,8 @@ class MemoryOrchestrator(BaseOrchestrator, BaseMemoryDataFlowObject):
                 ),
                 lock_network=MemoryLockNetwork(BaseConfig()),
                 rchecker_network=MemoryRedundancyChecker(
-                    BaseRedundancyCheckerConfig(
-                        key_value_store=MemoryKeyValueStore(BaseConfig())
+                    MemoryRedundancyCheckerConfig(
+                        kvstore=MemoryKeyValueStore(BaseConfig())
                     )
                 ),
                 opimp_network=MemoryOperationImplementationNetwork(
