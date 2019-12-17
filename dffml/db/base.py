@@ -1,6 +1,6 @@
 import abc
-from dffml.df.base import (BaseDataFlowObject,BaseDataFlowObjectContext)
-from typing import Any,List,Callable,Optional
+from dffml.df.base import BaseDataFlowObject,BaseDataFlowObjectContext
+from typing import Any,List,Callable,Optional,Dict
 
 class BaseDatabaseContext(BaseDataFlowObjectContext):
 
@@ -16,7 +16,7 @@ class BaseDatabaseContext(BaseDataFlowObjectContext):
         inserts values to corresponding
             cols (according to position) to the table `table_name`
         """
-        
+
     @abc.abstractmethod
     async def update(self,table_name:str,data:Dict[str,Any],
             condition:Optional[Callable[...,bool]])->None:
@@ -34,3 +34,5 @@ class BaseDatabaseContext(BaseDataFlowObjectContext):
 
 #TODO add entrypoint here
 class BaseDatabase(BaseDataFlowObject):
+    """
+    """
