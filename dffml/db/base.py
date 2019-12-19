@@ -1,43 +1,65 @@
 import abc
 from dffml.df.base import BaseDataFlowObject,BaseDataFlowObjectContext
-from typing import Any,List,Callable,Optional,Dict
-
-
+from typing import Any,List,Callable,Optional,Dict,Tuple
+from collections import namedtuple
 import abc
 import inspect
 import types
 
-def sanitize_non_bindable(*to_scrub):
-    
-    def scrub(obj):
-        if(isinstance(obj,str)):
-            return '_'.join(obj.split(" "))
-        if(isinstance(obj,Dict)):
-            nobj={ scrub(k):v for k,v in obj.items() }
-            return nobj
-        
-    def sanitize(func):
-        sig=inspect.signature(func)
-        def wrappper(*args,**kwargs):
-            bounded = sig.bind(*args,*kwargs)
-            for arg in to_scrub:
-                if arg in bounded.arguments:
-                    bounded.arguments[arg]=scrub(bounded.arguments[arg])
-            return func(*bounded.args , **bounded.kwargs)
-        return wrappper
-    return sanitize
-
+Condition=namedtuple('Condtion',['column','operation','value'])
 
 class DatabaseContextMeta(type):
-    def __init__(cls,name,bases,clsdict):
-        to_scrub=["cols","table_name","data"]
-        for f in clsdict:
-            if (not f.startswith("__")) and ( type(getattr(cls,f)) == types.FunctionType):
-                setattr(cls,f,sanitize_non_bindable(*to_scrub)(getattr(cls,f)))
+
+    def __new__(cls,name,base,clsdict):
+        temp_cls=type.__new__(cls,name,base,clsdict)
+        new_dict={}
+        avoid = ["sanitize","scrub","sanitize_non_bindable"]
+        for fname,fval in clsdict.items():
+            if ( (not fname.startswith("__") )
+                and ( not fname in avoid )
+                and ( type(fval) == types.FunctionType )
+             ) :
+                    new_dict[fname]=temp_cls.sanitize(fval)
+            else:
+                new_dict[fname]=fval
+                    
+
+        new_cls=type.__new__(cls,name,base,new_dict)
+        return new_cls
 
 
 
 class BaseDatabaseContext(BaseDataFlowObjectContext,metaclass=DatabaseContextMeta):
+
+    @classmethod
+    def sanitize_non_bindable(self,val):
+        return '_'.join(val.split(" "))
+    
+    @classmethod    
+    def sanitize(self,func):
+        sig=inspect.signature(func)
+
+        def scrub(obj):
+            if(isinstance(obj,str)):
+                return self.sanitize_non_bindable(obj)
+            if(isinstance(obj,Dict)):
+                nobj={ self.sanitize_non_bindable(k):v for k,v in obj.items() }
+                return nobj
+            if(isinstance(obj,List)):
+                nobj= list(map(scrub,obj))
+                return nobj
+            if(isinstance(obj,Condition)):
+                column,*others = obj 
+                nobj = Condition._make( [scrub(column),*others])
+                return nobj
+
+        def wrappper(*args,**kwargs):
+            bounded = sig.bind(*args,*kwargs)
+            for arg in bounded.arguments:
+                bounded.arguments[arg]=scrub(bounded.arguments[arg])
+            return func(*bounded.args , **bounded.kwargs)
+        return wrappper
+    
 
     @abc.abstractmethod
     async def create_table(self,table_name : str,cols:Dict[str,str])->None:
