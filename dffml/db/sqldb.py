@@ -2,17 +2,16 @@ import asyncio
 import sqlite3
 import abc
 import operator 
-from functools import reduce
-from dffml.db.base import BaseDatabaseContext,BaseDatabaseObject,Condition
+
+
+from dffml.db.base import BaseDatabaseContext,BaseDatabaseObject,Condition,Conditions
 from dffml.base import config
 from dffml.df.base import BaseConfig,BaseDataFlowObject
-from typing import Dict,Any,List,Union,Tuple
 from dffml.util.entrypoint import entry_point, EntrypointNotFound
 
-Conditions = Union [
-                    List[ List[ Condition] ],
-                    List[ List[ Tuple[str] ] ],
-                 ]
+from typing import Dict,Any,List,Union,Tuple
+
+
 
 @config
 class SqlDatabaseContextConfig:
@@ -38,7 +37,7 @@ class SqlDatabaseContext(BaseDatabaseContext):
                     + ','.join([ f"{k} {v}" for k,v in cols.items()])  
                     + ")"
                 )
-                
+
         self.cursor.execute(query)
         
 
