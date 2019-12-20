@@ -37,7 +37,6 @@ class SqlDatabaseContext(BaseDatabaseContext):
                     + ','.join([ f"{k} {v}" for k,v in cols.items()])  
                     + ")"
                 )
-        print(f"query is:{query}\n")
         print(f"Self : {self}")
         self.cursor.execute(query)
         
@@ -50,7 +49,6 @@ class SqlDatabaseContext(BaseDatabaseContext):
         query=f"INSERT INTO {table_name} "
         
         if(isinstance(data,List)):
-            print("Its list")
             query+= f"VALUES ({ ', '.join('?' * len(data)) })"
             async with self.lock:
                 with self.db:
@@ -114,7 +112,6 @@ class SqlDatabaseContext(BaseDatabaseContext):
         query =( f"DELETE FROM {table_name} " 
                 + (f" WHERE {condition_exp}" if condition_exp is not None else "")
             )
-        print(query)
         async with self.lock:
             with self.db:    
                 self.cursor.execute(query)

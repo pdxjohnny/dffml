@@ -31,7 +31,7 @@ class DatabaseContextMeta(type):
 
 
 #todo add metaclass
-class BaseDatabaseContext(BaseDataFlowObjectContext,metaclass=DatabaseContextMeta):
+class BaseDatabaseContext(BaseDataFlowObjectContext):
 
     @classmethod
     def sanitize_non_bindable(self,val):
