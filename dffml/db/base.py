@@ -2,6 +2,7 @@ import abc
 from dffml.df.base import BaseDataFlowObject,BaseDataFlowObjectContext
 from typing import Any,List,Callable,Optional,Dict,Tuple
 from collections import namedtuple
+from dffml.util.entrypoint import base_entry_point
 import abc
 import inspect
 import types
@@ -11,7 +12,7 @@ Condition=namedtuple('Condtion',['column','operation','value'])
 class DatabaseContextMeta(type):
 
     def __new__(cls,name,base,clsdict):
-        temp_cls=type.__new__(cls,name,base,clsdict)
+        temp_cls=super().__new__(cls,name,base,clsdict)
         new_dict={}
         avoid = ["sanitize","scrub","sanitize_non_bindable"]
         for fname,fval in clsdict.items():
@@ -24,11 +25,12 @@ class DatabaseContextMeta(type):
                 new_dict[fname]=fval
                     
 
-        new_cls=type.__new__(cls,name,base,new_dict)
+        new_cls=super().__new__(cls,name,base,new_dict)
+        print(f"\n\nReturning newcls={new_cls}\n\n")
         return new_cls
 
 
-
+#todo add metaclass
 class BaseDatabaseContext(BaseDataFlowObjectContext,metaclass=DatabaseContextMeta):
 
     @classmethod
@@ -61,6 +63,33 @@ class BaseDatabaseContext(BaseDataFlowObjectContext,metaclass=DatabaseContextMet
         return wrappper
     
 
+    def make_conditions(self,lst):
+        res = [ list(map(Condition._make,cnd)) for cnd in lst ]
+        return res
+
+    def _make_condition_expression(self,conditions):
+        def make_or(lst):
+            exp = [ f"({cnd.column} {cnd.operation} '{cnd.value}')"
+                    for cnd in lst
+                    ]
+            return " OR ".join(exp)
+        def make_and(lst):
+            lst = [ f"({x})" for x in lst  ]
+            return " AND ".join(lst)
+
+        lst = (map(make_or,conditions))
+        lst = make_and(lst)
+        return lst
+    
+    def make_condition_expression(self,conditions):
+        condition_exp = None
+        if (not conditions==None) and (len(conditions)!=0) :
+            if not (isinstance(conditions[0][0] ,Condition)):
+                conditions=self.make_conditions(conditions)
+            condition_exp = self._make_condition_expression(conditions)
+        return condition_exp
+
+
     @abc.abstractmethod
     async def create_table(self,table_name : str,cols:Dict[str,str])->None:
         """
@@ -89,7 +118,7 @@ class BaseDatabaseContext(BaseDataFlowObjectContext,metaclass=DatabaseContextMet
         returns list of rows (satisfying `condition` if provided) from `table_name` 
         """             
 
-#TODO add entrypoint here
+@base_entry_point("dffml.db","db")
 class BaseDatabaseObject(BaseDataFlowObject):
     """
     """
