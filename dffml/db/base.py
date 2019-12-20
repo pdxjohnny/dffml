@@ -6,32 +6,26 @@ from dffml.util.entrypoint import base_entry_point
 import abc
 import inspect
 import types
+from functools import wraps
 
 Condition=namedtuple('Condtion',['column','operation','value'])
 
-class DatabaseContextMeta(type):
 
-    def __new__(cls,name,base,clsdict):
-        temp_cls=super().__new__(cls,name,base,clsdict)
-        new_dict={}
-        avoid = ["sanitize","scrub","sanitize_non_bindable"]
-        for fname,fval in clsdict.items():
-            if ( (not fname.startswith("__") )
-                and ( not fname in avoid )
-                and ( type(fval) == types.FunctionType )
-             ) :
-                    new_dict[fname]=temp_cls.sanitize(fval)
-            else:
-                new_dict[fname]=fval
-                    
+class DatabaseContextConstraint:
 
-        new_cls=super().__new__(cls,name,base,new_dict)
-        print(f"\n\nReturning newcls={new_cls}\n\n")
-        return new_cls
+    def __init_subclass__(cls,**kwargs):
+        super().__init_subclass__(**kwargs)
+        for attr in vars(cls).keys():
+            if (
+                (not attr.startswith("__"))
+                and not attr.startswith("sanitize")
+            ):
+                setattr(cls,attr,cls.sanitize(getattr(cls,attr)))
+    
+    
 
 
-#todo add metaclass
-class BaseDatabaseContext(BaseDataFlowObjectContext):
+class BaseDatabaseContext(BaseDataFlowObjectContext,DatabaseContextConstraint):
 
     @classmethod
     def sanitize_non_bindable(self,val):
@@ -40,7 +34,6 @@ class BaseDatabaseContext(BaseDataFlowObjectContext):
     @classmethod    
     def sanitize(self,func):
         sig=inspect.signature(func)
-
         def scrub(obj):
             if(isinstance(obj,str)):
                 return self.sanitize_non_bindable(obj)
@@ -55,9 +48,12 @@ class BaseDatabaseContext(BaseDataFlowObjectContext):
                 nobj = Condition._make( [scrub(column),*others])
                 return nobj
 
+        @wraps(func)
         def wrappper(*args,**kwargs):
             bounded = sig.bind(*args,*kwargs)
             for arg in bounded.arguments:
+                if (arg=='self' or arg=='cls'):
+                    continue    
                 bounded.arguments[arg]=scrub(bounded.arguments[arg])
             return func(*bounded.args , **bounded.kwargs)
         return wrappper

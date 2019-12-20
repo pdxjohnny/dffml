@@ -24,7 +24,8 @@ class SqlDatabaseContext(BaseDatabaseContext):
         self.db = sqlite3.connect(self.config.filename)
         self.cursor=self.db.cursor()
         self.lock=asyncio.Lock()
-        print(f"init sqldbctx  self = {self}\n")
+        
+        
 
     
     async def create_table(self,table_name:str ,cols:Dict[str,str])->None:
@@ -37,7 +38,7 @@ class SqlDatabaseContext(BaseDatabaseContext):
                     + ','.join([ f"{k} {v}" for k,v in cols.items()])  
                     + ")"
                 )
-        print(f"Self : {self}")
+                
         self.cursor.execute(query)
         
 

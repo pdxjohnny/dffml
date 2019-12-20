@@ -5,7 +5,7 @@ from dffml.df.base import BaseConfig
 class TestSqlDatabase(AsyncTestCase):
     def setUp(self):
         self.sdb = SqlDatabase(BaseConfig())
-        self.table_name="mytable"
+        self.table_name="my table"
         self.cols = {"name":"text","age":"numbers"}
         self.cfg = SqlDatabaseContextConfig(filename="_test_database")
 
@@ -24,4 +24,5 @@ class TestSqlDatabase(AsyncTestCase):
                 await ctx.insert(self.table_name,data_dict)
                 await ctx.insert(self.table_name,data_list)
                 results = await ctx.lookup(self.table_name,[],[])
+                await(ctx.remove(self.table_name,[]))
                 print(results)
