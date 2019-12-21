@@ -21,11 +21,14 @@ class DatabaseContextConstraint(abc.ABC):
     def __init_subclass__(cls,**kwargs):
         super().__init_subclass__(**kwargs)
         for attr in vars(cls).keys():
+            func = getattr(cls,attr)
             if (
                 (not attr.startswith("__"))
-                and not attr.startswith("sanitize")
+                and inspect.isfunction(func)
+                and not ( inspect.ismethod(func) and func.__self__ is cls  ) #checks if `@classmethod`
+
             ):
-                setattr(cls,attr,cls.sanitize(getattr(cls,attr)))
+                setattr(cls,attr,cls.sanitize(func))
     
     
 
@@ -63,31 +66,33 @@ class BaseDatabaseContext(BaseDataFlowObjectContext,DatabaseContextConstraint):
             return func(*bounded.args , **bounded.kwargs)
         return wrappper
     
-
+    @classmethod
     def make_conditions(self,lst):
         res = [ list(map(Condition._make,cnd)) for cnd in lst ]
         return res
 
-    def _make_condition_expression(self,conditions):
-        def make_or(lst):
-            exp = [ f"({cnd.column} {cnd.operation} '{cnd.value}')"
-                    for cnd in lst
-                    ]
-            return " OR ".join(exp)
-        def make_and(lst):
-            lst = [ f"({x})" for x in lst  ]
-            return " AND ".join(lst)
-
-        lst = (map(make_or,conditions))
-        lst = make_and(lst)
-        return lst
     
+    @classmethod
     def make_condition_expression(self,conditions):
+        def _make_condition_expression(conditions):
+            def make_or(lst):
+                exp = [ f"({cnd.column} {cnd.operation} '{cnd.value}')"
+                        for cnd in lst
+                        ]
+                return " OR ".join(exp)
+            def make_and(lst):
+                lst = [ f"({x})" for x in lst  ]
+                return " AND ".join(lst)
+
+            lst = (map(make_or,conditions))
+            lst = make_and(lst)
+            return lst
+
         condition_exp = None
         if (not conditions==None) and (len(conditions)!=0) :
             if not (isinstance(conditions[0][0] ,Condition)):
                 conditions=self.make_conditions(conditions)
-            condition_exp = self._make_condition_expression(conditions)
+            condition_exp = _make_condition_expression(conditions)
         return condition_exp
 
 
