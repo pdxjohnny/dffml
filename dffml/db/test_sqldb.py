@@ -22,7 +22,7 @@ class TestSqlDatabase(AsyncTestCase):
         os.remove(cls.database_name)
 
 
-    async def test_create_table(self):
+    async def test_0_create_table(self):
         async with  self.sdb as sdb:
             async with sdb(self.cfg) as db:
                 await db.create_table(self.table_name,self.cols)
@@ -34,17 +34,17 @@ class TestSqlDatabase(AsyncTestCase):
                 self.assertEqual(results[0],1)
 
     
-    async def test_set_get(self):
+    async def test_1_set_get(self):
 
         data_dicts=[
                 {
                 "first name":"John",
                 "last name":"Doe",
-                "age":32
+                "age":16
                 },
                 {
                 "first name":"John",
-                "last name":"Miller",
+                "last name":"Miles",
                 "age":37
                 },
                 {
@@ -64,5 +64,48 @@ class TestSqlDatabase(AsyncTestCase):
 
                 results = await db.lookup(self.table_name,[],[])
                 self.assertCountEqual(results,expected)
+    
+    async def test_2_update(self):
+        data = {"age":35 }
+        conditions= [ 
+                [ 
+                    ["first name", "=" ,"John"],
+                    ["last name","=","Miles"]
+                ],  
+                [
+                    ["age","<","38"]
+                ]
+            ]
+        
+        query_condition = [
+                    [    
+                        ["first name","=","John"]
+                    ]
+                ]
+        
+        
+        async with  self.sdb as sdb:
+            async with sdb(self.cfg) as db:
+                await db.update(self.table_name,data,conditions)
+                results = await db.lookup(self.table_name,["age"],query_condition)
+                
+                self.assertEqual(results,
+                            [(35,),(35,)]
+                        )
+
+    async def test_3_remove(self):
+        condition = [
+                    [    
+                        ["first name","=","John"]
+                    ]
+                ]
+        async with  self.sdb as sdb:
+            async with sdb(self.cfg) as db:
+                await db.remove(self.table_name,condition)
+                results = await db.lookup(self.table_name,["first name"],[])
+                self.assertEqual(results,
+                                [('Richard',)]
+                                )
+
                 
             

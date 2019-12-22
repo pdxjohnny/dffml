@@ -55,7 +55,7 @@ class SqlDatabaseContext(BaseDatabaseContext):
                 self.cursor.execute(query, 
                                     list( data.values() )
                                     )
-                return
+                
 
     
     async def update(self,table_name:str,data:Dict[str,Any],
