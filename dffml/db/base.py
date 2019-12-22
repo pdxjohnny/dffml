@@ -55,6 +55,8 @@ class BaseDatabaseContext(BaseDataFlowObjectContext,DatabaseContextConstraint):
                 column,*others = obj 
                 nobj = Condition._make( [scrub(column),*others])
                 return nobj
+            else:
+                return obj
 
         @wraps(func)
         def wrappper(*args,**kwargs):
@@ -103,14 +105,14 @@ class BaseDatabaseContext(BaseDataFlowObjectContext,DatabaseContextConstraint):
         """
     
     @abc.abstractmethod
-    async def insert(self,table_name:str,data:Dict[str,str]) -> None:
+    async def insert(self,table_name:str,data:Dict[str,Any]) -> None:
         """
         inserts values to corresponding
             cols (according to position) to the table `table_name`
         """
 
     @abc.abstractmethod
-    async def update(self,table_name:str,data:Dict[str,str],
+    async def update(self,table_name:str,data:Dict[str,Any],
             conditions:Conditions) -> None:
             """
             updates values of rows (satisfying `condition` if provided) with 

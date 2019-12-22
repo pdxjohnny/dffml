@@ -41,22 +41,14 @@ class SqlDatabaseContext(BaseDatabaseContext):
         self.cursor.execute(query)
         
 
-    async def insert(self,table_name:str,data:Dict[str,str]) -> None:
+    async def insert(self,table_name:str,data:Dict[str,Any]) -> None:
         """
         inserts values to corresponding
             cols (according to position) to the table `table_name`
         """
-        query=f"INSERT INTO {table_name} "
-        
-        if(isinstance(data,List)):
-            query+= f"VALUES ({ ', '.join('?' * len(data)) })"
-            async with self.lock:
-                with self.db:
-                    self.cursor.execute(query,data)
-                    return
-
-        if(isinstance(data,Dict)):
-            query+= f"( {','.join(data)} ) VALUES( {', '.join('?' * len(data))} ) "  
+        query= (f"INSERT INTO {table_name} "
+              + f"( {','.join(data)} ) VALUES( {', '.join('?' * len(data))} ) "
+            )  
        
         async with self.lock:
             with self.db:
@@ -66,7 +58,7 @@ class SqlDatabaseContext(BaseDatabaseContext):
                 return
 
     
-    async def update(self,table_name:str,data:Dict[str,str],
+    async def update(self,table_name:str,data:Dict[str,Any],
             conditions:Conditions) -> None:
         """
         updates values of rows (satisfying `condition` if provided) with 

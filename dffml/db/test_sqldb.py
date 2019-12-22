@@ -1,14 +1,26 @@
+import os
+
+from dffml.df.base import BaseConfig
 from dffml.util.asynctestcase import AsyncTestCase
 from dffml.db.sqldb import SqlDatabase,SqlDatabaseContextConfig
-from dffml.df.base import BaseConfig
 
 class TestSqlDatabase(AsyncTestCase):
-    def setUp(self):
-        self.sdb = SqlDatabase(BaseConfig())
-        self.table_name="my table"
-        self.cols = {"name":"text","age":"numbers"}
-        self.cfg = SqlDatabaseContextConfig(filename="_test_database")
-        
+
+    @classmethod
+    def setUp(cls):
+        cls.sdb = SqlDatabase(BaseConfig())
+        cls.database_name = "_test_database.db"
+        cls.cfg = SqlDatabaseContextConfig(filename=cls.database_name)
+
+        cls.table_name="my table"
+        cls.cols = {"first name":"text",
+                    "last name":"text",
+                    "age":"numbers"}
+    
+    @classmethod
+    def tearDownClass(cls):
+        os.remove(cls.database_name)
+
 
     async def test_create_table(self):
         async with  self.sdb as sdb:
@@ -24,13 +36,33 @@ class TestSqlDatabase(AsyncTestCase):
     
     async def test_set_get(self):
 
-        data_dict={"name":"Tony","age":"12"}
-        data_list=["Stark","32"]
-    
+        data_dicts=[
+                {
+                "first name":"John",
+                "last name":"Doe",
+                "age":32
+                },
+                {
+                "first name":"John",
+                "last name":"Miller",
+                "age":37
+                },
+                {
+                "first name":"Richard",
+                "last name":"Miles",
+                "age":40   
+                }   
+            ]
+
+        expected = [ tuple(d.values()) for d in data_dicts ]
+       
+
         async with  self.sdb as sdb:
-            async with sdb(self.cfg) as ctx:
-                await ctx.insert(self.table_name,data_dict)
-                await ctx.insert(self.table_name,data_list)
-                results = await ctx.lookup(self.table_name,[],[])
-                await(ctx.remove(self.table_name,[]))
-                print(results)
+            async with sdb(self.cfg) as db:
+                for data_dict in data_dicts:
+                    await db.insert(self.table_name,data_dict)
+
+                results = await db.lookup(self.table_name,[],[])
+                self.assertCountEqual(results,expected)
+                
+            
