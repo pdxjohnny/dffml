@@ -8,10 +8,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 - Correctly identify when functions decorated with `op` use `self` to reference
   the `OperationImplementationContext`.
+- Negative values are correctly parsed when input via the command line.
+- Do not lowercase development mode install location when reporting version.
 
 ## [0.3.1] - 2019-12-12
 ### Added
 - Integration tests using the command line interface.
+- `Operation` `run_dataflow` to run a dataflow and test for the same.
 ### Changed
 - Features were moved from ModelContext to ModelConfig
 - CI is now run via GitHub Actions

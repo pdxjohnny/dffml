@@ -182,7 +182,6 @@ class TestMemoryOperationImplementationNetwork(AsyncTestCase):
 class TestOrchestrator(AsyncTestCase):
     async def test_run(self):
         calc_strings_check = {"add 40 and 2": 42, "multiply 42 and 10": 420}
-        dataflow = DATAFLOW
         # TODO(p0) Implement and test asyncgenerator
         callstyles_no_expand = ["asyncgenerator", "dict"]
         callstyles = {
@@ -230,7 +229,7 @@ class TestOrchestrator(AsyncTestCase):
             ],
         }
         async with MemoryOrchestrator.withconfig({}) as orchestrator:
-            async with orchestrator(dataflow) as octx:
+            async with orchestrator(DATAFLOW) as octx:
                 for callstyle, inputs in callstyles.items():
                     with self.subTest(callstyle=callstyle):
                         if callstyle in callstyles_no_expand:
