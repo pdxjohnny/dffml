@@ -114,6 +114,7 @@ async def parse_line(line: str):
 
 OPIMPS = opimp_in(sys.modules[__name__])
 OPERATIONS = operation_in(sys.modules[__name__])
+DATAFLOW = DataFlow.auto(*OPIMPS)
 
 
 class TestMemoryKeyValueStore(AsyncTestCase):
@@ -181,7 +182,7 @@ class TestMemoryOperationImplementationNetwork(AsyncTestCase):
 class TestOrchestrator(AsyncTestCase):
     async def test_run(self):
         calc_strings_check = {"add 40 and 2": 42, "multiply 42 and 10": 420}
-        dataflow = DataFlow.auto(*OPIMPS)
+        dataflow = DATAFLOW
         # TODO(p0) Implement and test asyncgenerator
         callstyles_no_expand = ["asyncgenerator", "dict"]
         callstyles = {

@@ -37,6 +37,8 @@ class BaseDatabaseContext(BaseDataFlowObjectContext,DatabaseContextConstraint):
 
     @classmethod
     def sanitize_non_bindable(self,val):
+
+        val = '_'.join(val.split(" "))
         return '_'.join(val.split(" "))
     
     @classmethod    
@@ -134,3 +136,5 @@ class BaseDatabaseContext(BaseDataFlowObjectContext,DatabaseContextConstraint):
 class BaseDatabaseObject(BaseDataFlowObject):
     """
     """
+    def __call__(self) -> BaseDatabaseContext:
+        return self.CONTEXT(self)
