@@ -77,7 +77,7 @@ setup(
             "dffml.mapping.create = dffml.operation.mapping:create_mapping",
         ],
         "dffml.kvstore": ["memory = dffml.df.memory:MemoryKeyValueStore"],
-        "dffml.db": ["sqldb = dffml.db.sqldb:SqlDatabase"],
+        "dffml.db": ["sqlitedb = dffml.db.sqlitedb:SqliteDatabase"],
         "dffml.input.network": ["memory = dffml.df.memory:MemoryInputNetwork"],
         "dffml.operation.network": [
             "memory = dffml.df.memory:MemoryOperationNetwork"

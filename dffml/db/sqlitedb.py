@@ -110,7 +110,7 @@ class SqliteDatabaseContext(BaseDatabaseContext):
 
     
 
-@entry_point("sqldb")
+@entry_point("sqlitedb")
 class SqliteDatabase(BaseDatabaseObject):
     CONTEXT = SqliteDatabaseContext
     CONFIG = SqliteDatabaseConfig
