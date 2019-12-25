@@ -43,10 +43,11 @@ class SqliteDatabaseContext(BaseDatabaseContext):
         inserts values to corresponding
             cols (according to position) to the table `table_name`
         """
+        col_exp = ', '.join([f"'{col}'" for col in data])
         query= (f"INSERT INTO {table_name} "
-              + f"( {','.join(data)} ) VALUES( {', '.join('?' * len(data))} ) "
+              + f"( { col_exp } )" 
+              + f" VALUES( {', '.join('?' * len(data))} ) "
             )  
-       
         async with self.parent.lock:
             with self.parent.db:
                 self.parent.cursor.execute(query, 
@@ -64,7 +65,7 @@ class SqliteDatabaseContext(BaseDatabaseContext):
         condition_exp = self.make_condition_expression(conditions)
 
         query = (f"UPDATE {table_name} SET " 
-                + ' '.join([f"{col} = ?" for col in data])
+                + ' '.join([f"'{col}' = ?" for col in data])
                 + (f" WHERE {condition_exp}" if condition_exp is not None else "")
             )
        
@@ -83,12 +84,12 @@ class SqliteDatabaseContext(BaseDatabaseContext):
         if len(cols)==0:
             col_exp = '*'
         else:
-            col_exp = ', '.join(cols)
+            col_exp = ', '.join([f"{col}" for col in cols])
         
         query = ( f"SELECT {col_exp} FROM {table_name} " 
                 + (f" WHERE {condition_exp}" if condition_exp is not None else "")
             )
-        
+
         async with self.parent.lock:
             with self.parent.db:    
                 self.parent.cursor.execute(query)

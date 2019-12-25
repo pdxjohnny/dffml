@@ -15,9 +15,12 @@ class TestSqlDatabase(AsyncTestCase):
                         )
                     )
         cls.table_name="my table"
-        cls.cols = {"first name":"text",
+        cls.cols = {
+                    "key":"real",
+                    "first name":"text",
                     "last name":"text",
-                    "age":"numbers"}
+                    "age":"real"
+                    }
     
     @classmethod
     def tearDownClass(cls):
@@ -39,16 +42,19 @@ class TestSqlDatabase(AsyncTestCase):
 
         data_dicts=[
                 {
+                "key" : 10,
                 "first name":"John",
                 "last name":"Doe",
                 "age":16
                 },
                 {
+                "key" : 11,
                 "first name":"John",
                 "last name":"Miles",
                 "age":37
                 },
                 {
+                "key" : 12,
                 "first name":"Richard",
                 "last name":"Miles",
                 "age":40   
