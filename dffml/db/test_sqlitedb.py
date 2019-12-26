@@ -14,11 +14,11 @@ class TestSqlDatabase(AsyncTestCase):
                         filename=cls.database_name
                         )
                     )
-        cls.table_name="my table"
+        cls.table_name="myTable"
         cls.cols = {
                     "key":"real",
-                    "first name":"text",
-                    "last name":"text",
+                    "firstName":"text",
+                    "lastName":"text",
                     "age":"real"
                     }
     
@@ -26,12 +26,11 @@ class TestSqlDatabase(AsyncTestCase):
     def tearDownClass(cls):
         os.remove(cls.database_name)
 
-
     async def test_0_create_table(self):
         async with  self.sdb() as db_ctx:
             await db_ctx.create_table(self.table_name,self.cols)
             query = ("SELECT count(name) FROM sqlite_master "
-                    + " WHERE type='table' and name='my_table' "
+                    + " WHERE type='table' and name='myTable' "
                     )
             db_ctx.parent.cursor.execute(query)
             results=db_ctx.parent.cursor.fetchone()
@@ -43,20 +42,20 @@ class TestSqlDatabase(AsyncTestCase):
         data_dicts=[
                 {
                 "key" : 10,
-                "first name":"John",
-                "last name":"Doe",
+                "firstName":"John",
+                "lastName":"Doe",
                 "age":16
                 },
                 {
                 "key" : 11,
-                "first name":"John",
-                "last name":"Miles",
+                "firstName":"John",
+                "lastName":"Miles",
                 "age":37
                 },
                 {
                 "key" : 12,
-                "first name":"Richard",
-                "last name":"Miles",
+                "firstName":"Richard",
+                "lastName":"Miles",
                 "age":40   
                 }   
             ]
@@ -75,8 +74,8 @@ class TestSqlDatabase(AsyncTestCase):
         data = {"age":35 }
         conditions= [ 
                 [ 
-                    ["first name", "=" ,"John"],
-                    ["last name","=","Miles"]
+                    ["firstName", "=" ,"John"],
+                    ["lastName","=","Miles"]
                 ],  
                 [
                     ["age","<","38"]
@@ -85,7 +84,7 @@ class TestSqlDatabase(AsyncTestCase):
         
         query_condition = [
                     [    
-                        ["first name","=","John"]
+                        ["firstName","=","John"]
                     ]
                 ]
         
@@ -101,12 +100,12 @@ class TestSqlDatabase(AsyncTestCase):
     async def test_3_remove(self):
         condition = [
                     [    
-                        ["first name","=","John"]
+                        ["firstName","=","John"]
                     ]
                 ]
         async with  self.sdb() as db_ctx:
             await db_ctx.remove(self.table_name,condition)
-            results = await db_ctx.lookup(self.table_name,["first name"],[])
+            results = await db_ctx.lookup(self.table_name,["firstName"],[])
             self.assertEqual(results,
                             [('Richard',)]
                             )

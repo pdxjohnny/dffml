@@ -17,6 +17,7 @@ Conditions = Union [
                     List[ List[ Tuple[str] ] ],
                  ]
 
+
 class DatabaseContextConstraint(abc.ABC):
     def __init_subclass__(cls,**kwargs):
         super().__init_subclass__(**kwargs)
@@ -30,16 +31,15 @@ class DatabaseContextConstraint(abc.ABC):
             ):
                 setattr(cls,attr,cls.sanitize(func))
     
-    
-
 
 class BaseDatabaseContext(BaseDataFlowObjectContext,DatabaseContextConstraint):
 
     @classmethod
     def sanitize_non_bindable(self,val):
-
-        val = '_'.join(val.split(" "))
-        return '_'.join(val.split(" "))
+        if val.isalnum():
+            return val
+        raise ValueError(
+            f"`{val}` : Only alphanumeric [a-zA-Z0-9] characters are allowed as table,column names")
     
     @classmethod    
     def sanitize(self,func):
@@ -65,13 +65,17 @@ class BaseDatabaseContext(BaseDataFlowObjectContext,DatabaseContextConstraint):
             bounded = sig.bind(*args,*kwargs)
             for arg in bounded.arguments:
                 if (arg=='self' or arg=='cls'):
-                    continue    
+                    continue
+                if arg == 'conditions' :
+                    bounded.arguments[arg] = self.make_conditions(bounded.arguments[arg])  
                 bounded.arguments[arg]=scrub(bounded.arguments[arg])
             return func(*bounded.args , **bounded.kwargs)
         return wrappper
     
     @classmethod
     def make_conditions(self,lst):
+        if ( (not lst) or isinstance(lst[0][0] ,Condition)):
+            return lst
         res = [ list(map(Condition._make,cnd)) for cnd in lst ]
         return res
 
@@ -94,8 +98,6 @@ class BaseDatabaseContext(BaseDataFlowObjectContext,DatabaseContextConstraint):
 
         condition_exp = None
         if (not conditions==None) and (len(conditions)!=0) :
-            if not (isinstance(conditions[0][0] ,Condition)):
-                conditions=self.make_conditions(conditions)
             condition_exp = _make_condition_expression(conditions)
         return condition_exp
 
