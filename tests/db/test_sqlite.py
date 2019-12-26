@@ -3,7 +3,7 @@ import tempfile
 
 from dffml.df.base import BaseConfig
 from dffml.util.asynctestcase import AsyncTestCase
-from dffml.db.sqlitedb import SqliteDatabase, SqliteDatabaseConfig
+from dffml.db.sqlite import SqliteDatabase, SqliteDatabaseConfig
 
 
 class TestSqlDatabase(AsyncTestCase):
