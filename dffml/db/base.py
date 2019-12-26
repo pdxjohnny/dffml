@@ -35,6 +35,10 @@ class DatabaseContextConstraint(abc.ABC):
 class BaseDatabaseContext(
     BaseDataFlowObjectContext, DatabaseContextConstraint
 ):
+    """
+    Base context class for database interaction
+    """
+
     @classmethod
     def sanitize_non_bindable(self, val):
         if val.isalnum():
@@ -121,8 +125,8 @@ class BaseDatabaseContext(
     @abc.abstractmethod
     async def insert(self, table_name: str, data: Dict[str, Any]) -> None:
         """
-        inserts values to corresponding
-            cols (according to position) to the table `table_name`
+        Inserts values to corresponding cols (according to position) to the
+        table `table_name`
         """
 
     @abc.abstractmethod
@@ -130,27 +134,30 @@ class BaseDatabaseContext(
         self, table_name: str, data: Dict[str, Any], conditions: Conditions
     ) -> None:
         """
-            updates values of rows (satisfying `condition` if provided) with 
-            `data` in `table_name`
-            """
+        Updates values of rows (satisfying `conditions` if provided) with `data`
+        in `table_name`
+        """
 
     @abc.abstractmethod
     async def lookup(
         self, table_name: str, cols: List[str], conditions: Conditions
     ):
         """
-        returns list of rows (satisfying `condition` if provided) from `table_name` 
+        Returns list of rows (satisfying `conditions` if provided) from
+        `table_name`
         """
 
     @abc.abstractmethod
     async def remove(self, table_name: str, conditions: Conditions):
         """
+        Removes rows (satisfying `conditions`) from `table_name`
         """
 
 
 @base_entry_point("dffml.db", "db")
 class BaseDatabaseObject(BaseDataFlowObject):
     """
+    Base class for database interaction
     """
 
     def __call__(self) -> BaseDatabaseContext:
