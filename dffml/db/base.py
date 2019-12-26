@@ -39,6 +39,9 @@ class BaseDatabaseContext(
     Base context class for database interaction
     """
 
+    def __init__(self, parent: "BaseDatabase"):
+        self.parent = parent
+
     @classmethod
     def sanitize_non_bindable(self, val):
         if val.isalnum():
@@ -155,7 +158,7 @@ class BaseDatabaseContext(
 
 
 @base_entry_point("dffml.db", "db")
-class BaseDatabaseObject(BaseDataFlowObject):
+class BaseDatabase(BaseDataFlowObject):
     """
     Base class for database interaction
     """

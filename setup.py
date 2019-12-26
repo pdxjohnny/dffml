@@ -79,7 +79,6 @@ setup(
             "dffml.dataflow.run = dffml.operation.dataflow:run_dataflow",
         ],
         "dffml.kvstore": ["memory = dffml.df.memory:MemoryKeyValueStore"],
-        "dffml.db": ["sqlitedb = dffml.db.sqlitedb:SqliteDatabase"],
         "dffml.input.network": ["memory = dffml.df.memory:MemoryInputNetwork"],
         "dffml.operation.network": [
             "memory = dffml.df.memory:MemoryOperationNetwork"
@@ -92,5 +91,7 @@ setup(
             "memory = dffml.df.memory:MemoryOperationImplementationNetwork"
         ],
         "dffml.orchestrator": ["memory = dffml.df.memory:MemoryOrchestrator"],
+        # Databases
+        "dffml.db": ["sqlite = dffml.db.sqlite:SqliteDatabase"],
     },
 )
