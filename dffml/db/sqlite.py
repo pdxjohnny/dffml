@@ -22,6 +22,18 @@ class SqliteDatabaseConfig:
 class SqliteDatabaseContext(BaseDatabaseContext):
     @classmethod
     def make_condition_expression(cls, conditions):
+        # TODO cnd.value should be replaced with a ? in the built SQL statement
+        # and all the values which were replaced with a ? should be passed to
+        # execute in the list of bound parameters (its second argument)
+        #
+        # For example, the update query for test_2_update is currently run as:
+        #
+        # cursor.execute("UPDATE myTable SET `age` = ? WHERE ((firstName = 'John') OR (lastName = 'Miles')) AND ((age < '38'))", (35,))
+        #
+        # It should become:
+        #
+        # cursor.execute("UPDATE myTable SET `age` = ? WHERE ((firstName = ?) OR (lastName = ?)) AND ((age < ?))", (35, "John", "Miles", 38,))
+
         def _make_condition_expression(conditions):
             def make_or(lst):
                 exp = [
