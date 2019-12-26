@@ -1,17 +1,26 @@
 import abc
-import inspect
 import types
-
-from typing import Any, List, Callable, Optional, Dict, Tuple, Union
-from collections import namedtuple
-from functools import wraps
-
+import inspect
+import functools
+import collections
+from typing import (
+    Any,
+    List,
+    Callable,
+    Optional,
+    Dict,
+    Tuple,
+    Union,
+    AsyncIterator,
+)
 
 from dffml.df.base import BaseDataFlowObject, BaseDataFlowObjectContext
 from dffml.util.entrypoint import base_entry_point
 
 
-Condition = namedtuple("Condtion", ["column", "operation", "value"])
+Condition = collections.namedtuple(
+    "Condtion", ["column", "operation", "value"]
+)
 Conditions = Union[
     List[List[Condition]], List[List[Tuple[str]]],
 ]
@@ -72,7 +81,7 @@ class BaseDatabaseContext(
             else:
                 return obj
 
-        @wraps(func)
+        @functools.wraps(func)
         def wrappper(*args, **kwargs):
             bounded = sig.bind(*args, *kwargs)
             for arg in bounded.arguments:
@@ -94,29 +103,6 @@ class BaseDatabaseContext(
         res = [list(map(Condition._make, cnd)) for cnd in lst]
         return res
 
-    @classmethod
-    def make_condition_expression(self, conditions):
-        def _make_condition_expression(conditions):
-            def make_or(lst):
-                exp = [
-                    f"({cnd.column} {cnd.operation} '{cnd.value}')"
-                    for cnd in lst
-                ]
-                return " OR ".join(exp)
-
-            def make_and(lst):
-                lst = [f"({x})" for x in lst]
-                return " AND ".join(lst)
-
-            lst = map(make_or, conditions)
-            lst = make_and(lst)
-            return lst
-
-        condition_exp = None
-        if (not conditions == None) and (len(conditions) != 0):
-            condition_exp = _make_condition_expression(conditions)
-        return condition_exp
-
     @abc.abstractmethod
     async def create_table(
         self, table_name: str, cols: Dict[str, str]
@@ -134,7 +120,10 @@ class BaseDatabaseContext(
 
     @abc.abstractmethod
     async def update(
-        self, table_name: str, data: Dict[str, Any], conditions: Conditions
+        self,
+        table_name: str,
+        data: Dict[str, Any],
+        conditions: Optional[Conditions] = None,
     ) -> None:
         """
         Updates values of rows (satisfying `conditions` if provided) with `data`
@@ -143,15 +132,20 @@ class BaseDatabaseContext(
 
     @abc.abstractmethod
     async def lookup(
-        self, table_name: str, cols: List[str], conditions: Conditions
-    ):
+        self,
+        table_name: str,
+        cols: Optional[List[str]] = None,
+        conditions: Optional[Conditions] = None,
+    ) -> AsyncIterator[Dict[str, Any]]:
         """
         Returns list of rows (satisfying `conditions` if provided) from
         `table_name`
         """
 
     @abc.abstractmethod
-    async def remove(self, table_name: str, conditions: Conditions):
+    async def remove(
+        self, table_name: str, conditions: Optional[Conditions] = None
+    ):
         """
         Removes rows (satisfying `conditions`) from `table_name`
         """

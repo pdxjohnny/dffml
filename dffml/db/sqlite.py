@@ -1,7 +1,7 @@
 import abc
 import asyncio
 import sqlite3
-from typing import Dict, Any, List, Union, Tuple
+from typing import Dict, Any, List, Union, Tuple, Optional, AsyncIterator
 
 
 from dffml.db.base import (
@@ -20,6 +20,29 @@ class SqliteDatabaseConfig:
 
 
 class SqliteDatabaseContext(BaseDatabaseContext):
+    @classmethod
+    def make_condition_expression(cls, conditions):
+        def _make_condition_expression(conditions):
+            def make_or(lst):
+                exp = [
+                    f"({cnd.column} {cnd.operation} '{cnd.value}')"
+                    for cnd in lst
+                ]
+                return " OR ".join(exp)
+
+            def make_and(lst):
+                lst = [f"({x})" for x in lst]
+                return " AND ".join(lst)
+
+            lst = map(make_or, conditions)
+            lst = make_and(lst)
+            return lst
+
+        condition_exp = None
+        if (not conditions == None) and (len(conditions) != 0):
+            condition_exp = _make_condition_expression(conditions)
+        return condition_exp
+
     async def create_table(
         self, table_name: str, cols: Dict[str, str]
     ) -> None:
@@ -54,7 +77,10 @@ class SqliteDatabaseContext(BaseDatabaseContext):
                 self.parent.cursor.execute(query, list(data.values()))
 
     async def update(
-        self, table_name: str, data: Dict[str, Any], conditions: Conditions
+        self,
+        table_name: str,
+        data: Dict[str, Any],
+        conditions: Optional[Conditions] = None,
     ) -> None:
         """
         Updates values of rows (satisfying `conditions` if provided) with
@@ -74,15 +100,18 @@ class SqliteDatabaseContext(BaseDatabaseContext):
                 self.parent.cursor.execute(query, list(data.values()))
 
     async def lookup(
-        self, table_name: str, cols: List[str], conditions: Conditions
-    ):
+        self,
+        table_name: str,
+        cols: Optional[List[str]] = None,
+        conditions: Optional[Conditions] = None,
+    ) -> AsyncIterator[Dict[str, Any]]:
         """
         Returns list of rows (satisfying `conditions` if provided) from
         `table_name`
         """
 
         condition_exp = self.make_condition_expression(conditions)
-        if len(cols) == 0:
+        if not cols:
             col_exp = "*"
         else:
             col_exp = ", ".join([f"`{col}`" for col in cols])
@@ -95,9 +124,12 @@ class SqliteDatabaseContext(BaseDatabaseContext):
             with self.parent.db:
                 self.logger.debug(query)
                 self.parent.cursor.execute(query)
-                return self.parent.cursor.fetchall()
+                for row in self.parent.cursor.fetchall():
+                    yield dict(row)
 
-    async def remove(self, table_name: str, conditions: Conditions):
+    async def remove(
+        self, table_name: str, conditions: Optional[Conditions] = None
+    ):
         """
         Removes rows (satisfying `conditions` if provided) from `table_name`
         """
@@ -119,5 +151,6 @@ class SqliteDatabase(BaseDatabase):
     def __init__(self, cfg):
         super().__init__(cfg)
         self.db = sqlite3.connect(self.config.filename)
+        self.db.row_factory = sqlite3.Row
         self.cursor = self.db.cursor()
         self.lock = asyncio.Lock()
