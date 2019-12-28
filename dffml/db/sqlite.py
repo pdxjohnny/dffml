@@ -25,20 +25,19 @@ class SqliteDatabaseContext(BaseDatabaseContext):
         """
         Returns a dict with keys 'expression','values' if conditions is not empty
         else returns `None`
-            
+
         eg :
             Input : conditions = [
                 [["firstName", "=", "John"], ["lastName", "=", "Miles"]],
                 [["age", "<", "38"]],
             ]
 
-            Output : 
-            {
-                'expression': 
-                    '((firstName = ? ) OR (lastName = ? )) AND ((age < ? ))', 
+            Output : {
+                'expression':
+                    '((firstName = ? ) OR (lastName = ? )) AND ((age < ? ))',
                 'values':
                      ['John', 'Miles', '38']
-            }
+                }
         """
 
         def _make_condition_expression(conditions):
