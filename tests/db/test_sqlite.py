@@ -73,7 +73,7 @@ class TestSqlDatabase(AsyncTestCase):
 
             self.assertEqual(results, [{"age": 35}, {"age": 35}])
 
-    async def test_3_remove(self):
+    async def _test_3_remove(self):
         condition = [[["firstName", "=", "John"]]]
         async with self.sdb() as db_ctx:
             await db_ctx.remove(self.table_name, condition)

@@ -22,38 +22,57 @@ class SqliteDatabaseConfig:
 class SqliteDatabaseContext(BaseDatabaseContext):
     @classmethod
     def make_condition_expression(cls, conditions):
-        # TODO cnd.value should be replaced with a ? in the built SQL statement
-        # and all the values which were replaced with a ? should be passed to
-        # execute in the list of bound parameters (its second argument)
-        #
-        # For example, the update query for test_2_update is currently run as:
-        #
-        # cursor.execute("UPDATE myTable SET `age` = ? WHERE ((firstName = 'John') OR (lastName = 'Miles')) AND ((age < '38'))", (35,))
-        #
-        # It should become:
-        #
-        # cursor.execute("UPDATE myTable SET `age` = ? WHERE ((firstName = ?) OR (lastName = ?)) AND ((age < ?))", (35, "John", "Miles", 38,))
+        """
+        Returns a dict with keys 'expression','values' if conditions is not empty
+        else returns `None`
+            
+        eg :
+            Input : conditions = [
+                [["firstName", "=", "John"], ["lastName", "=", "Miles"]],
+                [["age", "<", "38"]],
+            ]
+
+            Output : 
+            {
+                'expression': 
+                    '((firstName = ? ) OR (lastName = ? )) AND ((age < ? ))', 
+                'values':
+                     ['John', 'Miles', '38']
+            }
+        """
 
         def _make_condition_expression(conditions):
             def make_or(lst):
-                exp = [
-                    f"({cnd.column} {cnd.operation} '{cnd.value}')"
-                    for cnd in lst
-                ]
-                return " OR ".join(exp)
+                val_list = []
+                exp = []
 
-            def make_and(lst):
-                lst = [f"({x})" for x in lst]
-                return " AND ".join(lst)
+                for cnd in lst:
+                    exp.append(f"({cnd.column} {cnd.operation} ? )")
+                    val_list.append(cnd.value)
+
+                result = {"expression": " OR ".join(exp), "values": val_list}
+
+                return result
 
             lst = map(make_or, conditions)
-            lst = make_and(lst)
-            return lst
 
-        condition_exp = None
+            result_exps = []
+            result_vals = []
+            for result in lst:
+                temp_exp = result["expression"]
+                temp_exp = f"({temp_exp})"
+                result_exps.append(temp_exp)
+                result_vals.extend(result["values"])
+
+            result_exps = " AND ".join(result_exps)
+            result = {"expression": result_exps, "values": result_vals}
+
+            return result
+
+        condition_dict = None
         if (not conditions == None) and (len(conditions) != 0):
-            condition_exp = _make_condition_expression(conditions)
-        return condition_exp
+            condition_dict = _make_condition_expression(conditions)
+        return condition_dict
 
     async def create_table(
         self, table_name: str, cols: Dict[str, str]
@@ -98,7 +117,14 @@ class SqliteDatabaseContext(BaseDatabaseContext):
         Updates values of rows (satisfying `conditions` if provided) with
         `data` in `table_name`
         """
-        condition_exp = self.make_condition_expression(conditions)
+        query_values = list(data.values())
+        condition_dict = self.make_condition_expression(conditions)
+
+        if condition_dict is not None:
+            condition_exp = condition_dict["expression"]
+            query_values.extend(condition_dict["values"])
+        else:
+            condition_exp = None
 
         query = (
             f"UPDATE {table_name} SET "
@@ -109,7 +135,7 @@ class SqliteDatabaseContext(BaseDatabaseContext):
         async with self.parent.lock:
             with self.parent.db:
                 self.logger.debug(query)
-                self.parent.cursor.execute(query, list(data.values()))
+                self.parent.cursor.execute(query, query_values)
 
     async def lookup(
         self,
@@ -122,7 +148,14 @@ class SqliteDatabaseContext(BaseDatabaseContext):
         `table_name`
         """
 
-        condition_exp = self.make_condition_expression(conditions)
+        condition_dict = self.make_condition_expression(conditions)
+        query_values = []
+        if condition_dict is not None:
+            condition_exp = condition_dict["expression"]
+            query_values.extend(condition_dict["values"])
+        else:
+            condition_exp = None
+
         if not cols:
             col_exp = "*"
         else:
@@ -135,7 +168,7 @@ class SqliteDatabaseContext(BaseDatabaseContext):
         async with self.parent.lock:
             with self.parent.db:
                 self.logger.debug(query)
-                self.parent.cursor.execute(query)
+                self.parent.cursor.execute(query, query_values)
                 for row in self.parent.cursor.fetchall():
                     yield dict(row)
 
