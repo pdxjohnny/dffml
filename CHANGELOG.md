@@ -7,6 +7,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 ### Added
 - Database abstraction with first database being `sqlite3`.
+- scikit models
+  - Classifiers
+    - LogisticRegression
+    - GradientBoostingClassifier
+    - BernoulliNB
+    - ExtraTreesClassifier
+    - BaggingClassifier
+    - LinearDiscriminantAnalysis
+    - MultinomialNB
+  - Regressors
+    - ElasticNet
+    - BayesianRidge
+    - Lasso
+    - ARDRegression
+    - RANSACRegressor
+    - DecisionTreeRegressor
+    - GaussianProcessRegressor
+    - OrthogonalMatchingPursuit
+    - Lars
 - `AsyncExitStackTestCase` which instantiates and enters async and non-async
   `contextlib` exit stacks. Provides temporary file creation.
 ### Changed
