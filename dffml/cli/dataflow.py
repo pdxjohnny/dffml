@@ -223,15 +223,18 @@ class RunAllRepos(RunCMD):
                     await sctx.update(repo)
 
     async def run(self):
-        dataflow_path = pathlib.Path(self.dataflow)
-        config_cls = self.config
-        if config_cls is None:
-            config_type = dataflow_path.suffix.replace(".", "")
-            config_cls = BaseConfigLoader.load(config_type)
-        async with config_cls.withconfig(self.extra_config) as configloader:
-            async with configloader() as loader:
-                exported = await loader.loadb(dataflow_path.read_bytes())
-                dataflow = DataFlow._fromdict(**exported)
+        if not isinstance(self.dataflow, DataFlow):
+            dataflow_path = pathlib.Path(self.dataflow)
+            config_cls = self.config
+            if config_cls is None:
+                config_type = dataflow_path.suffix.replace(".", "")
+                config_cls = BaseConfigLoader.load(config_type)
+            async with config_cls.withconfig(self.extra_config) as configloader:
+                async with configloader() as loader:
+                    exported = await loader.loadb(dataflow_path.read_bytes())
+                    dataflow = DataFlow._fromdict(**exported)
+        else:
+            dataflow = self.dataflow
         async with self.orchestrator as orchestrator, self.sources as sources:
             async for repo in self.run_dataflow(
                 orchestrator, sources, dataflow
