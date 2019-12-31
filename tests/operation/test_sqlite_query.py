@@ -21,10 +21,11 @@ class TestSqliteQuery(AsyncTestCase):
         cls.sdb = SqliteDatabase(
             SqliteDatabaseConfig(filename=cls.database_name)
         )
+
     def _create_dataflow_with_config(self,cfg):
         return DataFlow(
             operations={
-                "run_dataflow": sqlite_query.op,
+                "sqlite_query": sqlite_query.op,
                 "get_single": GetSingle.imp.op,
             },
             configs={"sqlite_query": cfg},
@@ -67,5 +68,5 @@ class TestSqliteQuery(AsyncTestCase):
                         ]
                     }
                 ):
-                    print(_ctx)
+                    print(results)
 
