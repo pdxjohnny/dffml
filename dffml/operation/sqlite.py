@@ -62,7 +62,7 @@ async def sqlite_query(self,*,
 
 
     query_fn=getattr(self.dbctx,query_fn)
-    
+
     try:
         await query_fn(**kwargs)
         return {"lookups":{}}
@@ -73,6 +73,6 @@ async def sqlite_query(self,*,
             return {"lookups":[res async for res in result] }
         else :
             raise e
-    
+
 
 
