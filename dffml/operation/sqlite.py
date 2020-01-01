@@ -38,18 +38,20 @@ class SqliteQueryConfig:
         )
     },
     config_cls=SqliteQueryConfig,
+    imp_enter={"database": (lambda self: self.config.database)},
     ctx_enter={"dbctx": (lambda self: self.parent.database())},
 )
 async def sqlite_query(self,*,
                 table_name : str,
                 data : Dict[str,Any] = {},
-                Conditions : Conditions = [],
+                conditions : Conditions = [],
                 cols : List[str] = [],
                 ) -> Optional[Dict[str, Any]]:
 
     frame = inspect.currentframe()
     args, _, _, values = inspect.getargvalues(frame)
-    kwargs={(arg, values[arg]) for i in args[1:]}
+
+    kwargs={arg:values[arg] for arg in args[1:]}
 
     query_fn = self.config.query_type
     if 'create' in query_fn:
@@ -58,14 +60,19 @@ async def sqlite_query(self,*,
     if not query_fn in allowed:
         raise ValueError(f"Only queries of type {allowed} is allowed")
 
+
     query_fn=getattr(self.dbctx,query_fn)
-    if inspect.isasyncgenfunction(query_fn):
-        async for res in query_fn(**kwargs):
-            return{
-                "lookups":res
-            }
-    else:
-        query_fn(**kwargs)
+    
+    try:
+        await query_fn(**kwargs)
         return {"lookups":{}}
+
+    except TypeError as e:
+        if 'async_gen' in repr(e):
+            result = query_fn(**kwargs)
+            return {"lookups":[res async for res in result] }
+        else :
+            raise e
+    
 
 

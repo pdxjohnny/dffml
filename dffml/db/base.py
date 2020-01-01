@@ -83,7 +83,7 @@ class BaseDatabaseContext(
 
         @functools.wraps(func)
         def wrappper(*args, **kwargs):
-            bounded = sig.bind(*args, *kwargs)
+            bounded = sig.bind(*args, **kwargs)
             for arg in bounded.arguments:
                 if arg == "self" or arg == "cls":
                     continue
