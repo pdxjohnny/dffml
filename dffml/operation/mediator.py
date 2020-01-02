@@ -23,6 +23,9 @@ def mediator(dataflow,mapping_data,extra_definitions={}):
 
             }
 
+        Another use case would be to insert/update db with an intemediate operation which
+        publishes data from some flow output.
+
     """
     df_definitions = dataflow.definitions
     extra_definitions.update(df_definitions)
