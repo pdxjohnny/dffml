@@ -1,6 +1,6 @@
 from typing import Dict, List, Any,Callable
-from ..df.types import Definition,DataFlow
-from ..df.base import op
+from dffml.df.types import Definition,DataFlow
+from dffml.df.base import op
 
 
 
