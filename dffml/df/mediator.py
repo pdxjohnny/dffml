@@ -4,7 +4,7 @@ from dffml.df.base import op
 
 
 
-def mediator(dataflow,mapping_data,extra_definitions={}):
+def add_ops_to_dataflow(dataflow,mapping_data,extra_definitions={}):
     """
         creates and adds operations to `dataflow` to connect operations differing
         in output -> input definitions,or to reformat output of one operation as

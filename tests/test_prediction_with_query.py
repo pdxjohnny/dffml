@@ -1,6 +1,8 @@
+import os
 import io
 import json
 import unittest.mock
+import tempfile
 
 from dffml.df.types import DataFlow, Input
 from dffml.df.memory import MemoryOrchestrator
@@ -14,26 +16,17 @@ from dffml.model.model import ModelContext, Model
 from dffml.accuracy import Accuracy as AccuracyType
 from typing import List, Dict, Any, Optional, Tuple, AsyncIterator
 from dffml.repo import Repo
+from dffml.db.sqlite import SqliteDatabase, SqliteDatabaseConfig
 
 from dffml.util.entrypoint import entry_point
 from dffml.df.mediator import add_ops_to_dataflow
 from dffml.df.base import op
 from dffml.df.types import Definition,DataFlow
-
-fakeDefinition=Definition(name="fakeDefinition",primitive="Dict[str:Any]")
-
-@op(
-    name="fake_op",
-    inputs={
-        "fake_inputs":fakeDefinition
-        },
-    outputs={}
-)
-def fake_op(fake_inputs):
-    print("\n\n fake_op ran \n\n")
-    print(f"Prining fake inputs : \n{fake_inputs}\n")
+from dffml.operation.model import model_predict,ModelPredictConfig
+from dffml.operation.sqlite import SqliteQueryConfig,SqliteDatabase,sqlite_query
 
 
+# Model
 class FakeModelContext(ModelContext):
     async def train(self,*args,**kwargs):
         pass
@@ -45,50 +38,68 @@ class FakeModelContext(ModelContext):
             yield repo
 
 @entry_point("fake")
-class FakeModel:
+class FakeModel(Model):
         CONTEXT = FakeModelContext
         CONFIG = FakeConfig
 
+
 class TestRunOnDataflow(AsyncTestCase):
+    @classmethod
+    def setUpClass(cls):
+        fileno, cls.database_name = tempfile.mkstemp(suffix=".db")
+        os.close(fileno)
+        cls.sdb = SqliteDatabase(
+            SqliteDatabaseConfig(filename=cls.database_name)
+        )
+        cls.table_name="fakeTable"
+
     async def test_run(self):
         test_dataflow = DataFlow(
             operations={
                 "run_dataflow": run_dataflow.op,
                 "get_single": GetSingle.imp.op,
-                "fake_op" : fake_op.op
+                "model_predict" : model_predict.op,
+                # "sqlite_query_create" : sqlite_query.op,
+                # "sqlite_query_insert" : sqlite_query.op,
+                # "sqlite_query_update" : sqlite_query.op,
+                # "sqlite_query_lookup" : sqlite_query.op,
+
             },
-            configs={"run_dataflow": RunDataFlowConfig(dataflow=DATAFLOW)},
+            configs={
+                "run_dataflow": RunDataFlowConfig(dataflow=DATAFLOW),
+                "model_predict" : ModelPredictConfig(model=FakeModel,msg="Fake Model!"),
+                # "sqlite_query_create":SqliteQueryConfig(
+                #                     database =self.sdb,
+                #                     query_type = "create"
+                #                     ),
+                # "sqlite_query_insert" :SqliteQueryConfig(
+                #                     database =self.sdb,
+                #                     query_type = "insert"
+                #                     ),
+                # "sqlite_query_update":SqliteQueryConfig(
+                #                     database =self.sdb,
+                #                     query_type = "update"
+                #                     ),
+                # "sqlite_query_lookup":SqliteQueryConfig(
+                #                     database =self.sdb,
+                #                     query_type = "lookup"
+                #                     )
+                } ,
             seed=[
                 Input(
                     value=[run_dataflow.op.outputs["results"].name],
                     definition=GetSingle.op.inputs["spec"],
                 )
             ],
-            implementations={"fake_op":fake_op.imp}
-
+            implementations = {"model_predict":model_predict.imp}
         )
 
-        #mediating
-        def _calcToFake(results):
-            return {
-                "fake_inputs":results
-            }
-
-        mapping_data={
-            "calcToFake":
-                {
-                    'input_types' : [
-                            ('results','flow_results')
-                    ],
-                    'output_types' : [('fake_inputs','fakeDefinition')],
-                    'redirect_function' : _calcToFake
-                }
-        }
-
-        test_dataflow2=add_ops_to_dataflow(dataflow=test_dataflow,
-                    mapping_data=mapping_data,
-                    )
-
+        definitions=test_dataflow.definitions
+        #adding ops to connect current ops in `test dataflow`
+        # def _calcToDbInsert(results):
+        #     ans = {
+        #         "query"
+        #     }
         test_inputs = [
             {
                 "add_op": [
@@ -118,7 +129,7 @@ class TestRunOnDataflow(AsyncTestCase):
         test_outputs = {"add_op": 42, "mult_op": 420}
 
         async with MemoryOrchestrator.withconfig({}) as orchestrator:
-            async with orchestrator(test_dataflow2) as octx:
+            async with orchestrator(test_dataflow) as octx:
                 async for _ctx, results in octx.run(
                     {
                         list(test_input.keys())[0]: [
