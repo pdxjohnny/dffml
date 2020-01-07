@@ -8,6 +8,14 @@ from ..df.base import op
 from ..db.base import Conditions
 from ..df.types import Definition
 
+
+#definitions
+QUERY_TABLE=Definition(name="query_table",primitive="str")
+QUERY_DATA=Definition(name="query_data", primitive="Dict[str, Any]")
+QUERY_CONDITIONS=Definition(name="query_conditions",primitive="Conditions")
+QUERY_COLS=Definition(name="query_cols",primitive="List[str]")
+QUERY_LOOKUPS=Definition(name="query_lookups", primitive="Dict[str, Any]")
+
 @config
 class SqliteQueryConfig:
     """
@@ -19,23 +27,13 @@ class SqliteQueryConfig:
 @op(
     name="dffml.sqlitedb.query",
     inputs={
-        "table_name":Definition(
-            name="query_table",primitive="str"
-        ),
-        "data": Definition(
-            name="query_data", primitive="Dict[str, Any]"
-        ),
-        "conditions":Definition(
-            name="query_conditions",primitive="Conditions"
-        ),
-        "cols":Definition(
-            name="query_cols",primitive="List[str]"
-        ),
+        "table_name":QUERY_TABLE,
+        "data": QUERY_DATA,
+        "conditions":QUERY_CONDITIONS,
+        "cols":QUERY_COLS
     },
     outputs={
-        "lookups": Definition(
-            name="query_lookups", primitive="Dict[str, Any]"
-        )
+        "lookups":QUERY_LOOKUPS
     },
     config_cls=SqliteQueryConfig,
     imp_enter={"database": (lambda self: self.config.database)},
@@ -73,6 +71,7 @@ async def sqlite_query(self,*,
             return {"lookups":[res async for res in result] }
         else :
             raise e
+
 
 
 

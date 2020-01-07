@@ -46,3 +46,20 @@ def mapping_expand_all_keys(mapping: Dict[str, Any]):
 )
 def mapping_expand_all_values(mapping: Dict[str, Any]):
     return {"value": list(mapping.values())}
+
+@op(
+    name="dffml.mapping.formatter",
+    inputs={
+        "data_to_format" : MAPPING,
+        "format_function":Definition(
+                name="formatter",primitive="Callable"
+                ),
+    },
+    outputs={
+        "formatted_data" : Definition(
+            name="formatted_data",primitive="Dict[str,Any]"
+        )
+    }
+)
+def mapping_formatter(data_to_format,format_function):
+    return {"formatted_data" : format_function(data_to_format) }

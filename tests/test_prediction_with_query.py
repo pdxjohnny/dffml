@@ -21,10 +21,9 @@ from dffml.repo import Repo
 from dffml.db.sqlite import SqliteDatabase, SqliteDatabaseConfig
 
 from dffml.util.entrypoint import entry_point
-from dffml.df.mediator import add_ops_to_dataflow
 from dffml.df.base import op
 from dffml.df.types import Definition,DataFlow
-from dffml.operation.mapping import mapping_expand_all_values, mapping_expand_all_keys, mapping_extract_value, create_mapping
+from dffml.operation.mapping import mapping_expand_all_values, mapping_expand_all_keys, mapping_extract_value, create_mapping,mapping_formatter
 from dffml.operation.model import model_predict,ModelPredictConfig
 from dffml.operation.sqlite import SqliteQueryConfig,SqliteDatabase,sqlite_query
 
@@ -81,6 +80,29 @@ class TestRunOnDataflow(AsyncTestCase):
 
     async def test_run(self):
         # results = [row async for row in db_ctx.lookup(self.table_name)]
+
+        def _modelPredictToQuery_formatter(data):
+            """
+             data : {'add_op': 420}
+            """
+
+            _key,_val = next(iter(data.items()))
+
+            table_name = self.table_name
+            data={"value":_val}
+            conditions=[[
+                        ["key","=",_key ]
+                    ]]
+            cols=[]
+
+            return {
+                "table_name" : table_name,
+                "data" : data,
+                "conditions" : conditions,
+                "cols" : cols
+            }
+
+
         test_dataflow = DataFlow(
             operations={
                 "run_dataflow": run_dataflow.op,
@@ -91,6 +113,7 @@ class TestRunOnDataflow(AsyncTestCase):
                 "create_mapping": create_mapping.op,
                 "mapping_extract_value": mapping_extract_value.op,
                 "sqlite_query_update" : sqlite_query.op,
+                "mapping_formatter" : mapping_formatter.op
             },
             configs={
                 "run_dataflow": RunDataFlowConfig(dataflow=DATAFLOW),
@@ -113,10 +136,18 @@ class TestRunOnDataflow(AsyncTestCase):
                     definition=GetSingle.op.inputs["spec"],
                 ),
                 Input(
+                    value=[mapping_formatter.op.outputs["formatted_data"].name],
+                    definition=GetSingle.op.inputs["spec"],
+                ),
+                Input(
                     # {'confidence': 0.5, 'value': 4200} -> 4200
                     value=["value"],
                     definition=mapping_extract_value.op.inputs["traverse"],
                 ),
+                Input(
+                        value = _modelPredictToQuery_formatter,
+                        definition = mapping_formatter.op.inputs["format_function"]
+                    )
             ],
             implementations={
                 "model_predict" : model_predict.imp,
@@ -124,6 +155,7 @@ class TestRunOnDataflow(AsyncTestCase):
                 mapping_expand_all_keys.op.name: mapping_expand_all_keys.imp,
                 create_mapping.op.name: create_mapping.imp,
                 mapping_extract_value.op.name: mapping_extract_value.imp,
+                mapping_formatter.op.name : mapping_formatter.imp,
             },
         )
         # Redirect output of run_dataflow to model_predict
@@ -137,6 +169,12 @@ class TestRunOnDataflow(AsyncTestCase):
                 [{"model_predict": "prediction"}]
         test_dataflow.flow["create_mapping"].inputs["value"] = \
                 [{"mapping_extract_value": "value"}]
+
+
+        # test_dataflow.flow["mapping_expand_all_values"].inputs["mapping"] = \
+        #         [{"mapping_formatter": "formated_data"}]
+
+
         test_dataflow.update_by_origin()
 
         definitions=test_dataflow.definitions
@@ -183,3 +221,8 @@ class TestRunOnDataflow(AsyncTestCase):
                     }
                 ):
                     print(results)
+
+        async with SqliteDatabase(SqliteDatabaseConfig(filename=self.database_name)) as db:
+            async with db() as db_ctx:
+                results = [row async for row in db_ctx.lookup(self.table_name)]
+                print(f"Final lookup : {results}\n")

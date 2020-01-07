@@ -10,8 +10,7 @@ from dffml.operation.output import GetSingle
 from dffml.df.memory import MemoryOrchestrator
 
 DEFINITIONS  = Operation.definitions(sqlite_query.op)
-# for definition_name,definition in definitions.items():
-#     setattr(sys.modules[__name__], definition_name, definition)
+
 
 
 class TestSqliteQuery(AsyncTestCase):
