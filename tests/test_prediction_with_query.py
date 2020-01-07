@@ -171,9 +171,6 @@ class TestRunOnDataflow(AsyncTestCase):
                 [{"mapping_extract_value": "value"}]
 
 
-        # test_dataflow.flow["mapping_expand_all_values"].inputs["mapping"] = \
-        #         [{"mapping_formatter": "formated_data"}]
-
 
         test_dataflow.update_by_origin()
 

@@ -59,7 +59,8 @@ def mapping_expand_all_values(mapping: Dict[str, Any]):
         "formatted_data" : Definition(
             name="formatted_data",primitive="Dict[str,Any]"
         )
-    }
+    },
+    # expand=["formatted_data"],
 )
 def mapping_formatter(data_to_format,format_function):
     return {"formatted_data" : format_function(data_to_format) }

@@ -50,7 +50,7 @@ async def sqlite_query(self,*,
     args, _, _, values = inspect.getargvalues(frame)
 
     kwargs={arg:values[arg] for arg in args[1:]}
-
+    print(f"\n Debug \n Sqlite op was called with args {kwargs}")
     query_fn = self.config.query_type
     if 'create' in query_fn:
         query_fn='create_table'
