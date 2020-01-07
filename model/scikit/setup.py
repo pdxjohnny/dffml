@@ -14,7 +14,7 @@ INSTALL_REQUIRES = [
     "joblib>=0.13.2",
     "pandas>=0.25.0",
 ] + (
-    ["dffml>=0.3.1"]
+    ["dffml>=0.3.2"]
     if not any(
         list(
             map(
@@ -104,6 +104,7 @@ setup(
             f"scikitgpr = {IMPORT_NAME}.scikit_models:GaussianProcessRegressorModel",
             f"scikitomp = {IMPORT_NAME}.scikit_models:OrthogonalMatchingPursuitModel",
             f"scikitlars = {IMPORT_NAME}.scikit_models:LarsModel",
+            f"scikitridge = {IMPORT_NAME}.scikit_models:RidgeModel",
         ]
     },
 )

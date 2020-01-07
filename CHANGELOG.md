@@ -5,6 +5,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
+
+## [0.3.2] - 2020-01-03
 ### Added
 - Database abstraction with first database being `sqlite3`.
 - scikit models
@@ -26,10 +28,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
     - GaussianProcessRegressor
     - OrthogonalMatchingPursuit
     - Lars
+    - Ridge
 - `AsyncExitStackTestCase` which instantiates and enters async and non-async
   `contextlib` exit stacks. Provides temporary file creation.
+- Automatic releases to PyPi via GitHub Actions
+- Automatic documentation deployment to GitHub Pages
+- Function to create a config class dynamically, analogous to `make_dataclass`
 ### Changed
 - CLI tests and integration tests derive from `AsyncExitStackTestCase`
+- SciKit models now use the auto args and config methods.
 ### Fixed
 - Correctly identify when functions decorated with `op` use `self` to reference
   the `OperationImplementationContext`.
