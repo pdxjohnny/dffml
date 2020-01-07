@@ -34,5 +34,5 @@ async def model_predict(self, features: Dict[str, Any]) -> Dict[str, Any]:
 
     async for repo in self.mctx.predict(repos()):
         return {
-            "prediction": {self.config.model.config.predict: repo.prediction()}
+            "prediction": repo.prediction(),
         }
