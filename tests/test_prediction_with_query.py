@@ -4,6 +4,7 @@ import json
 import unittest.mock
 import tempfile
 
+from dffml.base import config
 from dffml.df.types import DataFlow, Input
 from dffml.df.memory import MemoryOrchestrator
 from dffml.operation.dataflow import run_dataflow, RunDataFlowConfig
@@ -11,7 +12,8 @@ from dffml.operation.output import GetSingle
 from dffml.util.asynctestcase import AsyncTestCase
 
 from tests.test_df import DATAFLOW, add, mult, parse_line
-from tests.test_cli import FakeFeature,FakeConfig
+from tests.test_cli import FakeFeature
+from dffml.feature.feature import Feature, DefFeature
 from dffml.model.model import ModelContext, Model
 from dffml.accuracy import Accuracy as AccuracyType
 from typing import List, Dict, Any, Optional, Tuple, AsyncIterator
@@ -22,8 +24,14 @@ from dffml.util.entrypoint import entry_point
 from dffml.df.mediator import add_ops_to_dataflow
 from dffml.df.base import op
 from dffml.df.types import Definition,DataFlow
+from dffml.operation.mapping import mapping_expand_all_values, mapping_expand_all_keys, mapping_extract_value, create_mapping
 from dffml.operation.model import model_predict,ModelPredictConfig
 from dffml.operation.sqlite import SqliteQueryConfig,SqliteDatabase,sqlite_query
+
+
+@config
+class FakeModelConfig:
+    feature: Feature
 
 
 # Model
@@ -34,13 +42,16 @@ class FakeModelContext(ModelContext):
         return AccuracyType(0.5)
     async def predict(self,repos:AsyncIterator[Repo])->AsyncIterator[Repo]:
         async for repo in repos:
-            repo.predicted(repo.feature("fake")*10,50)
+            repo.predicted(
+                repo.feature(self.parent.config.feature.NAME) * 10,
+                0.5
+            )
             yield repo
 
 @entry_point("fake")
 class FakeModel(Model):
         CONTEXT = FakeModelContext
-        CONFIG = FakeConfig
+        CONFIG = FakeModelConfig
 
 
 class TestRunOnDataflow(AsyncTestCase):
@@ -53,53 +64,83 @@ class TestRunOnDataflow(AsyncTestCase):
         )
         cls.table_name="fakeTable"
 
+    @classmethod
+    def tearDownClass(cls):
+        os.unlink(cls.database_name)
+
+    async def setUp(self):
+        super().setUp()
+        async with SqliteDatabase(SqliteDatabaseConfig(filename=self.database_name)) as db:
+            async with db() as ctx:
+                await ctx.create_table(self.table_name, {
+                    "key": "text",
+                    "value": "int",
+                })
+                await ctx.insert(self.table_name, {"key": "add_op", "value": 0})
+                await ctx.insert(self.table_name, {"key": "mult_op", "value": 0})
+
     async def test_run(self):
+        # results = [row async for row in db_ctx.lookup(self.table_name)]
         test_dataflow = DataFlow(
             operations={
                 "run_dataflow": run_dataflow.op,
                 "get_single": GetSingle.imp.op,
                 "model_predict" : model_predict.op,
-                # "sqlite_query_create" : sqlite_query.op,
-                # "sqlite_query_insert" : sqlite_query.op,
-                # "sqlite_query_update" : sqlite_query.op,
-                # "sqlite_query_lookup" : sqlite_query.op,
-
+                "mapping_expand_all_values": mapping_expand_all_values.op,
+                "mapping_expand_all_keys": mapping_expand_all_keys.op,
+                "create_mapping": create_mapping.op,
+                "mapping_extract_value": mapping_extract_value.op,
+                "sqlite_query_update" : sqlite_query.op,
             },
             configs={
                 "run_dataflow": RunDataFlowConfig(dataflow=DATAFLOW),
-                "model_predict" : ModelPredictConfig(model=FakeModel,msg="Fake Model!"),
-                # "sqlite_query_create":SqliteQueryConfig(
-                #                     database =self.sdb,
-                #                     query_type = "create"
-                #                     ),
-                # "sqlite_query_insert" :SqliteQueryConfig(
-                #                     database =self.sdb,
-                #                     query_type = "insert"
-                #                     ),
-                # "sqlite_query_update":SqliteQueryConfig(
-                #                     database =self.sdb,
-                #                     query_type = "update"
-                #                     ),
-                # "sqlite_query_lookup":SqliteQueryConfig(
-                #                     database =self.sdb,
-                #                     query_type = "lookup"
-                #                     )
-                } ,
+                "model_predict" : ModelPredictConfig(
+                    model=FakeModel(
+                        FakeModelConfig(
+                            feature=DefFeature("result", int, 1),
+                        )
+                    ),
+                    msg="Fake Model!",
+                ),
+                "sqlite_query_update": SqliteQueryConfig(
+                    database=self.sdb,
+                    query_type="update"
+                ),
+            },
             seed=[
                 Input(
-                    value=[run_dataflow.op.outputs["results"].name],
+                    value=[create_mapping.op.outputs["mapping"].name],
                     definition=GetSingle.op.inputs["spec"],
-                )
+                ),
+                Input(
+                    # {'confidence': 0.5, 'value': 4200} -> 4200
+                    value=["value"],
+                    definition=mapping_extract_value.op.inputs["traverse"],
+                ),
             ],
-            implementations = {"model_predict":model_predict.imp}
+            implementations={
+                "model_predict" : model_predict.imp,
+                mapping_expand_all_values.op.name: mapping_expand_all_values.imp,
+                mapping_expand_all_keys.op.name: mapping_expand_all_keys.imp,
+                create_mapping.op.name: create_mapping.imp,
+                mapping_extract_value.op.name: mapping_extract_value.imp,
+            },
         )
+        # Redirect output of run_dataflow to model_predict
+        test_dataflow.flow["mapping_expand_all_keys"].inputs["mapping"] = \
+                [{"run_dataflow": "results"}]
+        test_dataflow.flow["mapping_expand_all_values"].inputs["mapping"] = \
+                [{"run_dataflow": "results"}]
+        test_dataflow.flow["model_predict"].inputs["features"] = \
+                [{"mapping_expand_all_values": "value"}]
+        test_dataflow.flow["mapping_extract_value"].inputs["mapping"] = \
+                [{"model_predict": "prediction"}]
+        test_dataflow.flow["create_mapping"].inputs["value"] = \
+                [{"mapping_extract_value": "value"}]
+        test_dataflow.update_by_origin()
 
         definitions=test_dataflow.definitions
-        #adding ops to connect current ops in `test dataflow`
-        # def _calcToDbInsert(results):
-        #     ans = {
-        #         "query"
-        #     }
+
         test_inputs = [
             {
                 "add_op": [

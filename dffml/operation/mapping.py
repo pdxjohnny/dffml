@@ -26,3 +26,23 @@ def mapping_extract_value(mapping: Dict[str, Any], traverse: List[str]):
 )
 def create_mapping(key: str, value: Any):
     return {"mapping": {key: value}}
+
+
+@op(
+    name="dffml.mapping.expand.all.keys",
+    inputs={"mapping": MAPPING},
+    outputs={"key": MAPPING_KEY},
+    expand=["key"],
+)
+def mapping_expand_all_keys(mapping: Dict[str, Any]):
+    return {"key": list(mapping.keys())}
+
+
+@op(
+    name="dffml.mapping.expand.all.values",
+    inputs={"mapping": MAPPING},
+    outputs={"value": MAPPING_VALUE},
+    expand=["value"],
+)
+def mapping_expand_all_values(mapping: Dict[str, Any]):
+    return {"value": list(mapping.values())}
