@@ -23,7 +23,8 @@ from dffml.db.sqlite import SqliteDatabase, SqliteDatabaseConfig
 from dffml.util.entrypoint import entry_point
 from dffml.df.base import op
 from dffml.df.types import Definition,DataFlow
-from dffml.operation.mapping import mapping_expand_all_values, mapping_expand_all_keys, mapping_extract_value, create_mapping, mapping_merge, mapping_formatter
+from dffml.operation.mapping import mapping_expand_all_values, mapping_expand_all_keys, mapping_extract_value, create_mapping, mapping_formatter
+from dffml.operation.array import array_create, array_append
 from dffml.operation.model import model_predict,ModelPredictConfig
 from dffml.operation.sqlite import SqliteQueryConfig,SqliteDatabase,sqlite_query
 
@@ -111,10 +112,11 @@ class TestRunOnDataflow(AsyncTestCase):
                 "mapping_expand_all_values": mapping_expand_all_values.op,
                 "mapping_expand_all_keys": mapping_expand_all_keys.op,
                 "mapping_extract_value": mapping_extract_value.op,
-                "create_key_mapping": create_mapping.op,
                 "create_value_mapping": create_mapping.op,
-                "create_update_mapping": mapping_merge.op,
-                "sqlite_query_update": sqlite_query.op,
+                "conditions_array_create": array_create.op,
+                "conditions_array_append_1": array_append.op,
+                "conditions_array_append_2": array_append.op,
+                "update_db": sqlite_query.op,
             },
             configs={
                 "run_dataflow": RunDataFlowConfig(dataflow=DATAFLOW),
@@ -126,7 +128,7 @@ class TestRunOnDataflow(AsyncTestCase):
                     ),
                     msg="Fake Model!",
                 ),
-                "sqlite_query_update": SqliteQueryConfig(
+                "update_db": SqliteQueryConfig(
                     database=self.sdb,
                     query_type="update"
                 ),
@@ -146,15 +148,35 @@ class TestRunOnDataflow(AsyncTestCase):
                     value=["value"],
                     definition=mapping_extract_value.op.inputs["traverse"],
                 ),
-                Input(
-                    value="key",
-                    definition=create_mapping.op.inputs["key"],
-                    origin="seed.create_key_mapping.key",
-                ),
+                # Create a key value mapping where the key is "value"
+                # {'value': 4200}
                 Input(
                     value="value",
                     definition=create_mapping.op.inputs["key"],
                     origin="seed.create_value_mapping.key",
+                ),
+                # Create the conditions array for the db update operation
+                Input(
+                    value="key",
+                    definition=array_append.op.inputs["value"],
+                    origin="seed.conditions.index.0",
+                ),
+                Input(
+                    value="=",
+                    definition=array_append.op.inputs["value"],
+                    origin="seed.conditions.index.1",
+                ),
+                # The table to update
+                Input(
+                    value=self.table_name,
+                    definition=sqlite_query.op.inputs["table_name"],
+                ),
+                # Cols is empty since we are not doing a lookup
+                # TODO Make lookup a different function, since the other
+                # operations will never have cols
+                Input(
+                    value=[],
+                    definition=sqlite_query.op.inputs["cols"],
                 ),
             ],
             implementations={
@@ -163,8 +185,8 @@ class TestRunOnDataflow(AsyncTestCase):
                 mapping_expand_all_keys.op.name: mapping_expand_all_keys.imp,
                 create_mapping.op.name: create_mapping.imp,
                 mapping_extract_value.op.name: mapping_extract_value.imp,
-                mapping_merge.op.name: mapping_merge.imp,
-                mapping_formatter.op.name : mapping_formatter.imp,
+                array_create.op.name: array_create.imp,
+                array_append.op.name: array_append.imp,
             },
         )
         # Redirect output of run_dataflow to model_predict
@@ -176,21 +198,27 @@ class TestRunOnDataflow(AsyncTestCase):
                 [{"mapping_expand_all_values": "value"}]
         test_dataflow.flow["mapping_extract_value"].inputs["mapping"] = \
                 [{"model_predict": "prediction"}]
-        # Create key mapping
-        test_dataflow.flow["create_key_mapping"].inputs["key"] = \
-                ["seed.create_key_mapping.key"]
-        test_dataflow.flow["create_key_mapping"].inputs["value"] = \
-                [{"mapping_expand_all_keys": "key"}]
         # Create value mapping
         test_dataflow.flow["create_value_mapping"].inputs["key"] = \
                 ["seed.create_value_mapping.key"]
         test_dataflow.flow["create_value_mapping"].inputs["value"] = \
                 [{"mapping_extract_value": "value"}]
-        # Merge key mapping and value mapping
-        test_dataflow.flow["create_update_mapping"].inputs["one"] = \
-                [{"create_key_mapping": "mapping"}]
-        test_dataflow.flow["create_update_mapping"].inputs["two"] = \
-                [{"create_value_mapping": "mapping"}]
+        # Create db update conditions array
+        test_dataflow.flow["conditions_array_create"].inputs["value"] = \
+                ["seed.conditions.index.0"]
+        test_dataflow.flow["conditions_array_append_1"].inputs.update({
+            "array": [{"conditions_array_create": "array"}],
+            "value": ["seed.conditions.index.1"],
+        })
+        test_dataflow.flow["conditions_array_append_2"].inputs.update({
+            "array": [{"conditions_array_append_1": "array"}],
+            "value": [{"mapping_expand_all_keys": "key"}],
+        })
+        # Use key value mapping as data for db update
+        test_dataflow.flow["update_db"].inputs.update({
+            "data": [{"create_value_mapping": "mapping"}],
+            "conditions": [{"conditions_array_append_2": "array"}],
+        })
 
         test_dataflow.update_by_origin()
 

@@ -51,10 +51,10 @@ def mapping_expand_all_values(mapping: Dict[str, Any]):
 @op(
     name="dffml.mapping.merge",
     inputs={"one": MAPPING, "two": MAPPING},
-    outputs={"merged": MAPPING},
+    outputs={"mapping": MAPPING},
 )
 def mapping_merge(one: dict, two: dict):
-    return {"merged": merge(copy.deepcopy(one), copy.deepcopy(two))}
+    return {"mapping": merge(copy.deepcopy(one), copy.deepcopy(two))}
 
 @op(
     name="dffml.mapping.formatter",
