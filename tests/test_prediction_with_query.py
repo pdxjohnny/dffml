@@ -116,6 +116,8 @@ class TestRunOnDataflow(AsyncTestCase):
                 "conditions_array_create": array_create.op,
                 "conditions_array_append_1": array_append.op,
                 "conditions_array_append_2": array_append.op,
+                "conditions_or": array_create.op,
+                "conditions_and": array_create.op,
                 "update_db": sqlite_query.op,
             },
             configs={
@@ -214,10 +216,19 @@ class TestRunOnDataflow(AsyncTestCase):
             "array": [{"conditions_array_append_1": "array"}],
             "value": [{"mapping_expand_all_keys": "key"}],
         })
+        # Nest the condition array in the
+        # ((key = ?) OR (1 = 1)) AND ((1 = 1))
+        # Format that the update operation requires
+        test_dataflow.flow["conditions_or"].inputs.update({
+            "value": [{"conditions_array_append_2": "array"}],
+        })
+        test_dataflow.flow["conditions_and"].inputs.update({
+            "value": [{"conditions_or": "array"}],
+        })
         # Use key value mapping as data for db update
         test_dataflow.flow["update_db"].inputs.update({
             "data": [{"create_value_mapping": "mapping"}],
-            "conditions": [{"conditions_array_append_2": "array"}],
+            "conditions": [{"conditions_and": "array"}],
         })
 
         test_dataflow.update_by_origin()
