@@ -12,6 +12,7 @@ def merge(one, two):
             merge(one[key], two[key])
         else:
             one[key] = two[key]
+    return one
 
 
 def traverse_config_set(target, *args):

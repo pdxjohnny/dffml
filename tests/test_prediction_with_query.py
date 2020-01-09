@@ -23,7 +23,7 @@ from dffml.db.sqlite import SqliteDatabase, SqliteDatabaseConfig
 from dffml.util.entrypoint import entry_point
 from dffml.df.base import op
 from dffml.df.types import Definition,DataFlow
-from dffml.operation.mapping import mapping_expand_all_values, mapping_expand_all_keys, mapping_extract_value, create_mapping,mapping_formatter
+from dffml.operation.mapping import mapping_expand_all_values, mapping_expand_all_keys, mapping_extract_value, create_mapping, mapping_merge, mapping_formatter
 from dffml.operation.model import model_predict,ModelPredictConfig
 from dffml.operation.sqlite import SqliteQueryConfig,SqliteDatabase,sqlite_query
 
@@ -42,7 +42,7 @@ class FakeModelContext(ModelContext):
     async def predict(self,repos:AsyncIterator[Repo])->AsyncIterator[Repo]:
         async for repo in repos:
             repo.predicted(
-                repo.feature(self.parent.config.feature.NAME) * 10,
+                repo.feature(self.parent.config.feature.NAME) + 0.1234,
                 0.5
             )
             yield repo
@@ -110,10 +110,11 @@ class TestRunOnDataflow(AsyncTestCase):
                 "model_predict" : model_predict.op,
                 "mapping_expand_all_values": mapping_expand_all_values.op,
                 "mapping_expand_all_keys": mapping_expand_all_keys.op,
-                "create_mapping": create_mapping.op,
                 "mapping_extract_value": mapping_extract_value.op,
-                "sqlite_query_update" : sqlite_query.op,
-                "mapping_formatter" : mapping_formatter.op
+                "create_key_mapping": create_mapping.op,
+                "create_value_mapping": create_mapping.op,
+                "create_update_mapping": mapping_merge.op,
+                "sqlite_query_update": sqlite_query.op,
             },
             configs={
                 "run_dataflow": RunDataFlowConfig(dataflow=DATAFLOW),
@@ -131,44 +132,6 @@ class TestRunOnDataflow(AsyncTestCase):
                 ),
             },
             seed=[
-                Input(
-                    value=[create_mapping.op.outputs["mapping"].name],
-                    definition=GetSingle.op.inputs["spec"],
-                ),
-                Input(
-                    value=[mapping_formatter.op.outputs["formatted_data"].name],
-                    definition=GetSingle.op.inputs["spec"],
-                ),
-                Input(
-                    # {'confidence': 0.5, 'value': 4200} -> 4200
-                    value=["value"],
-                    definition=mapping_extract_value.op.inputs["traverse"],
-                ),
-                Input(
-                        value = _modelPredictToQuery_formatter,
-                        definition = mapping_formatter.op.inputs["format_function"]
-                    )
-            ],
-            implementations={
-                "model_predict" : model_predict.imp,
-                mapping_expand_all_values.op.name: mapping_expand_all_values.imp,
-                mapping_expand_all_keys.op.name: mapping_expand_all_keys.imp,
-                create_mapping.op.name: create_mapping.imp,
-                mapping_extract_value.op.name: mapping_extract_value.imp,
-                mapping_formatter.op.name : mapping_formatter.imp,
-            },
-        )
-        # Redirect output of run_dataflow to model_predict
-        test_dataflow.flow["mapping_expand_all_keys"].inputs["mapping"] = \
-                [{"run_dataflow": "results"}]
-        test_dataflow.flow["mapping_expand_all_values"].inputs["mapping"] = \
-                [{"run_dataflow": "results"}]
-        test_dataflow.flow["model_predict"].inputs["features"] = \
-                [{"mapping_expand_all_values": "value"}]
-        test_dataflow.flow["mapping_extract_value"].inputs["mapping"] = \
-                [{"model_predict": "prediction"}]
-        test_dataflow.flow["create_mapping"].inputs["value"] = \
-                [{"mapping_extract_value": "value"}]
                 # Make the output of the dataflow the prediction
                 Input(
                     value=[create_mapping.op.outputs["mapping"].name],
@@ -184,12 +147,12 @@ class TestRunOnDataflow(AsyncTestCase):
                     definition=mapping_extract_value.op.inputs["traverse"],
                 ),
                 Input(
-                    value=["key"],
+                    value="key",
                     definition=create_mapping.op.inputs["key"],
                     origin="seed.create_key_mapping.key",
                 ),
                 Input(
-                    value=["value"],
+                    value="value",
                     definition=create_mapping.op.inputs["key"],
                     origin="seed.create_value_mapping.key",
                 ),
@@ -200,6 +163,7 @@ class TestRunOnDataflow(AsyncTestCase):
                 mapping_expand_all_keys.op.name: mapping_expand_all_keys.imp,
                 create_mapping.op.name: create_mapping.imp,
                 mapping_extract_value.op.name: mapping_extract_value.imp,
+                mapping_merge.op.name: mapping_merge.imp,
                 mapping_formatter.op.name : mapping_formatter.imp,
             },
         )
@@ -212,19 +176,23 @@ class TestRunOnDataflow(AsyncTestCase):
                 [{"mapping_expand_all_values": "value"}]
         test_dataflow.flow["mapping_extract_value"].inputs["mapping"] = \
                 [{"model_predict": "prediction"}]
-
         # Create key mapping
+        test_dataflow.flow["create_key_mapping"].inputs["key"] = \
+                ["seed.create_key_mapping.key"]
         test_dataflow.flow["create_key_mapping"].inputs["value"] = \
+                [{"mapping_expand_all_keys": "key"}]
+        # Create value mapping
+        test_dataflow.flow["create_value_mapping"].inputs["key"] = \
+                ["seed.create_value_mapping.key"]
+        test_dataflow.flow["create_value_mapping"].inputs["value"] = \
                 [{"mapping_extract_value": "value"}]
-seed.create_key_mapping.key
-        test_dataflow.flow["create_key_mapping"].inputs["value"] = \
-                [{"mapping_extract_value": "value"}]
-
-
+        # Merge key mapping and value mapping
+        test_dataflow.flow["create_update_mapping"].inputs["one"] = \
+                [{"create_key_mapping": "mapping"}]
+        test_dataflow.flow["create_update_mapping"].inputs["two"] = \
+                [{"create_value_mapping": "mapping"}]
 
         test_dataflow.update_by_origin()
-
-        definitions=test_dataflow.definitions
 
         test_inputs = [
             {
@@ -252,7 +220,7 @@ seed.create_key_mapping.key
                 ]
             },
         ]
-        test_outputs = {"add_op": 42, "mult_op": 420}
+        test_outputs = {"add_op": 42.1234, "mult_op": 420.1234}
 
         async with MemoryOrchestrator.withconfig({}) as orchestrator:
             async with orchestrator(test_dataflow) as octx:
@@ -267,9 +235,12 @@ seed.create_key_mapping.key
                         for test_input in test_inputs
                     }
                 ):
-                    print(results)
+                    pass
 
         async with SqliteDatabase(SqliteDatabaseConfig(filename=self.database_name)) as db:
             async with db() as db_ctx:
-                results = [row async for row in db_ctx.lookup(self.table_name)]
-                print(f"Final lookup : {results}\n")
+                results = {row["key"]: row["value"] async for row in db_ctx.lookup(self.table_name)}
+                for key, value in test_outputs.items():
+                    with self.subTest(context=key):
+                        self.assertIn(key, results)
+                        self.assertEqual(value, results[key])

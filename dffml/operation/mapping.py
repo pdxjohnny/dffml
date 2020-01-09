@@ -1,8 +1,9 @@
+import copy
 from typing import Dict, List, Any
 
 from ..df.types import Definition
 from ..df.base import op
-from ..util.data import traverse_get
+from ..util.data import traverse_get, merge
 
 MAPPING = Definition(name="mapping", primitive="map")
 MAPPING_TRAVERSE = Definition(name="mapping_traverse", primitive="List[str]")
@@ -46,6 +47,14 @@ def mapping_expand_all_keys(mapping: Dict[str, Any]):
 )
 def mapping_expand_all_values(mapping: Dict[str, Any]):
     return {"value": list(mapping.values())}
+
+@op(
+    name="dffml.mapping.merge",
+    inputs={"one": MAPPING, "two": MAPPING},
+    outputs={"merged": MAPPING},
+)
+def mapping_merge(one: dict, two: dict):
+    return {"merged": merge(copy.deepcopy(one), copy.deepcopy(two))}
 
 @op(
     name="dffml.mapping.formatter",
