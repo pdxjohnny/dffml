@@ -169,6 +169,56 @@ class TestRunOnDataflow(AsyncTestCase):
                 [{"model_predict": "prediction"}]
         test_dataflow.flow["create_mapping"].inputs["value"] = \
                 [{"mapping_extract_value": "value"}]
+                # Make the output of the dataflow the prediction
+                Input(
+                    value=[create_mapping.op.outputs["mapping"].name],
+                    definition=GetSingle.op.inputs["spec"],
+                ),
+                # model_predict outputs: {'confidence': 0.5, 'value': 4200}
+                # we need to extract the 'value' from it.
+                # We could also do this by creating a mapping_remove_key
+                # operation and removing the 'confidence' key, then merging with
+                # the string to parse.
+                Input(
+                    value=["value"],
+                    definition=mapping_extract_value.op.inputs["traverse"],
+                ),
+                Input(
+                    value=["key"],
+                    definition=create_mapping.op.inputs["key"],
+                    origin="seed.create_key_mapping.key",
+                ),
+                Input(
+                    value=["value"],
+                    definition=create_mapping.op.inputs["key"],
+                    origin="seed.create_value_mapping.key",
+                ),
+            ],
+            implementations={
+                "model_predict" : model_predict.imp,
+                mapping_expand_all_values.op.name: mapping_expand_all_values.imp,
+                mapping_expand_all_keys.op.name: mapping_expand_all_keys.imp,
+                create_mapping.op.name: create_mapping.imp,
+                mapping_extract_value.op.name: mapping_extract_value.imp,
+                mapping_formatter.op.name : mapping_formatter.imp,
+            },
+        )
+        # Redirect output of run_dataflow to model_predict
+        test_dataflow.flow["mapping_expand_all_keys"].inputs["mapping"] = \
+                [{"run_dataflow": "results"}]
+        test_dataflow.flow["mapping_expand_all_values"].inputs["mapping"] = \
+                [{"run_dataflow": "results"}]
+        test_dataflow.flow["model_predict"].inputs["features"] = \
+                [{"mapping_expand_all_values": "value"}]
+        test_dataflow.flow["mapping_extract_value"].inputs["mapping"] = \
+                [{"model_predict": "prediction"}]
+
+        # Create key mapping
+        test_dataflow.flow["create_key_mapping"].inputs["value"] = \
+                [{"mapping_extract_value": "value"}]
+seed.create_key_mapping.key
+        test_dataflow.flow["create_key_mapping"].inputs["value"] = \
+                [{"mapping_extract_value": "value"}]
 
 
 
