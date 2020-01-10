@@ -90,7 +90,7 @@ class FakeConfig:
 
 class FakeFeature(Feature):
 
-    NAME: str = "fake"
+    name: str = "fake"
 
     def dtype(self):
         return float  # pragma: no cov

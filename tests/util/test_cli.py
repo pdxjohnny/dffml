@@ -89,7 +89,7 @@ class TestJSONEncoder(unittest.TestCase):
 
     def test_feature(self):
         class FaceFeature(Feature):
-            NAME = "face"
+            name = "face"
 
         self.assertIn("face", json.dumps(FaceFeature(), cls=JSONEncoder))
 

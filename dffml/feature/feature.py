@@ -148,25 +148,25 @@ class Feature(abc.ABC, Entrypoint):
 
     LOGGER = LOGGER.getChild("Feature")
 
-    NAME: str = ""
+    name: str = ""
     # LENGTH: int = 10
     # FREQUENCY: Type[Frequency] = Quarterly
     ENTRYPOINT = "dffml.feature"
 
     def __eq__(self, other):
-        self_tuple = (self.NAME, self.dtype(), self.length())
-        other_tuple = (other.NAME, other.dtype(), other.length())
+        self_tuple = (self.name, self.dtype(), self.length())
+        other_tuple = (other.name, other.dtype(), other.length())
         return bool(self_tuple == other_tuple)
 
     def __str__(self):
-        return "%s(%s)" % (self.NAME, self.__class__.__qualname__)
+        return "%s(%s)" % (self.name, self.__class__.__qualname__)
 
     def __repr__(self):
         return "%s[%r, %d]" % (self.__str__(), self.dtype(), self.length())
 
     def export(self):
         return {
-            "name": self.NAME,
+            "name": self.name,
             "dtype": self.dtype().__qualname__,
             "length": self.length(),
         }
@@ -278,7 +278,7 @@ def DefFeature(name, dtype, length):
             self, name: str = "", dtype: Type = int, length: int = 1
         ) -> None:
             super().__init__()
-            self.NAME = name
+            self.name = name
             self._dtype = dtype
             self._length = length
 
@@ -311,10 +311,10 @@ class Features(list):
         self.timeout = timeout if not timeout is None else self.TIMEOUT
 
     def names(self) -> List[str]:
-        return list(({feature.NAME: True for feature in self}).keys())
+        return list(({feature.name: True for feature in self}).keys())
 
     def export(self):
-        return {feature.NAME: feature.export() for feature in self}
+        return {feature.name: feature.export() for feature in self}
 
     @classmethod
     def _fromdict(cls, **kwargs):
@@ -369,7 +369,7 @@ class Features(list):
             *[
                 feature
                 for feature in self
-                if feature.NAME and await feature.applicable(data)
+                if feature.name and await feature.applicable(data)
             ]
         )
 
@@ -391,7 +391,7 @@ class Features(list):
     async def _run_calc(
         self, feature: Feature, results: Dict[str, Any], data: Data
     ) -> Any:
-        results[feature.NAME] = await self.run_feature_method(
+        results[feature.name] = await self.run_feature_method(
             feature, feature.calc, data
         )
 
@@ -403,7 +403,7 @@ class Features(list):
             self.LOGGER.debug(
                 "%s %s(%s).%s",
                 data.src_url,
-                feature.NAME,
+                feature.name,
                 feature.__class__.__qualname__,
                 method.__name__,
             )

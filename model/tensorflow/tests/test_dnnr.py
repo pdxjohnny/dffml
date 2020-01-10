@@ -19,7 +19,7 @@ from dffml_model_tensorflow.dnnr import (
 # Creating feature classes
 class Feature_1(Feature):
 
-    NAME: str = "feature_1"
+    name: str = "feature_1"
 
     def dtype(self) -> Type:
         return float
@@ -30,7 +30,7 @@ class Feature_1(Feature):
 
 class Feature_2(Feature):
 
-    NAME: str = "feature_2"
+    name: str = "feature_2"
 
     def dtype(self) -> Type:
         return float
@@ -64,8 +64,8 @@ class TestDNN(AsyncTestCase):
                 "x" + str(random.random()),
                 data={
                     "features": {
-                        cls.feature1.NAME: float(_temp_data[0][i]),
-                        cls.feature2.NAME: float(_temp_data[1][i]),
+                        cls.feature1.name: float(_temp_data[0][i]),
+                        cls.feature2.name: float(_temp_data[1][i]),
                         "TARGET": 2 * _temp_data[0][i] + 3 * _temp_data[1][i],
                     }
                 },
@@ -126,8 +126,8 @@ class TestDNN(AsyncTestCase):
             "a",
             data={
                 "features": {
-                    self.feature1.NAME: test_feature_val[1],
-                    self.feature2.NAME: test_feature_val[2],
+                    self.feature1.name: test_feature_val[1],
+                    self.feature2.name: test_feature_val[2],
                 }
             },
         )

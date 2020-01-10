@@ -62,7 +62,7 @@ def applicable_features(self, features):
             raise ValueError(
                 "Models only supports single values (non-matrix / array)"
             )
-        usable.append(feature.NAME)
+        usable.append(feature.name)
     return sorted(usable)
 
 

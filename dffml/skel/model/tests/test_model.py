@@ -41,14 +41,14 @@ class TestMisc(AsyncTestCase):
         cls.repos = [
             Repo(
                 "a" + str(random.random()),
-                data={"features": {cls.feature.NAME: 1, "string": "a"}},
+                data={"features": {cls.feature.name: 1, "string": "a"}},
             )
             for _ in range(0, 1000)
         ]
         cls.repos += [
             Repo(
                 "b" + str(random.random()),
-                data={"features": {cls.feature.NAME: 0, "string": "not a"}},
+                data={"features": {cls.feature.name: 0, "string": "not a"}},
             )
             for _ in range(0, 1000)
         ]
@@ -72,8 +72,8 @@ class TestMisc(AsyncTestCase):
                 self.assertGreater(res, 0.9)
 
     async def test_02_predict(self):
-        a = Repo("a", data={"features": {self.feature.NAME: 1}})
-        b = Repo("not a", data={"features": {self.feature.NAME: 0}})
+        a = Repo("a", data={"features": {self.feature.name: 1}})
+        b = Repo("not a", data={"features": {self.feature.name: 0}})
         async with Sources(
             MemorySource(MemorySourceConfig(repos=[a, b]))
         ) as sources, self.model as model:

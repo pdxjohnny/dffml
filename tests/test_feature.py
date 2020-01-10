@@ -17,11 +17,11 @@ class SingleFeature(Feature):
 
 
 class OneFeatureTester(SingleFeature):
-    NAME: str = "one"
+    name: str = "one"
 
 
 class TwoFeatureTester(SingleFeature):
-    NAME: str = "two"
+    name: str = "two"
 
     async def calc(self, data: Data) -> bool:
         return True
@@ -32,14 +32,14 @@ class TwoBFeatureTester(SingleFeature):
 
 
 class ThreeFeatureTester(SingleFeature):
-    NAME: str = "three"
+    name: str = "three"
 
     async def applicable(self, data: Data) -> bool:
         return False
 
 
 class ProgessFeatureTester(SingleFeature):
-    NAME: str = "progress"
+    name: str = "progress"
 
     async def calc(self, data: Data) -> bool:
         await data.log("Hi")
@@ -113,7 +113,7 @@ class TestFeature(AsyncTestCase):
 
     def test_load_def(self):
         feature = Feature.load_def("test", "float", 10)
-        self.assertEqual(feature.NAME, "test")
+        self.assertEqual(feature.name, "test")
         self.assertEqual(feature.dtype(), float)
         self.assertEqual(feature.length(), 10)
 
@@ -128,7 +128,7 @@ class TestFeature(AsyncTestCase):
 class TestDefFeature(AsyncTestCase):
     def test_deffeature(self):
         feature = DefFeature("test", float, 10)
-        self.assertEqual(feature.NAME, "test")
+        self.assertEqual(feature.name, "test")
         self.assertEqual(feature.dtype(), float)
         self.assertEqual(feature.length(), 10)
 
@@ -156,17 +156,17 @@ class TestFeatures(AsyncTestCase):
     async def test_evaluate(self):
         async with self.features:
             results = await self.features.evaluate("test")
-            self.assertIn(self.one.NAME, results)
-            self.assertIn(self.two.NAME, results)
-            self.assertNotIn(self.three.NAME, results)
-            self.assertEqual(results[self.one.NAME], False)
-            self.assertEqual(results[self.two.NAME], True)
+            self.assertIn(self.one.name, results)
+            self.assertIn(self.two.name, results)
+            self.assertNotIn(self.three.name, results)
+            self.assertEqual(results[self.one.name], False)
+            self.assertEqual(results[self.two.name], True)
 
     async def test_one_applicable_other_not(self):
         twob = TwoBFeatureTester()
         features = Features(self.two, twob)
         async with features:
             results = await features.evaluate("test")
-            self.assertIn(self.two.NAME, results)
+            self.assertIn(self.two.name, results)
             self.assertEqual(len(results), 1)
-            self.assertEqual(results[self.two.NAME], True)
+            self.assertEqual(results[self.two.name], True)

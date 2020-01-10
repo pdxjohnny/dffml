@@ -46,7 +46,7 @@ class TensorflowModelContext(ModelContext):
         for feature in self.parent.config.features:
             col = self._feature_feature_column(feature)
             if not col is None:
-                cols[feature.NAME] = col
+                cols[feature.name] = col
         return cols
 
     def _feature_feature_column(self, feature: Feature):
@@ -66,7 +66,7 @@ class TensorflowModelContext(ModelContext):
             or issubclass(dtype, float)
         ):
             return tensorflow.feature_column.numeric_column(
-                feature.NAME, shape=feature.length()
+                feature.name, shape=feature.length()
             )
         self.logger.warning(
             "Unknown dtype %r. Cound not create column" % (dtype)

@@ -68,7 +68,7 @@ class SLRContext(ModelContext):
                 raise ValueError(
                     "Simple LR only supports single values (non-matrix / array)"
                 )
-            usable.append(feature.NAME)
+            usable.append(feature.name)
         return sorted(usable)
 
     async def predict_input(self, x):
