@@ -11,7 +11,7 @@ from dffml.db.base import (
     Conditions,
 )
 from dffml.base import config
-from dffml.util.entrypoint import entry_point
+from dffml.util.entrypoint import entrypoint
 
 
 @config
@@ -190,7 +190,7 @@ class SqliteDatabaseContext(BaseDatabaseContext):
                 self.parent.cursor.execute(query)
 
 
-@entry_point("sqlite")
+@entrypoint("sqlite")
 class SqliteDatabase(BaseDatabase):
     CONFIG = SqliteDatabaseConfig
     CONTEXT = SqliteDatabaseContext

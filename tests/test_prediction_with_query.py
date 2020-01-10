@@ -20,13 +20,13 @@ from typing import List, Dict, Any, Optional, Tuple, AsyncIterator
 from dffml.repo import Repo
 from dffml.db.sqlite import SqliteDatabase, SqliteDatabaseConfig
 
-from dffml.util.entrypoint import entry_point
+from dffml.util.entrypoint import entrypoint
 from dffml.df.base import op
 from dffml.df.types import Definition,DataFlow
 from dffml.operation.mapping import mapping_expand_all_values, mapping_expand_all_keys, mapping_extract_value, create_mapping, mapping_formatter
 from dffml.operation.array import array_create, array_append
 from dffml.operation.model import model_predict,ModelPredictConfig
-from dffml.operation.sqlite import SqliteQueryConfig,SqliteDatabase,sqlite_query
+from dffml.operation.db import SqliteQueryConfig,SqliteDatabase,sqlite_query
 
 
 @config
@@ -48,7 +48,7 @@ class FakeModelContext(ModelContext):
             )
             yield repo
 
-@entry_point("fake")
+@entrypoint("fake")
 class FakeModel(Model):
         CONTEXT = FakeModelContext
         CONFIG = FakeModelConfig
@@ -128,7 +128,6 @@ class TestRunOnDataflow(AsyncTestCase):
                             feature=DefFeature("result", int, 1),
                         )
                     ),
-                    msg="Fake Model!",
                 ),
                 "update_db": SqliteQueryConfig(
                     database=self.sdb,

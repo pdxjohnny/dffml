@@ -4,7 +4,7 @@ import sys
 from collections import OrderedDict
 from dffml.db.sqlite import SqliteDatabase, SqliteDatabaseConfig
 from dffml.util.asynctestcase import AsyncTestCase
-from dffml.operation.sqlite import sqlite_query,SqliteQueryConfig
+from dffml.operation.db import sqlite_query,SqliteQueryConfig
 from dffml.df.types import DataFlow, Input,Operation
 from dffml.operation.output import GetSingle
 from dffml.df.memory import MemoryOrchestrator
@@ -21,6 +21,14 @@ class TestSqliteQuery(AsyncTestCase):
         cls.sdb = SqliteDatabase(
             SqliteDatabaseConfig(filename=cls.database_name)
         )
+        def dict_factory(cursor, row):
+            d = {}
+            for idx, col in enumerate(cursor.description):
+                d[col[0]] = row[idx]
+            return d
+        # for ease of testing
+        cls.sdb.db.row_factory = dict_factory
+        cls.sdb.cursor =  cls.sdb.db.cursor()
 
     def setUp(self):
         self.table_name="myTable"
@@ -82,7 +90,14 @@ class TestSqliteQuery(AsyncTestCase):
                         for test_ctx,test_val in test_inputs.items()
                     }
                 ):
-                    print(results)
+                    async with self.sdb() as db_ctx:
+                        query = (
+                            "SELECT count(name) FROM sqlite_master "
+                            + f" WHERE type='table' and name='{self.table_name}' "
+                            )
+                        db_ctx.parent.cursor.execute(query)
+                        results = db_ctx.parent.cursor.fetchone()
+                        self.assertEqual(results['count(name)'], 1)
 
     async def test_1_insert(self):
         cfg =SqliteQueryConfig(
@@ -114,7 +129,15 @@ class TestSqliteQuery(AsyncTestCase):
                             for test_ctx,test_val in test_inputs.items()
                         }
                     ):
-                        print(results)
+                        continue
+
+        async with self.sdb() as db_ctx:
+            query = (
+                f"SELECT * FROM {self.table_name} "
+                )
+            db_ctx.parent.cursor.execute(query)
+            rows = db_ctx.parent.cursor.fetchall()
+            self.assertEqual(self.data_dicts,rows)
 
     async def test_2_lookup(self):
         cfg =SqliteQueryConfig(
@@ -145,5 +168,8 @@ class TestSqliteQuery(AsyncTestCase):
                         for test_ctx,test_val in test_inputs.items()
                     }
                 ):
-                    print(results)
+                   self.assertIn("query_lookups",results)
+                   results = results["query_lookups"]
+                   self.assertEqual(self.data_dicts,results)
+
 
