@@ -5,6 +5,22 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
+### Added
+- Quickstart document to show how to use models from Python.
+- The latest release of the documentation now includes a link to the
+  documentation for the master branch (on GitHub pages).
+### Changed
+- Defining features on the command line no longer requires that defined features
+  be prefixed with `def:`
+- The model predict operation will now raise an exception if the model it is
+  passed via it's config is a class rather than an instance.
+- `entry_point` and friends have been renamed to `entrypoint`.
+### Fixed
+- CONTRIBUTING.md has `-e` in the wrong place in the getting setup section.
+- Since moving to auto `args()` and `config()`, BaseConfigurable no longer
+  produces odd typenames in conjunction with docs.py.
+### Removed
+- The model predict operation erroneously had a `msg` parameter in it's config.
 
 ## [0.3.2] - 2020-01-03
 ### Added
@@ -153,8 +169,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Labels for CSV sources
 - util.cli CMD's correcly set the description of subparsers instead of their
   help, they also accept the `CLI_FORMATTER_CLASS` property.
-- CSV source now has `entry_point` decoration
-- JSON source now has `entry_point` decoration
+- CSV source now has `entrypoint` decoration
+- JSON source now has `entrypoint` decoration
 - Strict flag in df.memory is now on by default
 - Dynamically created scikit models get config args correctly
 - Renamed `DNNClassifierModelContext` first init arg from `config` to `features`
@@ -183,7 +199,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 - MemoryOperationImplementationNetwork instantiates OperationImplementations
   using their `withconfig()` method.
-- MemorySource now decorated with `entry_point`
+- MemorySource now decorated with `entrypoint`
 - MemorySource takes arguments correctly via `config_set` and `config_get`
 - skel modules have `long_description_content_type` set to "text/markdown"
 - Base Orchestrator `__aenter__` and `__aexit__` methods were moved to the
