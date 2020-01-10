@@ -1,0 +1,2 @@
+tasks:
+  - init: pip install -e .[dev] && dffml service dev install
