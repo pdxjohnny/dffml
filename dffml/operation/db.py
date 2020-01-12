@@ -28,7 +28,6 @@ class SqliteQueryConfig:
 # flow on execution
 # Note : Add `query_type`:str to `SqliteQueryConfig` before use.
 @op(
-    name="dffml.sqlitedb.query",
     inputs={
         "table_name":QUERY_TABLE,
         "data": QUERY_DATA,

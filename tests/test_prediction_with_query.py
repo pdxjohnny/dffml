@@ -26,7 +26,7 @@ from dffml.df.types import Definition,DataFlow
 from dffml.operation.mapping import mapping_expand_all_values, mapping_expand_all_keys, mapping_extract_value, create_mapping, mapping_formatter
 from dffml.operation.array import array_create, array_append
 from dffml.operation.model import model_predict,ModelPredictConfig
-from dffml.operation.db import SqliteQueryConfig,SqliteDatabase,sqlite_query
+from dffml.operation.db import SqliteQueryConfig,SqliteDatabase,sqlite_query,sqlite_query_update
 
 
 @config
@@ -118,7 +118,7 @@ class TestRunOnDataflow(AsyncTestCase):
                 "conditions_array_append_2": array_append.op,
                 "conditions_or": array_create.op,
                 "conditions_and": array_create.op,
-                "update_db": sqlite_query.op,
+                "update_db": sqlite_query_update.op,
             },
             configs={
                 "run_dataflow": RunDataFlowConfig(dataflow=DATAFLOW),
@@ -131,7 +131,6 @@ class TestRunOnDataflow(AsyncTestCase):
                 ),
                 "update_db": SqliteQueryConfig(
                     database=self.sdb,
-                    query_type="update"
                 ),
             },
             seed=[
@@ -170,15 +169,8 @@ class TestRunOnDataflow(AsyncTestCase):
                 # The table to update
                 Input(
                     value=self.table_name,
-                    definition=sqlite_query.op.inputs["table_name"],
-                ),
-                # Cols is empty since we are not doing a lookup
-                # TODO Make lookup a different function, since the other
-                # operations will never have cols
-                Input(
-                    value=[],
-                    definition=sqlite_query.op.inputs["cols"],
-                ),
+                    definition=sqlite_query_update.op.inputs["table_name"],
+                )
             ],
             implementations={
                 "model_predict" : model_predict.imp,
@@ -188,6 +180,7 @@ class TestRunOnDataflow(AsyncTestCase):
                 mapping_extract_value.op.name: mapping_extract_value.imp,
                 array_create.op.name: array_create.imp,
                 array_append.op.name: array_append.imp,
+                sqlite_query_update.op.name : sqlite_query_update.imp,
             },
         )
         # Redirect output of run_dataflow to model_predict

@@ -77,8 +77,6 @@ setup(
             "dffml.mapping.create = dffml.operation.mapping:create_mapping",
             # dataflow
             "dffml.dataflow.run = dffml.operation.dataflow:run_dataflow",
-            #databse
-            "dffml.sqlitedb.query = dffml.operation.db:sqlite_query"
         ],
         "dffml.kvstore": ["memory = dffml.df.memory:MemoryKeyValueStore"],
         "dffml.input.network": ["memory = dffml.df.memory:MemoryInputNetwork"],
