@@ -4,7 +4,7 @@ import sys
 from collections import OrderedDict
 from dffml.db.sqlite import SqliteDatabase, SqliteDatabaseConfig
 from dffml.util.asynctestcase import AsyncTestCase
-from dffml.operation.db import sqlite_query,SqliteQueryConfig
+from dffml.operation.db import sqlite_query,SqliteQueryConfig,sqlite_query_create_table,sqlite_query_insert,sqlite_query_lookup
 from dffml.df.types import DataFlow, Input,Operation
 from dffml.operation.output import GetSingle
 from dffml.df.memory import MemoryOrchestrator
@@ -44,35 +44,33 @@ class TestSqliteQuery(AsyncTestCase):
             {"key": 12, "firstName": "Bill", "lastName": "Miles", "age": 40},
         ]
 
-    def _create_dataflow_with_config(self,cfg):
-
+    def _create_dataflow_with_op(self,query_op):
         seed = [
             Input(
-                    value=[sqlite_query.op.outputs["lookups"].name],
+                    value=[query_op.op.outputs["lookups"].name],
                     definition=GetSingle.op.inputs["spec"],
                 )
             ]
         return DataFlow(
             operations={
-                "sqlite_query": sqlite_query.op,
+                "sqlite_query": query_op.op,
                 "get_single": GetSingle.imp.op,
             },
-            configs={"sqlite_query": cfg},
-            seed=seed
+            configs={"sqlite_query": SqliteQueryConfig(
+                    database =self.sdb,
+                        )
+                    },
+            seed=seed,
+            implementations={query_op.op.name:query_op.imp}
         )
 
     async def test_0_create(self):
-        cfg =SqliteQueryConfig(
-                database =self.sdb,
-                query_type = "create"
-        )
-        df = self._create_dataflow_with_config(cfg)
+
+        df = self._create_dataflow_with_op(sqlite_query_create_table)
         test_inputs = {
             "create" : {
                 "table_name" : self.table_name,
                 "cols" : self.cols,
-                "data":{},
-                "conditions":[],
             }
         }
 
@@ -100,18 +98,13 @@ class TestSqliteQuery(AsyncTestCase):
                         self.assertEqual(results['count(name)'], 1)
 
     async def test_1_insert(self):
-        cfg =SqliteQueryConfig(
-                database =self.sdb,
-                query_type = "insert"
-        )
-        df = self._create_dataflow_with_config(cfg)
+
+        df = self._create_dataflow_with_op(sqlite_query_insert)
         for _data in  self.data_dicts:
             test_inputs = {
                 "insert" : {
                     "table_name" : self.table_name,
-                    "cols" : [],
                     "data":_data,
-                    "conditions":[],
                 }
             }
 
@@ -140,16 +133,11 @@ class TestSqliteQuery(AsyncTestCase):
             self.assertEqual(self.data_dicts,rows)
 
     async def test_2_lookup(self):
-        cfg =SqliteQueryConfig(
-                database =self.sdb,
-                query_type = "lookup"
-        )
-        df = self._create_dataflow_with_config(cfg)
+        df = self._create_dataflow_with_op(sqlite_query_lookup)
         test_inputs = {
-            "insert" : {
+            "lookup" : {
                 "table_name" : self.table_name,
                 "cols" : [],
-                "data":{},
                 "conditions":[],
             }
         }
