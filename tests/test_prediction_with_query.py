@@ -22,11 +22,21 @@ from dffml.db.sqlite import SqliteDatabase, SqliteDatabaseConfig
 
 from dffml.util.entrypoint import entrypoint
 from dffml.df.base import op
-from dffml.df.types import Definition,DataFlow
-from dffml.operation.mapping import mapping_expand_all_values, mapping_expand_all_keys, mapping_extract_value, create_mapping, mapping_formatter
+from dffml.df.types import Definition, DataFlow
+from dffml.operation.mapping import (
+    mapping_expand_all_values,
+    mapping_expand_all_keys,
+    mapping_extract_value,
+    create_mapping,
+    mapping_formatter,
+)
 from dffml.operation.array import array_create, array_append
-from dffml.operation.model import model_predict,ModelPredictConfig
-from dffml.operation.db import SqliteQueryConfig,SqliteDatabase,sqlite_query_update
+from dffml.operation.model import model_predict, ModelPredictConfig
+from dffml.operation.db import (
+    SqliteQueryConfig,
+    SqliteDatabase,
+    sqlite_query_update,
+)
 
 
 @config
@@ -36,22 +46,24 @@ class FakeModelConfig:
 
 # Model
 class FakeModelContext(ModelContext):
-    async def train(self,*args,**kwargs):
+    async def train(self, *args, **kwargs):
         pass
-    async def accuracy(self,*args,**kwargs):
+
+    async def accuracy(self, *args, **kwargs):
         return AccuracyType(0.5)
-    async def predict(self,repos:AsyncIterator[Repo])->AsyncIterator[Repo]:
+
+    async def predict(self, repos: AsyncIterator[Repo]) -> AsyncIterator[Repo]:
         async for repo in repos:
             repo.predicted(
-                repo.feature(self.parent.config.feature.NAME) + 0.1234,
-                0.5
+                repo.feature(self.parent.config.feature.NAME) + 0.1234, 0.5
             )
             yield repo
 
+
 @entrypoint("fake")
 class FakeModel(Model):
-        CONTEXT = FakeModelContext
-        CONFIG = FakeModelConfig
+    CONTEXT = FakeModelContext
+    CONFIG = FakeModelConfig
 
 
 class TestRunOnDataflow(AsyncTestCase):
@@ -62,7 +74,7 @@ class TestRunOnDataflow(AsyncTestCase):
         cls.sdb = SqliteDatabase(
             SqliteDatabaseConfig(filename=cls.database_name)
         )
-        cls.table_name="fakeTable"
+        cls.table_name = "fakeTable"
 
     @classmethod
     def tearDownClass(cls):
@@ -70,14 +82,19 @@ class TestRunOnDataflow(AsyncTestCase):
 
     async def setUp(self):
         super().setUp()
-        async with SqliteDatabase(SqliteDatabaseConfig(filename=self.database_name)) as db:
+        async with SqliteDatabase(
+            SqliteDatabaseConfig(filename=self.database_name)
+        ) as db:
             async with db() as ctx:
-                await ctx.create_table(self.table_name, {
-                    "key": "text",
-                    "value": "int",
-                })
-                await ctx.insert(self.table_name, {"key": "add_op", "value": 0})
-                await ctx.insert(self.table_name, {"key": "mult_op", "value": 0})
+                await ctx.create_table(
+                    self.table_name, {"key": "text", "value": "int"}
+                )
+                await ctx.insert(
+                    self.table_name, {"key": "add_op", "value": 0}
+                )
+                await ctx.insert(
+                    self.table_name, {"key": "mult_op", "value": 0}
+                )
 
     async def test_run(self):
         # results = [row async for row in db_ctx.lookup(self.table_name)]
@@ -87,28 +104,25 @@ class TestRunOnDataflow(AsyncTestCase):
              data : {'add_op': 420}
             """
 
-            _key,_val = next(iter(data.items()))
+            _key, _val = next(iter(data.items()))
 
             table_name = self.table_name
-            data={"value":_val}
-            conditions=[[
-                        ["key","=",_key ]
-                    ]]
-            cols=[]
+            data = {"value": _val}
+            conditions = [[["key", "=", _key]]]
+            cols = []
 
             return {
-                "table_name" : table_name,
-                "data" : data,
-                "conditions" : conditions,
-                "cols" : cols
+                "table_name": table_name,
+                "data": data,
+                "conditions": conditions,
+                "cols": cols,
             }
-
 
         test_dataflow = DataFlow(
             operations={
                 "run_dataflow": run_dataflow.op,
                 "get_single": GetSingle.imp.op,
-                "model_predict" : model_predict.op,
+                "model_predict": model_predict.op,
                 "mapping_expand_all_values": mapping_expand_all_values.op,
                 "mapping_expand_all_keys": mapping_expand_all_keys.op,
                 "mapping_extract_value": mapping_extract_value.op,
@@ -122,16 +136,12 @@ class TestRunOnDataflow(AsyncTestCase):
             },
             configs={
                 "run_dataflow": RunDataFlowConfig(dataflow=DATAFLOW),
-                "model_predict" : ModelPredictConfig(
+                "model_predict": ModelPredictConfig(
                     model=FakeModel(
-                        FakeModelConfig(
-                            feature=DefFeature("result", int, 1),
-                        )
-                    ),
+                        FakeModelConfig(feature=DefFeature("result", int, 1))
+                    )
                 ),
-                "update_db": SqliteQueryConfig(
-                    database=self.sdb,
-                ),
+                "update_db": SqliteQueryConfig(database=self.sdb),
             },
             seed=[
                 # Make the output of the dataflow the prediction
@@ -170,58 +180,71 @@ class TestRunOnDataflow(AsyncTestCase):
                 Input(
                     value=self.table_name,
                     definition=sqlite_query_update.op.inputs["table_name"],
-                )
+                ),
             ],
             implementations={
-                "model_predict" : model_predict.imp,
+                "model_predict": model_predict.imp,
                 mapping_expand_all_values.op.name: mapping_expand_all_values.imp,
                 mapping_expand_all_keys.op.name: mapping_expand_all_keys.imp,
                 create_mapping.op.name: create_mapping.imp,
                 mapping_extract_value.op.name: mapping_extract_value.imp,
                 array_create.op.name: array_create.imp,
                 array_append.op.name: array_append.imp,
-                sqlite_query_update.op.name : sqlite_query_update.imp,
+                sqlite_query_update.op.name: sqlite_query_update.imp,
             },
         )
         # Redirect output of run_dataflow to model_predict
-        test_dataflow.flow["mapping_expand_all_keys"].inputs["mapping"] = \
-                [{"run_dataflow": "results"}]
-        test_dataflow.flow["mapping_expand_all_values"].inputs["mapping"] = \
-                [{"run_dataflow": "results"}]
-        test_dataflow.flow["model_predict"].inputs["features"] = \
-                [{"mapping_expand_all_values": "value"}]
-        test_dataflow.flow["mapping_extract_value"].inputs["mapping"] = \
-                [{"model_predict": "prediction"}]
+        test_dataflow.flow["mapping_expand_all_keys"].inputs["mapping"] = [
+            {"run_dataflow": "results"}
+        ]
+        test_dataflow.flow["mapping_expand_all_values"].inputs["mapping"] = [
+            {"run_dataflow": "results"}
+        ]
+        test_dataflow.flow["model_predict"].inputs["features"] = [
+            {"mapping_expand_all_values": "value"}
+        ]
+        test_dataflow.flow["mapping_extract_value"].inputs["mapping"] = [
+            {"model_predict": "prediction"}
+        ]
         # Create value mapping
-        test_dataflow.flow["create_value_mapping"].inputs["key"] = \
-                ["seed.create_value_mapping.key"]
-        test_dataflow.flow["create_value_mapping"].inputs["value"] = \
-                [{"mapping_extract_value": "value"}]
+        test_dataflow.flow["create_value_mapping"].inputs["key"] = [
+            "seed.create_value_mapping.key"
+        ]
+        test_dataflow.flow["create_value_mapping"].inputs["value"] = [
+            {"mapping_extract_value": "value"}
+        ]
         # Create db update conditions array
-        test_dataflow.flow["conditions_array_create"].inputs["value"] = \
-                ["seed.conditions.index.0"]
-        test_dataflow.flow["conditions_array_append_1"].inputs.update({
-            "array": [{"conditions_array_create": "array"}],
-            "value": ["seed.conditions.index.1"],
-        })
-        test_dataflow.flow["conditions_array_append_2"].inputs.update({
-            "array": [{"conditions_array_append_1": "array"}],
-            "value": [{"mapping_expand_all_keys": "key"}],
-        })
+        test_dataflow.flow["conditions_array_create"].inputs["value"] = [
+            "seed.conditions.index.0"
+        ]
+        test_dataflow.flow["conditions_array_append_1"].inputs.update(
+            {
+                "array": [{"conditions_array_create": "array"}],
+                "value": ["seed.conditions.index.1"],
+            }
+        )
+        test_dataflow.flow["conditions_array_append_2"].inputs.update(
+            {
+                "array": [{"conditions_array_append_1": "array"}],
+                "value": [{"mapping_expand_all_keys": "key"}],
+            }
+        )
         # Nest the condition array in the
         # ((key = ?) OR (1 = 1)) AND ((1 = 1))
         # Format that the update operation requires
-        test_dataflow.flow["conditions_or"].inputs.update({
-            "value": [{"conditions_array_append_2": "array"}],
-        })
-        test_dataflow.flow["conditions_and"].inputs.update({
-            "value": [{"conditions_or": "array"}],
-        })
+        test_dataflow.flow["conditions_or"].inputs.update(
+            {"value": [{"conditions_array_append_2": "array"}]}
+        )
+        test_dataflow.flow["conditions_and"].inputs.update(
+            {"value": [{"conditions_or": "array"}]}
+        )
         # Use key value mapping as data for db update
-        test_dataflow.flow["update_db"].inputs.update({
-            "data": [{"create_value_mapping": "mapping"}],
-            "conditions": [{"conditions_and": "array"}],
-        })
+        test_dataflow.flow["update_db"].inputs.update(
+            {
+                "data": [{"create_value_mapping": "mapping"}],
+                "conditions": [{"conditions_and": "array"}],
+            }
+        )
 
         test_dataflow.update_by_origin()
 
@@ -268,9 +291,14 @@ class TestRunOnDataflow(AsyncTestCase):
                 ):
                     pass
 
-        async with SqliteDatabase(SqliteDatabaseConfig(filename=self.database_name)) as db:
+        async with SqliteDatabase(
+            SqliteDatabaseConfig(filename=self.database_name)
+        ) as db:
             async with db() as db_ctx:
-                results = {row["key"]: row["value"] async for row in db_ctx.lookup(self.table_name)}
+                results = {
+                    row["key"]: row["value"]
+                    async for row in db_ctx.lookup(self.table_name)
+                }
                 for key, value in test_outputs.items():
                     with self.subTest(context=key):
                         self.assertIn(key, results)

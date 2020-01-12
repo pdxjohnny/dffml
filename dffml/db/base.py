@@ -21,9 +21,7 @@ from dffml.util.entrypoint import base_entry_point
 Condition = collections.namedtuple(
     "Condtion", ["column", "operation", "value"]
 )
-Conditions = Union[
-    List[List[Condition]], List[List[Tuple[str]]],
-]
+Conditions = Union[List[List[Condition]], List[List[Tuple[str]]]]
 
 
 class DatabaseContextConstraint(abc.ABC):

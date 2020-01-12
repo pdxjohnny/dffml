@@ -74,7 +74,7 @@ class SqliteDatabaseContext(BaseDatabaseContext):
         return condition_dict
 
     async def create_table(
-        self, table_name: str, cols: Dict[str, str],*args,**kwargs
+        self, table_name: str, cols: Dict[str, str], *args, **kwargs
     ) -> None:
         """
         Creates a table with name `table_name` if it doesn't exist.
@@ -90,8 +90,9 @@ class SqliteDatabaseContext(BaseDatabaseContext):
         self.logger.debug(query)
         self.parent.cursor.execute(query)
 
-    async def insert(self, table_name: str, data: Dict[str, Any]
-        ,*args,**kwargs) -> None:
+    async def insert(
+        self, table_name: str, data: Dict[str, Any], *args, **kwargs
+    ) -> None:
         """
         Inserts values to corresponding cols (according to position) to the
         table `table_name`
@@ -112,7 +113,8 @@ class SqliteDatabaseContext(BaseDatabaseContext):
         table_name: str,
         data: Dict[str, Any],
         conditions: Optional[Conditions] = None,
-        *args,**kwargs
+        *args,
+        **kwargs,
     ) -> None:
         """
         Updates values of rows (satisfying `conditions` if provided) with
@@ -143,7 +145,8 @@ class SqliteDatabaseContext(BaseDatabaseContext):
         table_name: str,
         cols: Optional[List[str]] = None,
         conditions: Optional[Conditions] = None,
-        *args,**kwargs
+        *args,
+        **kwargs,
     ) -> AsyncIterator[Dict[str, Any]]:
         """
         Returns list of rows (satisfying `conditions` if provided) from
