@@ -28,7 +28,6 @@ from dffml.operation.mapping import (
     mapping_expand_all_keys,
     mapping_extract_value,
     create_mapping,
-    mapping_formatter,
 )
 from dffml.operation.array import array_create, array_append
 from dffml.operation.model import model_predict, ModelPredictConfig
