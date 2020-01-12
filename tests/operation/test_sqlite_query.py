@@ -5,10 +5,10 @@ from collections import OrderedDict
 from dffml.db.sqlite import SqliteDatabase, SqliteDatabaseConfig
 from dffml.util.asynctestcase import AsyncTestCase
 from dffml.operation.db import (
-    SqliteQueryConfig,
-    sqlite_query_create_table,
-    sqlite_query_insert,
-    sqlite_query_lookup,
+    DatabaseQueryConfig,
+    db_query_create_table,
+    db_query_insert,
+    db_query_lookup,
 )
 from dffml.df.types import DataFlow, Input, Operation
 from dffml.operation.output import GetSingle
@@ -51,17 +51,17 @@ class TestSqliteQuery(AsyncTestCase):
     def _create_dataflow_with_op(self, query_op, seed=[]):
         return DataFlow(
             operations={
-                "sqlite_query": query_op.op,
+                "db_query": query_op.op,
                 "get_single": GetSingle.imp.op,
             },
-            configs={"sqlite_query": SqliteQueryConfig(database=self.sdb)},
+            configs={"db_query": DatabaseQueryConfig(database=self.sdb)},
             seed=seed,
             implementations={query_op.op.name: query_op.imp},
         )
 
     async def test_0_create(self):
 
-        df = self._create_dataflow_with_op(sqlite_query_create_table)
+        df = self._create_dataflow_with_op(db_query_create_table)
         test_inputs = {
             "create": {"table_name": self.table_name, "cols": self.cols}
         }
@@ -73,7 +73,7 @@ class TestSqliteQuery(AsyncTestCase):
                         test_ctx: [
                             Input(
                                 value=val,
-                                definition=sqlite_query_create_table.op.inputs[
+                                definition=db_query_create_table.op.inputs[
                                     key
                                 ],
                             )
@@ -93,7 +93,7 @@ class TestSqliteQuery(AsyncTestCase):
 
     async def test_1_insert(self):
 
-        df = self._create_dataflow_with_op(sqlite_query_insert)
+        df = self._create_dataflow_with_op(db_query_insert)
         for _data in self.data_dicts:
             test_inputs = {
                 "insert": {"table_name": self.table_name, "data": _data}
@@ -106,7 +106,7 @@ class TestSqliteQuery(AsyncTestCase):
                             test_ctx: [
                                 Input(
                                     value=val,
-                                    definition=sqlite_query_insert.op.inputs[
+                                    definition=db_query_insert.op.inputs[
                                         key
                                     ],
                                 )
@@ -126,11 +126,11 @@ class TestSqliteQuery(AsyncTestCase):
     async def test_2_lookup(self):
         seed = [
             Input(
-                value=[sqlite_query_lookup.op.outputs["lookups"].name],
+                value=[db_query_lookup.op.outputs["lookups"].name],
                 definition=GetSingle.op.inputs["spec"],
             )
         ]
-        df = self._create_dataflow_with_op(sqlite_query_lookup, seed=seed)
+        df = self._create_dataflow_with_op(db_query_lookup, seed=seed)
         test_inputs = {
             "lookup": {
                 "table_name": self.table_name,
@@ -146,7 +146,7 @@ class TestSqliteQuery(AsyncTestCase):
                         test_ctx: [
                             Input(
                                 value=val,
-                                definition=sqlite_query_lookup.op.inputs[key],
+                                definition=db_query_lookup.op.inputs[key],
                             )
                             for key, val in test_val.items()
                         ]

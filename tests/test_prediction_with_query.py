@@ -33,15 +33,16 @@ from dffml.operation.mapping import (
 from dffml.operation.array import array_create, array_append
 from dffml.operation.model import model_predict, ModelPredictConfig
 from dffml.operation.db import (
-    SqliteQueryConfig,
+    DatabaseQueryConfig,
     SqliteDatabase,
-    sqlite_query_update,
+    db_query_update,
 )
 
 
 @config
 class FakeModelConfig:
     feature: Feature
+    predict: Feature
 
 
 # Model
@@ -132,16 +133,18 @@ class TestRunOnDataflow(AsyncTestCase):
                 "conditions_array_append_2": array_append.op,
                 "conditions_or": array_create.op,
                 "conditions_and": array_create.op,
-                "update_db": sqlite_query_update.op,
+                "update_db": db_query_update.op,
             },
             configs={
                 "run_dataflow": RunDataFlowConfig(dataflow=DATAFLOW),
                 "model_predict": ModelPredictConfig(
                     model=FakeModel(
-                        FakeModelConfig(feature=DefFeature("result", int, 1))
+                        FakeModelConfig(feature=DefFeature("result", int, 1),
+                                        predict=DefFeature("fakePrediction",float,1)
+                                        )
                     )
                 ),
-                "update_db": SqliteQueryConfig(database=self.sdb),
+                "update_db": DatabaseQueryConfig(database=self.sdb),
             },
             seed=[
                 # Make the output of the dataflow the prediction
@@ -179,7 +182,7 @@ class TestRunOnDataflow(AsyncTestCase):
                 # The table to update
                 Input(
                     value=self.table_name,
-                    definition=sqlite_query_update.op.inputs["table_name"],
+                    definition=db_query_update.op.inputs["table_name"],
                 ),
             ],
             implementations={
@@ -190,7 +193,7 @@ class TestRunOnDataflow(AsyncTestCase):
                 mapping_extract_value.op.name: mapping_extract_value.imp,
                 array_create.op.name: array_create.imp,
                 array_append.op.name: array_append.imp,
-                sqlite_query_update.op.name: sqlite_query_update.imp,
+                db_query_update.op.name: db_query_update.imp,
             },
         )
         # Redirect output of run_dataflow to model_predict

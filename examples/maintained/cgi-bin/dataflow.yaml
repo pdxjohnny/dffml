@@ -263,5 +263,40 @@ operations:
     outputs:
       work: work_spread
     stage: processing
-seed: []
-
+seed:
+- definition: group_by_spec
+  value:
+    authors:
+      group: author_count
+      by: quarter
+      fill: 0
+    work:
+      group: work_spread
+      by: quarter
+      fill: 0
+    commits:
+      group: commit_count
+      by: quarter
+      fill: 0
+- definition: quarter_start_date
+  value: 2019-03-29 13:24
+- definition: quarter
+  value: 0
+- definition: quarter
+  value: 1
+- definition: quarter
+  value: 2
+- definition: quarter
+  value: 3
+- definition: quarter
+  value: 4
+- definition: quarter
+  value: 5
+- definition: quarter
+  value: 6
+- definition: quarter
+  value: 7
+- definition: quarter
+  value: 8
+- definition: quarter
+  value: 9

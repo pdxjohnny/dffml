@@ -5,7 +5,7 @@ from ..base import config
 from ..db.sqlite import SqliteDatabase, SqliteDatabaseContext
 from typing import Dict, Any, Optional, List
 from ..df.base import op
-from ..db.base import Conditions
+from ..db.base import Conditions,BaseDatabase
 from ..df.types import Definition
 
 
@@ -18,17 +18,17 @@ QUERY_LOOKUPS = Definition(name="query_lookups", primitive="Dict[str, Any]")
 
 
 @config
-class SqliteQueryConfig:
+class DatabaseQueryConfig:
     """
         query_type : "create","insert","update","remove","lookup"
     """
 
-    database: SqliteDatabase
+    database: BaseDatabase
 
 
 # TODO Figure out a way to handle defaults so that all inputs need not be passed to the
 # flow on execution
-# Note : Add `query_type`:str to `SqliteQueryConfig` before use.
+# Note : Add `query_type`:str to `DatabaseQueryConfig` before use.
 @op(
     inputs={
         "table_name": QUERY_TABLE,
@@ -37,11 +37,11 @@ class SqliteQueryConfig:
         "cols": QUERY_COLS,
     },
     outputs={"lookups": QUERY_LOOKUPS},
-    config_cls=SqliteQueryConfig,
+    config_cls=DatabaseQueryConfig,
     imp_enter={"database": (lambda self: self.config.database)},
     ctx_enter={"dbctx": (lambda self: self.parent.database())},
 )
-async def sqlite_query(
+async def db_query(
     self,
     *,
     table_name: str,
@@ -78,11 +78,11 @@ async def sqlite_query(
 @op(
     inputs={"table_name": QUERY_TABLE, "cols": QUERY_COLS},
     outputs={},
-    config_cls=SqliteQueryConfig,
+    config_cls=DatabaseQueryConfig,
     imp_enter={"database": (lambda self: self.config.database)},
     ctx_enter={"dbctx": (lambda self: self.parent.database())},
 )
-async def sqlite_query_create_table(
+async def db_query_create_table(
     self, *, table_name: str, cols: List[str] = []
 ) -> Dict[str, Any]:
     await self.dbctx.create_table(table_name=table_name, cols=cols)
@@ -91,11 +91,11 @@ async def sqlite_query_create_table(
 @op(
     inputs={"table_name": QUERY_TABLE, "data": QUERY_DATA},
     outputs={},
-    config_cls=SqliteQueryConfig,
+    config_cls=DatabaseQueryConfig,
     imp_enter={"database": (lambda self: self.config.database)},
     ctx_enter={"dbctx": (lambda self: self.parent.database())},
 )
-async def sqlite_query_insert(
+async def db_query_insert(
     self, *, table_name: str, data: Dict[str, Any]
 ) -> Dict[str, Any]:
     await self.dbctx.insert(table_name=table_name, data=data)
@@ -108,11 +108,11 @@ async def sqlite_query_insert(
         "conditions": QUERY_CONDITIONS,
     },
     outputs={},
-    config_cls=SqliteQueryConfig,
+    config_cls=DatabaseQueryConfig,
     imp_enter={"database": (lambda self: self.config.database)},
     ctx_enter={"dbctx": (lambda self: self.parent.database())},
 )
-async def sqlite_query_update(
+async def db_query_update(
     self, *, table_name: str, data: Dict[str, Any], conditions: Conditions = []
 ) -> Dict[str, Any]:
     await self.dbctx.update(
@@ -123,11 +123,11 @@ async def sqlite_query_update(
 @op(
     inputs={"table_name": QUERY_TABLE, "conditions": QUERY_CONDITIONS},
     outputs={},
-    config_cls=SqliteQueryConfig,
+    config_cls=DatabaseQueryConfig,
     imp_enter={"database": (lambda self: self.config.database)},
     ctx_enter={"dbctx": (lambda self: self.parent.database())},
 )
-async def sqlite_query_remove(
+async def db_query_remove(
     self, *, table_name: str, conditions: Conditions = []
 ) -> Dict[str, Any]:
     await self.dbctx.remove(table_name=table_name, conditions=conditions)
@@ -140,11 +140,11 @@ async def sqlite_query_remove(
         "conditions": QUERY_CONDITIONS,
     },
     outputs={"lookups": QUERY_LOOKUPS},
-    config_cls=SqliteQueryConfig,
+    config_cls=DatabaseQueryConfig,
     imp_enter={"database": (lambda self: self.config.database)},
     ctx_enter={"dbctx": (lambda self: self.parent.database())},
 )
-async def sqlite_query_lookup(
+async def db_query_lookup(
     self, *, table_name: str, cols: List[str] = [], conditions: Conditions = []
 ) -> Dict[str, Any]:
     result = self.dbctx.lookup(
