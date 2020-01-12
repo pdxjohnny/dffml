@@ -158,7 +158,7 @@ class TestRunOnDataflow(AsyncTestCase):
                 # operation and removing the 'confidence' key, then merging with
                 # the string to parse.
                 Input(
-                    value=["value"],
+                    value=["fakePrediction","value"],
                     definition=mapping_extract_value.op.inputs["traverse"],
                 ),
                 # Create a key value mapping where the key is "value"
