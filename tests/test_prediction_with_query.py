@@ -26,7 +26,7 @@ from dffml.df.types import Definition,DataFlow
 from dffml.operation.mapping import mapping_expand_all_values, mapping_expand_all_keys, mapping_extract_value, create_mapping, mapping_formatter
 from dffml.operation.array import array_create, array_append
 from dffml.operation.model import model_predict,ModelPredictConfig
-from dffml.operation.db import SqliteQueryConfig,SqliteDatabase,sqlite_query,sqlite_query_update
+from dffml.operation.db import SqliteQueryConfig,SqliteDatabase,sqlite_query_update
 
 
 @config
