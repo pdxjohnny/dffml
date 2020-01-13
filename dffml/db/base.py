@@ -51,7 +51,7 @@ class BaseDatabaseContext(
 
     @classmethod
     def sanitize_non_bindable(self, val):
-        if val.isalnum():
+        if val.replace("_", "").isalnum():
             return val
         raise ValueError(
             f"`{val}` : Only alphanumeric [a-zA-Z0-9] characters are allowed as table,column names"
