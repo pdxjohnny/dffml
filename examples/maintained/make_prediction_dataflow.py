@@ -31,11 +31,16 @@ from dffml.operation.array import array_create, array_append
 from dffml.operation.model import model_predict, ModelPredictConfig
 from dffml.operation.db import (
     DatabaseQueryConfig,
-    SqliteDatabase,
     db_query_update,
 )
 from dffml.config.config import ConfigLoaders
-from model.tensorflow.dffml_model_tensorflow.dnnc import (
+
+from dffml_source_mysql.db import (
+    MySQLDatabase,
+    MySQLDatabaseConfig,
+)
+
+from dffml_model_tensorflow.dnnc import (
     DNNClassifierModel,
     DNNClassifierModelConfig,
 )
@@ -51,15 +56,6 @@ TODO
 """
 
 dataflow_yaml = "./cgi-bin/dataflow.yaml"
-
-class CustomSqliteDatabase(SqliteDatabase):
-    @classmethod
-    def sanitize_non_bindable(self, val):
-        if not re.match('^[a-zA-Z0-9()_]*$',password):
-            raise ValueError(
-                f"`{val}` : [a-zA-Z0-9_] characters are only allowed as table,column names"
-            )
-        return val
 
 
 async def main():
@@ -88,7 +84,7 @@ async def main():
                     model = DNNClassifierModel(
                         DNNClassifierModelConfig(
                             predict = DefFeature("maintained",int,1),
-                            classifications = [1,1],
+                            classifications = [0, 1],
                             features= Features(
                                 DefFeature("authors",int,10),
                                 DefFeature("commits",int,10),
@@ -98,12 +94,17 @@ async def main():
                         )
                     ),
                 "update_db": DatabaseQueryConfig(
-                                database=CustomSqliteDatabase(
-                                    SqliteDatabaseConfig(
-                                        filename="db.db"
-                                        )
-                                    )
-                                ),
+                    database=MySQLDatabase(
+                        MySQLDatabaseConfig(
+                            host="127.0.0.1",
+                            port=3306,
+                            user="user",
+                            password="pass",
+                            db="db",
+                            ca=None,
+                        )
+                    )
+                ),
             },
             seed=[
                 # Make the output of the dataflow the prediction
