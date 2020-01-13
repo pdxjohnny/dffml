@@ -1,80 +1,31 @@
-import abc
-import asyncio
-import sqlite3
+import ssl
 from typing import Dict, Any, List, Union, Tuple, Optional, AsyncIterator
 
+import aiomysql
 
 from dffml.db.base import (
-    BaseDatabaseContext,
     BaseDatabase,
     Condition,
     Conditions,
 )
+from dffml.db.sqlite import SqliteDatabaseContext
 from dffml.base import config
+from dffml.repo import Repo
 from dffml.util.entrypoint import entrypoint
 
 
 @config
-class SqliteDatabaseConfig:
-    filename: str
+class MySQLDatabaseConfig:
+    host: str
+    port: int
+    user: str
+    password: str
+    db: str
+    ca: str = None
 
 
-class SqliteDatabaseContext(BaseDatabaseContext):
-    # BIND_DECLARATION is the string used to bind a param
-    BIND_DECLARATION: str = "?"
-
-    @classmethod
-    def make_condition_expression(cls, conditions):
-        """
-        Returns a dict with keys 'expression','values' if conditions is not empty
-        else returns `None`
-
-        eg :
-            Input : conditions = [
-                [["firstName", "=", "John"], ["lastName", "=", "Miles"]],
-                [["age", "<", "38"]],
-            ]
-
-            Output : {
-                'expression':
-                    '((firstName = ? ) OR (lastName = ? )) AND ((age < ? ))',
-                'values':
-                     ['John', 'Miles', '38']
-                }
-        """
-
-        def _make_condition_expression(conditions):
-            def make_or(lst):
-                val_list = []
-                exp = []
-
-                for cnd in lst:
-                    exp.append(f"(`{cnd.column}` {cnd.operation} {cls.BIND_DECLARATION} )")
-                    val_list.append(cnd.value)
-
-                result = {"expression": " OR ".join(exp), "values": val_list}
-
-                return result
-
-            lst = map(make_or, conditions)
-
-            result_exps = []
-            result_vals = []
-            for result in lst:
-                temp_exp = result["expression"]
-                temp_exp = f"({temp_exp})"
-                result_exps.append(temp_exp)
-                result_vals.extend(result["values"])
-
-            result_exps = " AND ".join(result_exps)
-            result = {"expression": result_exps, "values": result_vals}
-
-            return result
-
-        condition_dict = None
-        if (not conditions == None) and (len(conditions) != 0):
-            condition_dict = _make_condition_expression(conditions)
-        return condition_dict
+class MySQLDatabaseContext(SqliteDatabaseContext):
+    BIND_DECLARATION: str = "%s"
 
     async def create_table(
         self, table_name: str, cols: Dict[str, str], *args, **kwargs
@@ -91,7 +42,7 @@ class SqliteDatabaseContext(BaseDatabaseContext):
         )
 
         self.logger.debug(query)
-        self.parent.cursor.execute(query)
+        await self.conn.execute(query)
 
     async def insert(
         self, table_name: str, data: Dict[str, Any], *args, **kwargs
@@ -106,10 +57,9 @@ class SqliteDatabaseContext(BaseDatabaseContext):
             + f"( {col_exp} )"
             + f" VALUES( {', '.join([self.BIND_DECLARATION] * len(data))} ) "
         )
-        async with self.parent.lock:
-            with self.parent.db:
-                self.logger.debug(query)
-                self.parent.cursor.execute(query, list(data.values()))
+
+        self.logger.debug(query)
+        await self.conn.execute(query, list(data.values()))
 
     async def update(
         self,
@@ -138,10 +88,8 @@ class SqliteDatabaseContext(BaseDatabaseContext):
             + (f" WHERE {condition_exp}" if condition_exp is not None else "")
         )
 
-        async with self.parent.lock:
-            with self.parent.db:
-                self.logger.debug(query)
-                self.parent.cursor.execute(query, query_values)
+        self.logger.debug(query)
+        await self.conn.execute(query, query_values)
 
     async def lookup(
         self,
@@ -173,12 +121,10 @@ class SqliteDatabaseContext(BaseDatabaseContext):
             f" WHERE {condition_exp}" if condition_exp is not None else ""
         )
 
-        async with self.parent.lock:
-            with self.parent.db:
-                self.logger.debug(query)
-                self.parent.cursor.execute(query, query_values)
-                for row in self.parent.cursor.fetchall():
-                    yield dict(row)
+        self.logger.debug(query)
+        await self.conn.execute(query, query_values)
+        for row in await self.conn.fetchall():
+            yield dict(row)
 
     async def remove(
         self, table_name: str, conditions: Optional[Conditions] = None
@@ -190,20 +136,53 @@ class SqliteDatabaseContext(BaseDatabaseContext):
         query = f"DELETE FROM {table_name} " + (
             f" WHERE {condition_exp}" if condition_exp is not None else ""
         )
-        async with self.parent.lock:
-            with self.parent.db:
-                self.logger.debug(query)
-                self.parent.cursor.execute(query)
+        # TODO Bind parameters?
+        await self.conn.execute(query)
+
+    async def __aenter__(self) -> "MySQLDatabaseContext":
+        self.__conn = self.parent.db.cursor(aiomysql.DictCursor)
+        self.conn = await self.__conn.__aenter__()
+        return self
+
+    async def __aexit__(self, exc_type, exc_value, traceback):
+        await self.__conn.__aexit__(exc_type, exc_value, traceback)
+        await self.parent.db.commit()
 
 
-@entrypoint("sqlite")
-class SqliteDatabase(BaseDatabase):
-    CONFIG = SqliteDatabaseConfig
-    CONTEXT = SqliteDatabaseContext
+@entrypoint("mysql")
+class MySQLDatabase(BaseDatabase):
+    CONFIG = MySQLDatabaseConfig
+    CONTEXT = MySQLDatabaseContext
 
     def __init__(self, cfg):
         super().__init__(cfg)
-        self.db = sqlite3.connect(self.config.filename)
-        self.db.row_factory = sqlite3.Row
-        self.cursor = self.db.cursor()
-        self.lock = asyncio.Lock()
+        self.db = None
+        self.pool = None
+
+    async def __aenter__(self) -> "MySQLDatabase":
+        # Verify MySQL connection using provided certificate, if given
+        ssl_ctx = None
+        if self.config.ca is not None:
+            self.logger.debug(
+                f"Secure connection to MySQL: CA file: {self.config.ca}"
+            )
+            ssl_ctx = ssl.create_default_context(cafile=self.config.ca)
+        else:
+            self.logger.critical("Insecure connection to MySQL")
+        # Connect to MySQL
+        self.pool = await aiomysql.create_pool(
+            host=self.config.host,
+            port=self.config.port,
+            user=self.config.user,
+            password=self.config.password,
+            db=self.config.db,
+            ssl=ssl_ctx,
+        )
+        self.__db = self.pool.acquire()
+        self.db = await self.__db.__aenter__()
+        return self
+
+    async def __aexit__(self, exc_type, exc_value, traceback):
+        await self.__db.__aexit__(exc_type, exc_value, traceback)
+        self.pool.close()
+        await self.pool.wait_closed()
