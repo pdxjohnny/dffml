@@ -313,6 +313,9 @@ By copying the example source implementation
     existing logic and just want to store data in MySQL, you chould check out
     the MySQL :doc:`/plugins/dffml_source` plugin.
 
+.. TODO See if we can use the existing MySQL source instead of implementing a
+   custom source.
+
 **demoapp/source.py**
 
 .. literalinclude:: /../examples/maintained/demoapp/source.py
