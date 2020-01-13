@@ -3,8 +3,12 @@ import io
 import json
 import asyncio
 import contextlib
+import logging
 import re
 import pathlib
+
+logging.basicConfig(level=logging.DEBUG)
+
 from dffml.df.types import DataFlow, Input
 from dffml.df.memory import MemoryOrchestrator
 from dffml.operation.dataflow import run_dataflow, RunDataFlowConfig
@@ -26,12 +30,13 @@ from dffml.operation.mapping import (
     mapping_expand_all_keys,
     mapping_extract_value,
     create_mapping,
+    mapping_merge,
 )
 from dffml.operation.array import array_create, array_append
 from dffml.operation.model import model_predict, ModelPredictConfig
 from dffml.operation.db import (
     DatabaseQueryConfig,
-    db_query_update,
+    db_query_insert,
 )
 from dffml.config.config import ConfigLoaders
 
@@ -70,13 +75,15 @@ async def main():
                 "mapping_expand_all_values": mapping_expand_all_values.op,
                 "mapping_expand_all_keys": mapping_expand_all_keys.op,
                 "mapping_extract_value": mapping_extract_value.op,
-                "create_value_mapping": create_mapping.op,
+                "create_src_url_mapping": create_mapping.op,
+                "create_maintained_mapping": create_mapping.op,
+                "create_insert_data": mapping_merge.op,
                 "conditions_array_create": array_create.op,
                 "conditions_array_append_1": array_append.op,
                 "conditions_array_append_2": array_append.op,
                 "conditions_or": array_create.op,
                 "conditions_and": array_create.op,
-                "update_db": db_query_update.op,
+                "insert_db": db_query_insert.op,
             },
             configs={
                 "run_dataflow": RunDataFlowConfig(dataflow=data_df),
@@ -93,7 +100,7 @@ async def main():
                             )
                         )
                     ),
-                "update_db": DatabaseQueryConfig(
+                "insert_db": DatabaseQueryConfig(
                     database=MySQLDatabase(
                         MySQLDatabaseConfig(
                             host="127.0.0.1",
@@ -122,25 +129,19 @@ async def main():
                 # # Create a key value mapping where the key is "value"
                 # # {'maintained': 1}
                 Input(
+                    value="src_url",
+                    definition=create_mapping.op.inputs["key"],
+                    origin="seed.create_src_url_mapping.key",
+                ),
+                Input(
                     value="maintained",
                     definition=create_mapping.op.inputs["key"],
-                    origin="seed.create_value_mapping.key",
+                    origin="seed.create_maintained_mapping.key",
                 ),
-                # # Create the conditions array for the db update operation
-                Input(
-                    value="src_url",
-                    definition=array_append.op.inputs["value"],
-                    origin="seed.conditions.index.0",
-                ),
-                Input(
-                    value="=",
-                    definition=array_append.op.inputs["value"],
-                    origin="seed.conditions.index.1",
-                ),
-                # # The table to update
+                # # The table to insert
                 Input(
                     value='status',
-                    definition=db_query_update.op.inputs["table_name"],
+                    definition=db_query_insert.op.inputs["table_name"],
                 ),
             ],
             implementations={
@@ -149,9 +150,10 @@ async def main():
                 mapping_expand_all_keys.op.name: mapping_expand_all_keys.imp,
                 create_mapping.op.name: create_mapping.imp,
                 mapping_extract_value.op.name: mapping_extract_value.imp,
+                mapping_merge.op.name: mapping_merge.imp,
                 array_create.op.name: array_create.imp,
                 array_append.op.name: array_append.imp,
-                db_query_update.op.name: db_query_update.imp,
+                db_query_insert.op.name: db_query_insert.imp,
             },
         )
 
@@ -170,43 +172,31 @@ async def main():
         {"model_predict": "prediction"}
     ]
 
-    # Create value mapping
-    prediction_df.flow["create_value_mapping"].inputs["key"] = [
-        "seed.create_value_mapping.key"
+    # Create src_url mapping
+    prediction_df.flow["create_src_url_mapping"].inputs["key"] = [
+        "seed.create_src_url_mapping.key"
     ]
-    prediction_df.flow["create_value_mapping"].inputs["value"] = [
+    prediction_df.flow["create_src_url_mapping"].inputs["value"] = [
+        {"mapping_expand_all_keys": "key"}
+    ]
+    # Create maintined mapping
+    prediction_df.flow["create_maintained_mapping"].inputs["key"] = [
+        "seed.create_maintained_mapping.key"
+    ]
+    prediction_df.flow["create_maintained_mapping"].inputs["value"] = [
         {"mapping_extract_value": "value"}
     ]
-
-    # Create db update conditions array
-    prediction_df.flow["conditions_array_append_1"].inputs.update(
-        {
-            "array": [{"conditions_array_create": "array"}],
-            "value": ["seed.conditions.index.1"],
-        }
-    )
-    prediction_df.flow["conditions_array_append_2"].inputs.update(
-        {
-            "array": [{"conditions_array_append_1": "array"}],
-            "value": [{"mapping_expand_all_keys": "key"}],
-        }
-    )
-    # Nest the condition array in the
-    # ((key = ?) OR (1 = 1)) AND ((1 = 1))
-    # Format that the update operation requires
-    prediction_df.flow["conditions_or"].inputs.update(
-        {"value": [{"conditions_array_append_2": "array"}]}
-    )
-    prediction_df.flow["conditions_and"].inputs.update(
-        {"value": [{"conditions_or": "array"}]}
-    )
-    # Use key value mapping as data for db update
-    prediction_df.flow["update_db"].inputs.update(
-        {
-            "data": [{"create_value_mapping": "mapping"}],
-            "conditions": [{"conditions_and": "array"}],
-        }
-    )
+    # Merge src_url and maintained mappings to create data for insert
+    prediction_df.flow["create_insert_data"].inputs["one"] = [
+        {"create_src_url_mapping": "mapping"}
+    ]
+    prediction_df.flow["create_insert_data"].inputs["two"] = [
+        {"create_maintained_mapping": "mapping"}
+    ]
+    # Use key value mapping as data for db insert
+    prediction_df.flow["insert_db"].inputs["data"] = [
+        {"create_insert_data": "mapping"},
+    ]
 
     prediction_df.update_by_origin()
 
