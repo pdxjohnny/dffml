@@ -32,7 +32,6 @@ from dffml.operation.mapping import (
     create_mapping,
     mapping_merge,
 )
-from dffml.operation.array import array_create, array_append
 from dffml.operation.model import model_predict, ModelPredictConfig
 from dffml.operation.db import (
     DatabaseQueryConfig,
@@ -73,11 +72,6 @@ prediction_df = DataFlow(
         "create_src_url_mapping": create_mapping.op,
         "create_maintained_mapping": create_mapping.op,
         "create_insert_data": mapping_merge.op,
-        "conditions_array_create": array_create.op,
-        "conditions_array_append_1": array_append.op,
-        "conditions_array_append_2": array_append.op,
-        "conditions_or": array_create.op,
-        "conditions_and": array_create.op,
         "insert_db": db_query_insert.op,
     },
     configs={
@@ -145,8 +139,6 @@ prediction_df = DataFlow(
         create_mapping.op.name: create_mapping.imp,
         mapping_extract_value.op.name: mapping_extract_value.imp,
         mapping_merge.op.name: mapping_merge.imp,
-        array_create.op.name: array_create.imp,
-        array_append.op.name: array_append.imp,
         db_query_insert.op.name: db_query_insert.imp,
     },
 )
