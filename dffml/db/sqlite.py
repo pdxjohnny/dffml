@@ -20,6 +20,9 @@ class SqliteDatabaseConfig:
 
 
 class SqliteDatabaseContext(BaseDatabaseContext):
+    # BIND_DECLARATION is the string used to bind a param
+    BIND_DECLARATION: str = "?"
+
     @classmethod
     def make_condition_expression(cls, conditions):
         """
@@ -46,7 +49,7 @@ class SqliteDatabaseContext(BaseDatabaseContext):
                 exp = []
 
                 for cnd in lst:
-                    exp.append(f"(`{cnd.column}` {cnd.operation} ? )")
+                    exp.append(f"(`{cnd.column}` {cnd.operation} {cls.BIND_DECLARATION} )")
                     val_list.append(cnd.value)
 
                 result = {"expression": " OR ".join(exp), "values": val_list}
@@ -101,7 +104,7 @@ class SqliteDatabaseContext(BaseDatabaseContext):
         query = (
             f"INSERT INTO {table_name} "
             + f"( {col_exp} )"
-            + f" VALUES( {', '.join('?' * len(data))} ) "
+            + f" VALUES( {', '.join(self.BIND_DECLARATION * len(data))} ) "
         )
         async with self.parent.lock:
             with self.parent.db:
@@ -131,7 +134,7 @@ class SqliteDatabaseContext(BaseDatabaseContext):
 
         query = (
             f"UPDATE {table_name} SET "
-            + " ".join([f"`{col}` = ?" for col in data])
+            + " ".join([f"`{col}` = {self.BIND_DECLARATION}" for col in data])
             + (f" WHERE {condition_exp}" if condition_exp is not None else "")
         )
 
