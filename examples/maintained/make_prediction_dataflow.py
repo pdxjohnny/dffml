@@ -4,6 +4,7 @@ import json
 import asyncio
 import contextlib
 import re
+import pathlib
 from dffml.df.types import DataFlow, Input
 from dffml.df.memory import MemoryOrchestrator
 from dffml.operation.dataflow import run_dataflow, RunDataFlowConfig
@@ -39,13 +40,17 @@ from model.tensorflow.dffml_model_tensorflow.dnnc import (
     DNNClassifierModelConfig,
 )
 
-dataflow_yaml = "/home/aghinsa/Documents/workspace/prep/global/dffml/examples/maintained/cgi-bin/dataflow.yaml"
 
-def pretty_print(_obj,msg=""):
-    a=_obj
-    # a=json.dumps(_obj,indent=2)
+"""
+TODO
+    * Insert prediction to database
+    * make dataflow_yaml general
+    * generalize??
+    * export dataflow -> predict_dataflow
+    * change documentation
+"""
 
-    print(f"{msg}\n{a}")
+dataflow_yaml = "./cgi-bin/dataflow.yaml"
 
 class CustomSqliteDatabase(SqliteDatabase):
     @classmethod
@@ -61,7 +66,6 @@ async def main():
     async with ConfigLoaders() as cfgl:
         _,data_df = await cfgl.load_file(filepath=dataflow_yaml)
     data_df=DataFlow._fromdict(**data_df)
-    pretty_print(data_df.definitions["URL"])
     prediction_df = DataFlow(
             operations={
                 "run_dataflow": run_dataflow.op,
@@ -83,7 +87,7 @@ async def main():
                 "model_predict": ModelPredictConfig(
                     model = DNNClassifierModel(
                         DNNClassifierModelConfig(
-                            classification = DefFeature("maintained",int,1),
+                            predict = DefFeature("maintained",int,1),
                             classifications = [1,1],
                             features= Features(
                                 DefFeature("authors",int,10),
@@ -96,59 +100,47 @@ async def main():
                 "update_db": DatabaseQueryConfig(
                                 database=CustomSqliteDatabase(
                                     SqliteDatabaseConfig(
-                                        filename="demoapp.db"
+                                        filename="db.db"
                                         )
                                     )
                                 ),
             },
             seed=[
-
-                Input(
-                    value=[run_dataflow.op.outputs["results"].name],
-                    definition=GetSingle.op.inputs["spec"],
-                ),
-                Input(
-                    value=[model_predict.op.outputs["prediction"].name],
-                    definition=GetSingle.op.inputs["spec"],
-                ),
-
                 # Make the output of the dataflow the prediction
                 Input(
                     value=[create_mapping.op.outputs["mapping"].name],
                     definition=GetSingle.op.inputs["spec"],
                 ),
-                # # model_predict outputs: {'confidence': 0.5, 'value': 4200}
+                # # model_predict outputs: {'model_predictions': {'maintained':
+                # {'confidence': 0.9989588260650635, 'value': '1'}}}
                 # # we need to extract the 'value' from it.
-                # # We could also do this by creating a mapping_remove_key
-                # # operation and removing the 'confidence' key, then merging with
-                # # the string to parse.
-                # Input(
-                #     value=["fakePrediction","value"],
-                #     definition=mapping_extract_value.op.inputs["traverse"],
-                # ),
+                Input(
+                    value=["maintained","value"],
+                    definition=mapping_extract_value.op.inputs["traverse"],
+                ),
                 # # Create a key value mapping where the key is "value"
-                # # {'value': 4200}
-                # Input(
-                #     value="value",
-                #     definition=create_mapping.op.inputs["key"],
-                #     origin="seed.create_value_mapping.key",
-                # ),
+                # # {'maintained': 1}
+                Input(
+                    value="maintained",
+                    definition=create_mapping.op.inputs["key"],
+                    origin="seed.create_value_mapping.key",
+                ),
                 # # Create the conditions array for the db update operation
-                # Input(
-                #     value="key",
-                #     definition=array_append.op.inputs["value"],
-                #     origin="seed.conditions.index.0",
-                # ),
-                # Input(
-                #     value="=",
-                #     definition=array_append.op.inputs["value"],
-                #     origin="seed.conditions.index.1",
-                # ),
+                Input(
+                    value="src_url",
+                    definition=array_append.op.inputs["value"],
+                    origin="seed.conditions.index.0",
+                ),
+                Input(
+                    value="=",
+                    definition=array_append.op.inputs["value"],
+                    origin="seed.conditions.index.1",
+                ),
                 # # The table to update
-                # Input(
-                #     value='ml_table',
-                #     definition=db_query_update.op.inputs["table_name"],
-                # ),
+                Input(
+                    value='status',
+                    definition=db_query_update.op.inputs["table_name"],
+                ),
             ],
             implementations={
                 "model_predict": model_predict.imp,
@@ -173,55 +165,54 @@ async def main():
     prediction_df.flow["model_predict"].inputs["features"] = [
         {"mapping_expand_all_values": "value"}
     ]
-    # prediction_df.flow["mapping_extract_value"].inputs["mapping"] = [
-    #     {"model_predict": "prediction"}
-    # ]
-    # # Create value mapping
-    # prediction_df.flow["create_value_mapping"].inputs["key"] = [
-    #     "seed.create_value_mapping.key"
-    # ]
-    # prediction_df.flow["create_value_mapping"].inputs["value"] = [
-    #     {"mapping_extract_value": "value"}
-    # ]
-    # # Create db update conditions array
-    # prediction_df.flow["conditions_array_create"].inputs["value"] = [
-    #     "seed.conditions.index.0"
-    # ]
-    # prediction_df.flow["conditions_array_append_1"].inputs.update(
-    #     {
-    #         "array": [{"conditions_array_create": "array"}],
-    #         "value": ["seed.conditions.index.1"],
-    #     }
-    # )
-    # prediction_df.flow["conditions_array_append_2"].inputs.update(
-    #     {
-    #         "array": [{"conditions_array_append_1": "array"}],
-    #         "value": [{"mapping_expand_all_keys": "key"}],
-    #     }
-    # )
-    # # Nest the condition array in the
-    # # ((key = ?) OR (1 = 1)) AND ((1 = 1))
-    # # Format that the update operation requires
-    # prediction_df.flow["conditions_or"].inputs.update(
-    #     {"value": [{"conditions_array_append_2": "array"}]}
-    # )
-    # prediction_df.flow["conditions_and"].inputs.update(
-    #     {"value": [{"conditions_or": "array"}]}
-    # )
-    # # Use key value mapping as data for db update
-    # prediction_df.flow["update_db"].inputs.update(
-    #     {
-    #         "data": [{"create_value_mapping": "mapping"}],
-    #         "conditions": [{"conditions_and": "array"}],
-    #     }
-    # )
+    prediction_df.flow["mapping_extract_value"].inputs["mapping"] = [
+        {"model_predict": "prediction"}
+    ]
+
+    # Create value mapping
+    prediction_df.flow["create_value_mapping"].inputs["key"] = [
+        "seed.create_value_mapping.key"
+    ]
+    prediction_df.flow["create_value_mapping"].inputs["value"] = [
+        {"mapping_extract_value": "value"}
+    ]
+
+    # Create db update conditions array
+    prediction_df.flow["conditions_array_append_1"].inputs.update(
+        {
+            "array": [{"conditions_array_create": "array"}],
+            "value": ["seed.conditions.index.1"],
+        }
+    )
+    prediction_df.flow["conditions_array_append_2"].inputs.update(
+        {
+            "array": [{"conditions_array_append_1": "array"}],
+            "value": [{"mapping_expand_all_keys": "key"}],
+        }
+    )
+    # Nest the condition array in the
+    # ((key = ?) OR (1 = 1)) AND ((1 = 1))
+    # Format that the update operation requires
+    prediction_df.flow["conditions_or"].inputs.update(
+        {"value": [{"conditions_array_append_2": "array"}]}
+    )
+    prediction_df.flow["conditions_and"].inputs.update(
+        {"value": [{"conditions_or": "array"}]}
+    )
+    # Use key value mapping as data for db update
+    prediction_df.flow["update_db"].inputs.update(
+        {
+            "data": [{"create_value_mapping": "mapping"}],
+            "conditions": [{"conditions_and": "array"}],
+        }
+    )
 
     prediction_df.update_by_origin()
 
 
     test_inputs = [
         {
-            "dffml_repo": [
+            "https://github.com/aghinsa/interactive_wall.git": [
                 {
                     "value": "https://github.com/aghinsa/interactive_wall.git",
                     "definition": data_df.definitions["URL"].name,
@@ -230,7 +221,6 @@ async def main():
             ]
         }
     ]
-    test_outputs = {"add_op": 42.1234, "mult_op": 420.1234}
 
     async with MemoryOrchestrator.withconfig({}) as orchestrator:
         async with orchestrator(prediction_df) as octx:

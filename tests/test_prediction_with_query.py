@@ -97,27 +97,6 @@ class TestRunOnDataflow(AsyncTestCase):
                 )
 
     async def test_run(self):
-        # results = [row async for row in db_ctx.lookup(self.table_name)]
-
-        def _modelPredictToQuery_formatter(data):
-            """
-             data : {'add_op': 420}
-            """
-
-            _key, _val = next(iter(data.items()))
-
-            table_name = self.table_name
-            data = {"value": _val}
-            conditions = [[["key", "=", _key]]]
-            cols = []
-
-            return {
-                "table_name": table_name,
-                "data": data,
-                "conditions": conditions,
-                "cols": cols,
-            }
-
         test_dataflow = DataFlow(
             operations={
                 "run_dataflow": run_dataflow.op,
@@ -151,7 +130,8 @@ class TestRunOnDataflow(AsyncTestCase):
                     value=[create_mapping.op.outputs["mapping"].name],
                     definition=GetSingle.op.inputs["spec"],
                 ),
-                # model_predict outputs: {'confidence': 0.5, 'value': 4200}
+                # model_predict outputs: {"fakePrediction":
+                #   {'confidence': 0.5, 'value': 4200}}
                 # we need to extract the 'value' from it.
                 # We could also do this by creating a mapping_remove_key
                 # operation and removing the 'confidence' key, then merging with
