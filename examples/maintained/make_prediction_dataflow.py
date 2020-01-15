@@ -64,10 +64,7 @@ dataflow_yaml = "./cgi-bin/dataflow.yaml"
         }
     ,
     outputs ={
-        "features" : Definition(
-                name="maintained_features",
-                primitive="Dict[str,Any]"
-                )
+        "features" : model_predict.op.inputs["features"]
             }
 )
 async def collect_maintained_features(authors,work,commits):
@@ -174,9 +171,6 @@ prediction_df = DataFlow(
 
 # Redirect output of run_dataflow to model_predict
 
-prediction_df.flow["model_predict"].inputs["features"] = [
-    {"collect_maintained_features": "features"}
-]
 prediction_df.flow["mapping_extract_value"].inputs["mapping"] = [
     {"model_predict": "prediction"}
 ]
