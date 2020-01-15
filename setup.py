@@ -75,8 +75,11 @@ setup(
             # Mapping
             "dffml.mapping.extract = dffml.operation.mapping:mapping_extract_value",
             "dffml.mapping.create = dffml.operation.mapping:create_mapping",
+            "dffml.mapping.merge = dffml.operation.mapping:mapping_merge",
             # dataflow
             "dffml.dataflow.run = dffml.operation.dataflow:run_dataflow",
+            # model
+            "dffml.model.predict = dffml.operation.model:model_predict"
         ],
         "dffml.kvstore": ["memory = dffml.df.memory:MemoryKeyValueStore"],
         "dffml.input.network": ["memory = dffml.df.memory:MemoryInputNetwork"],

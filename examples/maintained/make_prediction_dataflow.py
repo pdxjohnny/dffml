@@ -7,7 +7,7 @@ import logging
 import re
 import pathlib
 
-logging.basicConfig(level=logging.DEBUG)
+# logging.basicConfig(level=logging.DEBUG)
 
 from dffml.df.types import DataFlow, Input
 from dffml.df.memory import MemoryOrchestrator
@@ -26,8 +26,6 @@ from dffml.util.entrypoint import entrypoint
 from dffml.df.base import op
 from dffml.df.types import Definition, DataFlow
 from dffml.operation.mapping import (
-    mapping_expand_all_values,
-    mapping_expand_all_keys,
     mapping_extract_value,
     create_mapping,
     mapping_merge,
@@ -49,30 +47,60 @@ from dffml_model_tensorflow.dnnc import (
     DNNClassifierModelConfig,
 )
 
+from feature.git.dffml_feature_git.feature.operations import count_authors,git_commits,work,check_if_valid_git_repository_URL
+from feature.git.dffml_feature_git.feature.definitions import *
 
-"""
-TODO
-    * Insert prediction to database
-    * make dataflow_yaml general
-    * generalize??
-    * export dataflow -> predict_dataflow
-    * change documentation
-"""
+from dffml.df.base import op
+
 
 dataflow_yaml = "./cgi-bin/dataflow.yaml"
 
+#operation to collect features [authors,work,commits] to make features to pass to model
+@op(
+    inputs = {
+        "authors" : count_authors.op.outputs["authors"],
+        "work" : work.op.outputs["work"],
+        "commits" : git_commits.op.outputs["commits"]
+        }
+    ,
+    outputs ={
+        "features" : Definition(
+                name="maintained_features",
+                primitive="Dict[str,Any]"
+                )
+            }
+)
+async def collect_maintained_features(authors,work,commits):
+    return {
+        "features":{
+            "authors":authors,
+            "work":work,
+            "commits":commits
+        }
+    }
+
+#does outputing same defintion cause context to run twice?
+#operation to publish url
+@op(inputs={"url":URL},
+    outputs={"url":Definition(name="repeated_url",primitive="str")}
+    )
+async def publish_url(url):
+    return {"url":url}
+
 prediction_df = DataFlow(
     operations={
-        "run_dataflow": run_dataflow.op,
+        "git_work": work.op,
+        "git_count_authors": count_authors.op,
+        "git_commits": git_commits.op,
         "get_single": GetSingle.imp.op,
         "model_predict": model_predict.op,
-        "mapping_expand_all_values": mapping_expand_all_values.op,
-        "mapping_expand_all_keys": mapping_expand_all_keys.op,
         "mapping_extract_value": mapping_extract_value.op,
         "create_src_url_mapping": create_mapping.op,
         "create_maintained_mapping": create_mapping.op,
         "create_insert_data": mapping_merge.op,
-        "insert_db": db_query_insert.op,
+        "collect_maintained_features":collect_maintained_features.op,
+        "publish_url": publish_url.op,
+        # "insert_db": db_query_insert.op,
     },
     configs={
         "model_predict": ModelPredictConfig(
@@ -88,34 +116,39 @@ prediction_df = DataFlow(
                 )
             )
         ),
-        "insert_db": DatabaseQueryConfig(
-            database=MySQLDatabase(
-                MySQLDatabaseConfig(
-                    host="127.0.0.1",
-                    port=3306,
-                    user="user",
-                    password="pass",
-                    db="db",
-                    ca=None,
-                )
-            )
-        ),
+        # "insert_db": DatabaseQueryConfig(
+        #     database=MySQLDatabase(
+        #         MySQLDatabaseConfig(
+        #             host="127.0.0.1",
+        #             port=3306,
+        #             user="user",
+        #             password="pass",
+        #             db="db",
+        #             ca=None,
+        #         )
+        #     )
+        # ),
     },
     seed=[
         # Make the output of the dataflow the prediction
         Input(
+            value=[model_predict.op.outputs["prediction"].name],
+            definition=GetSingle.op.inputs["spec"],
+        ),
+
+        Input(
             value=[create_mapping.op.outputs["mapping"].name],
             definition=GetSingle.op.inputs["spec"],
         ),
-        # # model_predict outputs: {'model_predictions': {'maintained':
+        # model_predict outputs: {'model_predictions': {'maintained':
         # {'confidence': 0.9989588260650635, 'value': '1'}}}
-        # # we need to extract the 'value' from it.
+        # we need to extract the 'value' from it.
         Input(
             value=["maintained", "value"],
             definition=mapping_extract_value.op.inputs["traverse"],
         ),
-        # # Create a key value mapping where the key is "value"
-        # # {'maintained': 1}
+        # Create a key value mapping where the key is "value"
+        # {'maintained': 1}
         Input(
             value="src_url",
             definition=create_mapping.op.inputs["key"],
@@ -127,31 +160,22 @@ prediction_df = DataFlow(
             origin="seed.create_maintained_mapping.key",
         ),
         # # The table to insert
-        Input(
-            value="status",
-            definition=db_query_insert.op.inputs["table_name"],
-        ),
+        # Input(
+        #     value="status",
+        #     definition=db_query_insert.op.inputs["table_name"],
+        # ),
     ],
     implementations={
-        "model_predict": model_predict.imp,
-        mapping_expand_all_values.op.name: mapping_expand_all_values.imp,
-        mapping_expand_all_keys.op.name: mapping_expand_all_keys.imp,
-        create_mapping.op.name: create_mapping.imp,
-        mapping_extract_value.op.name: mapping_extract_value.imp,
-        mapping_merge.op.name: mapping_merge.imp,
-        db_query_insert.op.name: db_query_insert.imp,
+        # db_query_insert.op.name: db_query_insert.imp,
     },
 )
 
+
+
 # Redirect output of run_dataflow to model_predict
-prediction_df.flow["mapping_expand_all_keys"].inputs["mapping"] = [
-    {"run_dataflow": "results"}
-]
-prediction_df.flow["mapping_expand_all_values"].inputs["mapping"] = [
-    {"run_dataflow": "results"}
-]
+
 prediction_df.flow["model_predict"].inputs["features"] = [
-    {"mapping_expand_all_values": "value"}
+    {"collect_maintained_features": "features"}
 ]
 prediction_df.flow["mapping_extract_value"].inputs["mapping"] = [
     {"model_predict": "prediction"}
@@ -162,15 +186,17 @@ prediction_df.flow["create_src_url_mapping"].inputs["key"] = [
     "seed.create_src_url_mapping.key"
 ]
 prediction_df.flow["create_src_url_mapping"].inputs["value"] = [
-    {"mapping_expand_all_keys": "key"}
+    {"publish_url": "url"}
 ]
-# Create maintined mapping
+
+#Create maintined mapping
 prediction_df.flow["create_maintained_mapping"].inputs["key"] = [
     "seed.create_maintained_mapping.key"
 ]
 prediction_df.flow["create_maintained_mapping"].inputs["value"] = [
     {"mapping_extract_value": "value"}
 ]
+
 # Merge src_url and maintained mappings to create data for insert
 prediction_df.flow["create_insert_data"].inputs["one"] = [
     {"create_src_url_mapping": "mapping"}
@@ -178,49 +204,10 @@ prediction_df.flow["create_insert_data"].inputs["one"] = [
 prediction_df.flow["create_insert_data"].inputs["two"] = [
     {"create_maintained_mapping": "mapping"}
 ]
+
 # Use key value mapping as data for db insert
-prediction_df.flow["insert_db"].inputs["data"] = [
-    {"create_insert_data": "mapping"},
-]
+# prediction_df.flow["insert_db"].inputs["data"] = [
+#     {"create_insert_data": "mapping"},
+# ]
 
 prediction_df.update_by_origin()
-
-async def main():
-    async with ConfigLoaders() as cfgl:
-        _, data_df = await cfgl.load_file(filepath=dataflow_yaml)
-        data_df = DataFlow._fromdict(**data_df)
-
-    # Add the git feature scraping dataflow as the subflow
-    prediction_df.configs["run_dataflow"] = RunDataFlowConfig(
-        dataflow=data_df,
-    )
-
-    test_inputs = [
-        {
-            "https://github.com/aghinsa/interactive_wall.git": [
-                {
-                    "value": "https://github.com/aghinsa/interactive_wall.git",
-                    "definition": data_df.definitions["URL"].name,
-                },
-
-            ]
-        }
-    ]
-
-    async with MemoryOrchestrator.withconfig({}) as orchestrator:
-        async with orchestrator(prediction_df) as octx:
-            async for _ctx, results in octx.run(
-                {
-                    list(test_input.keys())[0]: [
-                        Input(
-                            value=test_input,
-                            definition=run_dataflow.op.inputs["inputs"],
-                        )
-                    ]
-                    for test_input in test_inputs
-                }
-            ):
-                print(f"result are :{results}")
-
-if __name__ == "__main__":
-    asyncio.run(main())

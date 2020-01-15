@@ -29,5 +29,12 @@ setup(
         "aiomysql>=0.0.20",
         # 'dffml>=0.3.1',
     ],
-    entry_points={"dffml.source": ["demoapp = demoapp.source:DemoAppSource"]},
+    entry_points=
+    {
+        "dffml.source": ["demoapp = demoapp.source:DemoAppSource"],
+        "dffml.operation": [
+            "publish_url = make_prediction_dataflow:publish_url",
+            "collect_maintained_features = make_prediction_dataflow:collect_maintained_features",
+        ],
+    },
 )
