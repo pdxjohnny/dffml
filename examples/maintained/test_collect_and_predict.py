@@ -51,6 +51,8 @@ from dffml_model_tensorflow.dnnc import (
 
 from make_prediction_dataflow import publish_url,collect_maintained_features
 
+os.system("dffml service dev export -config yaml make_prediction_dataflow:prediction_df > prediction_df.yaml")
+os.system("dffml dataflow merge dataflow.yaml prediction_df.yaml > collect_and_predict_df.json")
 
 collect_and_predict_path = "./collect_and_predict_df.json"
 

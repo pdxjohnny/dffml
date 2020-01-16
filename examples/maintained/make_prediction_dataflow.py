@@ -51,7 +51,7 @@ from feature.git.dffml_feature_git.feature.operations import count_authors,git_c
 from feature.git.dffml_feature_git.feature.definitions import *
 
 from dffml.df.base import op
-
+from dffml.operation.output import GroupBy
 
 dataflow_yaml = "./cgi-bin/dataflow.yaml"
 
@@ -94,9 +94,10 @@ prediction_df = DataFlow(
         "mapping_extract_value": mapping_extract_value.op,
         "create_src_url_mapping": create_mapping.op,
         "create_maintained_mapping": create_mapping.op,
-        "create_insert_data": mapping_merge.op,
+        # "create_insert_data": mapping_merge.op,
         "collect_maintained_features":collect_maintained_features.op,
         "publish_url": publish_url.op,
+        "group_by" : GroupBy.op
         # "insert_db": db_query_insert.op,
     },
     configs={
@@ -129,33 +130,41 @@ prediction_df = DataFlow(
     seed=[
         # Make the output of the dataflow the prediction
         Input(
-            value=[model_predict.op.outputs["prediction"].name],
-            definition=GetSingle.op.inputs["spec"],
+            value=[git_commits.op.outputs["commits"].name],
+            definition=GetSingle.op.inputs["spec"]
         ),
+        # Input(
+        #     value=[collect_maintained_features.op.outputs["features"].name],
+        #     definition=GetSingle.op.inputs["spec"]
+        # ),
+        # Input(
+        #     value=[model_predict.op.outputs["prediction"].name],
+        #     definition=GetSingle.op.inputs["spec"],
+        # ),
 
-        Input(
-            value=[create_mapping.op.outputs["mapping"].name],
-            definition=GetSingle.op.inputs["spec"],
-        ),
-        # model_predict outputs: {'model_predictions': {'maintained':
-        # {'confidence': 0.9989588260650635, 'value': '1'}}}
-        # we need to extract the 'value' from it.
-        Input(
-            value=["maintained", "value"],
-            definition=mapping_extract_value.op.inputs["traverse"],
-        ),
-        # Create a key value mapping where the key is "value"
-        # {'maintained': 1}
-        Input(
-            value="src_url",
-            definition=create_mapping.op.inputs["key"],
-            origin="seed.create_src_url_mapping.key",
-        ),
-        Input(
-            value="maintained",
-            definition=create_mapping.op.inputs["key"],
-            origin="seed.create_maintained_mapping.key",
-        ),
+        # Input(
+        #     value=[create_mapping.op.outputs["mapping"].name],
+        #     definition=GetSingle.op.inputs["spec"],
+        # ),
+        # # model_predict outputs: {'model_predictions': {'maintained':
+        # # {'confidence': 0.9989588260650635, 'value': '1'}}}
+        # # we need to extract the 'value' from it.
+        # Input(
+        #     value=["maintained", "value"],
+        #     definition=mapping_extract_value.op.inputs["traverse"],
+        # ),
+        # # Create a key value mapping where the key is "value"
+        # # {'maintained': 1}
+        # Input(
+        #     value="src_url",
+        #     definition=create_mapping.op.inputs["key"],
+        #     origin="seed.create_src_url_mapping.key",
+        # ),
+        # Input(
+        #     value="maintained",
+        #     definition=create_mapping.op.inputs["key"],
+        #     origin="seed.create_maintained_mapping.key",
+        # ),
         # # The table to insert
         # Input(
         #     value="status",
@@ -169,35 +178,38 @@ prediction_df = DataFlow(
 
 
 
-# Redirect output of run_dataflow to model_predict
+# # Redirect output of run_dataflow to model_predict
+# prediction_df.flow["model_predict"].inputs["features"] = [
+#     {"group_by": "output"}
+# ]
 
-prediction_df.flow["mapping_extract_value"].inputs["mapping"] = [
-    {"model_predict": "prediction"}
-]
+# prediction_df.flow["mapping_extract_value"].inputs["mapping"] = [
+#     {"model_predict": "prediction"}
+# ]
 
-# Create src_url mapping
-prediction_df.flow["create_src_url_mapping"].inputs["key"] = [
-    "seed.create_src_url_mapping.key"
-]
-prediction_df.flow["create_src_url_mapping"].inputs["value"] = [
-    {"publish_url": "url"}
-]
+# # Create src_url mapping
+# prediction_df.flow["create_src_url_mapping"].inputs["key"] = [
+#     "seed.create_src_url_mapping.key"
+# ]
+# prediction_df.flow["create_src_url_mapping"].inputs["value"] = [
+#     {"publish_url": "url"}
+# ]
 
-#Create maintined mapping
-prediction_df.flow["create_maintained_mapping"].inputs["key"] = [
-    "seed.create_maintained_mapping.key"
-]
-prediction_df.flow["create_maintained_mapping"].inputs["value"] = [
-    {"mapping_extract_value": "value"}
-]
+# #Create maintined mapping
+# prediction_df.flow["create_maintained_mapping"].inputs["key"] = [
+#     "seed.create_maintained_mapping.key"
+# ]
+# prediction_df.flow["create_maintained_mapping"].inputs["value"] = [
+#     {"mapping_extract_value": "value"}
+# ]
 
-# Merge src_url and maintained mappings to create data for insert
-prediction_df.flow["create_insert_data"].inputs["one"] = [
-    {"create_src_url_mapping": "mapping"}
-]
-prediction_df.flow["create_insert_data"].inputs["two"] = [
-    {"create_maintained_mapping": "mapping"}
-]
+# # Merge src_url and maintained mappings to create data for insert
+# prediction_df.flow["create_insert_data"].inputs["one"] = [
+#     {"create_src_url_mapping": "mapping"}
+# ]
+# prediction_df.flow["create_insert_data"].inputs["two"] = [
+#     {"create_maintained_mapping": "mapping"}
+# ]
 
 # Use key value mapping as data for db insert
 # prediction_df.flow["insert_db"].inputs["data"] = [
