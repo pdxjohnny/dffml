@@ -86,9 +86,9 @@ async def publish_url(url):
 
 prediction_df = DataFlow(
     operations={
-        "work": work.op,
-        "count_authors": count_authors.op,
-        "git_commits": git_commits.op,
+        # "work": work.op,
+        # "count_authors": count_authors.op,
+        # "git_commits": git_commits.op,
         "get_single": GetSingle.imp.op,
         "model_predict": model_predict.op,
         "mapping_extract_value": mapping_extract_value.op,
