@@ -49,17 +49,16 @@ from dffml_model_tensorflow.dnnc import (
     DNNClassifierModelConfig,
 )
 
-from make_prediction_dataflow import publish_url,collect_maintained_features
+from make_prediction_dataflow import prediction_df
 
-os.system("dffml service dev export -config yaml make_prediction_dataflow:prediction_df > prediction_df.yaml")
-os.system("dffml dataflow merge dataflow.yaml prediction_df.yaml > collect_and_predict_df.json")
+collect_and_predict_df = prediction_df
 
-collect_and_predict_path = "./collect_and_predict_df.json"
+# collect_and_predict_path = "./collect_and_predict_df.json"
 
 async def main():
-    async with ConfigLoaders() as cfgl:
-        _, collect_and_predict_df = await cfgl.load_file(filepath=collect_and_predict_path)
-        collect_and_predict_df = DataFlow._fromdict(**collect_and_predict_df)
+    # async with ConfigLoaders() as cfgl:
+    #     _, collect_and_predict_df = await cfgl.load_file(filepath=collect_and_predict_path)
+    #     collect_and_predict_df = DataFlow._fromdict(**collect_and_predict_df)
 
     test_inputs ={
             "interactive_wall": [

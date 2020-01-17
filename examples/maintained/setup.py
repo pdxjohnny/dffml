@@ -34,7 +34,7 @@ setup(
         "dffml.source": ["demoapp = demoapp.source:DemoAppSource"],
         "dffml.operation": [
             "publish_url = make_prediction_dataflow:publish_url",
-            "collect_maintained_features = make_prediction_dataflow:collect_maintained_features",
+            "publish_url_as_flow_input = make_prediction_dataflow:publish_url_as_flow_input",
         ],
     },
 )
