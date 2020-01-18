@@ -7,7 +7,7 @@ import logging
 import re
 import pathlib
 
-logging.basicConfig(level=logging.DEBUG)
+# logging.basicConfig(level=logging.DEBUG)
 
 from dffml.df.types import DataFlow, Input
 from dffml.df.memory import MemoryOrchestrator
@@ -207,6 +207,8 @@ async def main():
 
     prediction_df.update_by_origin()
 
+    exported = prediction_df.export()
+    DataFlow._fromdict(**exported)
     # TODO fix_export
 
     # with open('collect_and_predict_df.json','w+') as f:

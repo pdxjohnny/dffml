@@ -32,9 +32,5 @@ setup(
     entry_points=
     {
         "dffml.source": ["demoapp = demoapp.source:DemoAppSource"],
-        "dffml.operation": [
-            "publish_url = make_prediction_dataflow:publish_url",
-            "publish_url_as_flow_input = make_prediction_dataflow:publish_url_as_flow_input",
-        ],
     },
 )

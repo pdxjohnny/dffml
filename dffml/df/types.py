@@ -21,6 +21,7 @@ from typing import (
 from ..base import BaseConfig
 from ..util.data import export_dict, type_lookup
 from ..util.entrypoint import Entrypoint, base_entry_point
+from ..util.entrypoint import load as load_entrypoint
 
 
 class DefinitionMissing(Exception):
@@ -490,6 +491,20 @@ class DataFlow:
             )
             for instance_name, operation in kwargs["operations"].items()
         }
+
+        _implementations={}
+        for _,__op in kwargs["operations"].items():
+            _name = __op.name
+            if _name.count(":")>0 :
+                _implementations[_name]=next(
+                    load_entrypoint(__op.name)
+                    ).imp
+
+        if "implementations" in kwargs :
+             kwargs["implementations"].update(_implementations)
+        else:
+            kwargs["implementations"]=_implementations
+
         # Import seed inputs
         kwargs["seed"] = [
             Input._fromdict(**input_data) for input_data in kwargs["seed"]
