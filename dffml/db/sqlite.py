@@ -134,7 +134,7 @@ class SqliteDatabaseContext(BaseDatabaseContext):
 
         query = (
             f"UPDATE {table_name} SET "
-            + " ".join([f"`{col}` = {self.BIND_DECLARATION}" for col in data])
+            + " ,".join([f"`{col}` = {self.BIND_DECLARATION}" for col in data])
             + (f" WHERE {condition_exp}" if condition_exp is not None else "")
         )
 
@@ -210,6 +210,7 @@ class SqliteDatabaseContext(BaseDatabaseContext):
             await self.insert(table_name,data)
         except sqlite3.IntegrityError as e:
             # Hack to get primary key out of error message
+            # Error : ` UNIQUE constraint failed: myTable.id `
             e = repr(e)
             replaces = "'`()"
             for s in replaces:

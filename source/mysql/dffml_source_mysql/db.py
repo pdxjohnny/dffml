@@ -84,7 +84,7 @@ class MySQLDatabaseContext(SqliteDatabaseContext):
 
         query = (
             f"UPDATE {table_name} SET "
-            + " ".join([f"`{col}` = {self.BIND_DECLARATION}" for col in data])
+            + " ,".join([f"`{col}` = {self.BIND_DECLARATION}" for col in data])
             + (f" WHERE {condition_exp}" if condition_exp is not None else "")
         )
 
@@ -132,12 +132,31 @@ class MySQLDatabaseContext(SqliteDatabaseContext):
         """
         Removes rows (satisfying `conditions` if provided) from `table_name`
         """
-        condition_exp = self.make_condition_expression(conditions)
+        condition_dict = self.make_condition_expression(conditions)
+
+        if condition_dict is not None:
+            condition_exp = condition_dict["expression"]
+            query_values=condition_dict["values"]
+        else:
+            condition_exp = None
+
         query = f"DELETE FROM {table_name} " + (
             f" WHERE {condition_exp}" if condition_exp is not None else ""
         )
-        # TODO Bind parameters?
         await self.conn.execute(query)
+
+    async def insert_or_update(
+        self,table_name:str,data:Dict[str,Any]):
+        col_exp = ", ".join([f"`{col}`" for col in data])
+        query = (
+            f"INSERT INTO {table_name} "
+            + f"( {col_exp} )"
+            + f" VALUES( {', '.join([self.BIND_DECLARATION] * len(data))} ) "
+            + " ON DUPLICATE KEY UPDATE "
+            + " ,".join([f"`{col}` = {self.BIND_DECLARATION}" for col in data])
+        )
+        vals = list(data.values())*2
+        await self.conn.execute(query,vals)
 
     async def __aenter__(self) -> "MySQLDatabaseContext":
         self.__conn = self.parent.db.cursor(aiomysql.DictCursor)
