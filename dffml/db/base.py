@@ -148,6 +148,13 @@ class BaseDatabaseContext(
         Removes rows (satisfying `conditions`) from `table_name`
         """
 
+    @abc.abstractmethod
+    async def insert_or_update(
+        self, table_name: str, data: Dict[str, Any]) -> None:
+        try:
+            await self.insert(table_name, data)
+        except :
+            await self.update(table_name, data, conditions=[])
 
 @base_entry_point("dffml.db", "db")
 class BaseDatabase(BaseDataFlowObject):

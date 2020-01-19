@@ -186,14 +186,41 @@ class SqliteDatabaseContext(BaseDatabaseContext):
         """
         Removes rows (satisfying `conditions` if provided) from `table_name`
         """
-        condition_exp = self.make_condition_expression(conditions)
+        condition_dict = self.make_condition_expression(conditions)
+
+        if condition_dict is not None:
+            condition_exp = condition_dict["expression"]
+            query_values=condition_dict["values"]
+        else:
+            condition_exp = None
+
         query = f"DELETE FROM {table_name} " + (
             f" WHERE {condition_exp}" if condition_exp is not None else ""
         )
+
         async with self.parent.lock:
             with self.parent.db:
                 self.logger.debug(query)
-                self.parent.cursor.execute(query)
+                self.parent.cursor.execute(query,query_values)
+
+    async def insert_or_update(
+        self,table_name:str,data:Dict[str,Any]
+    ):
+        try:
+            await self.insert(table_name,data)
+        except sqlite3.IntegrityError as e:
+            # Hack to get primary key out of error message
+            e = repr(e)
+            replaces = "'`()"
+            for s in replaces:
+                e= e.replace(s,"")
+            _key = e.split("UNIQUE constraint failed:")[-1]
+            _key = _key.split(table_name+".")[-1]
+
+            _keyval = data.pop(_key)
+            conditions = [[[_key, "=", _keyval]]]
+            await self.update(table_name,data,conditions)
+
 
 
 @entrypoint("sqlite")

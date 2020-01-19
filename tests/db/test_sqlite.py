@@ -22,7 +22,7 @@ class TestSqlDatabase(AsyncTestCase):
         )
         self.table_name = "myTable"
         self.cols = {
-            "key": "real",
+            "key": "INTEGER NOT NULL PRIMARY KEY",
             "firstName": "text",
             "lastName": "text",
             "age": "real",
@@ -73,7 +73,7 @@ class TestSqlDatabase(AsyncTestCase):
 
             self.assertEqual(results, [{"age": 35}, {"age": 35}])
 
-    async def _test_3_remove(self):
+    async def test_3_remove(self):
         condition = [[["firstName", "=", "John"]]]
         async with self.sdb() as db_ctx:
             await db_ctx.remove(self.table_name, condition)
@@ -82,3 +82,19 @@ class TestSqlDatabase(AsyncTestCase):
                 async for row in db_ctx.lookup(self.table_name, ["firstName"])
             ]
             self.assertEqual(results, [{"firstName": "Bill"}])
+
+    async def test_4_insert_or_update(self):
+        data = {"key": 12,
+                "firstName": "Biller"}
+        expected = [
+                {'key': 12, 'firstName': 'Biller', 'lastName': 'Miles',
+                'age': 40.0
+                }
+            ]
+        async with self.sdb() as db_ctx:
+            await db_ctx.insert_or_update(self.table_name,data)
+            results = [
+                row
+                async for row in db_ctx.lookup(self.table_name)
+            ]
+            self.assertEqual(results,expected)
