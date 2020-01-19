@@ -19,10 +19,6 @@ QUERY_LOOKUPS = Definition(name="query_lookups", primitive="Dict[str, Any]")
 
 @config
 class DatabaseQueryConfig:
-    """
-        query_type : "create","insert","update","remove","lookup"
-    """
-
     database: BaseDatabase
 
 
@@ -84,7 +80,7 @@ async def db_query(
 )
 async def db_query_create_table(
     self, *, table_name: str, cols: List[str] = []
-) -> Dict[str, Any]:
+):
     await self.dbctx.create_table(table_name=table_name, cols=cols)
 
 
@@ -97,7 +93,7 @@ async def db_query_create_table(
 )
 async def db_query_insert(
     self, *, table_name: str, data: Dict[str, Any]
-) -> Dict[str, Any]:
+):
     await self.dbctx.insert(table_name=table_name, data=data)
 
 
@@ -114,7 +110,7 @@ async def db_query_insert(
 )
 async def db_query_update(
     self, *, table_name: str, data: Dict[str, Any], conditions: Conditions = []
-) -> Dict[str, Any]:
+) :
     print(f"\n\n In upadte conditions:{conditions},data :{data}\n\n")
     await self.dbctx.update(
         table_name=table_name, data=data, conditions=conditions
@@ -130,7 +126,7 @@ async def db_query_update(
 )
 async def db_query_remove(
     self, *, table_name: str, conditions: Conditions = []
-) -> Dict[str, Any]:
+)  :
     await self.dbctx.remove(table_name=table_name, conditions=conditions)
 
 
@@ -152,3 +148,15 @@ async def db_query_lookup(
         table_name=table_name, cols=cols, conditions=conditions
     )
     return {"lookups": [res async for res in result]}
+
+@op(
+    inputs={"table_name": QUERY_TABLE, "data": QUERY_DATA},
+    outputs={},
+    config_cls=DatabaseQueryConfig,
+    imp_enter={"database": (lambda self: self.config.database)},
+    ctx_enter={"dbctx": (lambda self: self.parent.database())},
+)
+async def db_query_insert_or_update(
+    self, *, table_name: str, data: Dict[str, Any]
+):
+    await self.dbctx.insert_or_update(table_name=table_name, data=data)
