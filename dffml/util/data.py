@@ -19,6 +19,7 @@ def merge(one, two, list_append: bool = True):
                 one[key] += two[key]
         else:
             one[key] = two[key]
+    return one
 
 
 def traverse_config_set(target, *args):
@@ -95,8 +96,29 @@ def type_lookup(typename):
 
 
 def export_value(obj, key, value):
+    # TODO This is a workaround for the generator related AttributeError when
+    # exporting a model.
+    #
+    # features is the key that triggers this error. It is this when it come
+    # through here and dies:
+    #
+    #     [<generator object _asdict_inner.<locals>.<genexpr> at 0x7f21982ae4f8>]
+    #
+    # The following error is then raised:
+    #
+    # File "/home/user/Documents/python/dffml/dffml/util/data.py", line 115, in export_value
+    #   obj[key] = value.export()
+    # File "/home/user/Documents/python/dffml/dffml/feature/feature.py", line 317, in export
+    #   return {feature.NAME: feature.export() for feature in self}
+    # File "/home/user/Documents/python/dffml/dffml/feature/feature.py", line 317, in <dictcomp>
+    #   return {feature.NAME: feature.export() for feature in self}
+    # AttributeError: 'generator' object has no attribute 'export'
+    #
+    # At some point we need to figure out why this is happening.
+    if isinstance(value, list) and value and inspect.isgenerator(value[0]):
+        obj[key] = list(value[0])
     # export and _asdict are not classmethods
-    if inspect.isclass(value):
+    elif inspect.isclass(value):
         obj[key] = value.__qualname__
     elif hasattr(value, "export"):
         obj[key] = value.export()
@@ -106,6 +128,8 @@ def export_value(obj, key, value):
         obj[key] = STANDARD_TYPES.get(
             str(value).replace("typing.", ""), "generic"
         )
+    elif hasattr(value, "config") and hasattr(value, "ENTRY_POINT_ORIG_LABEL"):
+        obj[key] = export_base_configurable(value)
 
 
 def export_list(iterable):
@@ -116,6 +140,13 @@ def export_list(iterable):
         elif isinstance(value, list):
             iterable[i] = export_list(iterable[i])
     return iterable
+
+
+def export_base_configurable(obj):
+    return {
+        "arg": obj.ENTRY_POINT_ORIG_LABEL,
+        "config": export_dict(**obj.config._asdict()),
+    }
 
 
 def export_dict(**kwargs):

@@ -139,10 +139,10 @@ class TensorflowModelContext(ModelContext):
 
 @config
 class DNNClassifierModelConfig:
-    classification: Feature = field(
-        "Feature name holding classification value"
+    predict: Feature = field(
+        "Feature name holding predict value"
     )
-    classifications: List[str] = field("Options for value of classification")
+    classifications: List[str] = field("Options for value of predict")
     features: Features = field("Features to train on")
     clstype: Type = field("Data type of classifications values", default=str)
     steps: int = field("Number of steps to train the model", default=3000)
@@ -176,13 +176,9 @@ class DNNClassifierModelContext(TensorflowModelContext):
         self.classifications = self._classifications(self.cids)
         self.model_dir_path = self._model_dir_path()
 
-    @property
-    def classification(self):
-        return self.parent.config.classification.NAME
-
     def _mkcids(self, classifications):
         """
-        Create an index, possible classification mapping and sort the list of
+        Create an index, possible predict mapping and sort the list of
         classifications first.
         """
         cids = dict(
@@ -238,14 +234,14 @@ class DNNClassifierModelContext(TensorflowModelContext):
         for repo in [
             repo
             async for repo in sources.with_features(
-                self.features + [self.classification]
+                self.features + [self.parent.config.predict.NAME]
             )
-            if repo.feature(self.classification) in self.classifications
+            if repo.feature(self.parent.config.predict.NAME) in self.classifications
         ]:
             for feature, results in repo.features(self.features).items():
                 x_cols[feature].append(np.array(results))
             y_cols.append(
-                self.classifications[repo.feature(self.classification)]
+                self.classifications[repo.feature(self.parent.config.predict.NAME)]
             )
         if not y_cols:
             raise ValueError("No repos to train on")
@@ -282,14 +278,14 @@ class DNNClassifierModelContext(TensorflowModelContext):
         for repo in [
             repo
             async for repo in sources.with_features(
-                self.features + [self.classification]
+                self.features + [self.parent.config.predict.NAME]
             )
-            if repo.feature(self.classification) in self.classifications
+            if repo.feature(self.parent.config.predict.NAME) in self.classifications
         ]:
             for feature, results in repo.features(self.features).items():
                 x_cols[feature].append(np.array(results))
             y_cols.append(
-                self.classifications[repo.feature(self.classification)]
+                self.classifications[repo.feature(self.parent.config.predict.NAME)]
             )
         y_cols = np.array(y_cols)
         for feature in x_cols:
@@ -348,13 +344,13 @@ class DNNClassifierModel(Model):
         $ wget http://download.tensorflow.org/data/iris_training.csv
         $ wget http://download.tensorflow.org/data/iris_test.csv
         $ head iris_training.csv
-        $ sed -i 's/.*setosa,versicolor,virginica/SepalLength,SepalWidth,PetalLength,PetalWidth,classification/g' *.csv
+        $ sed -i 's/.*setosa,versicolor,virginica/SepalLength,SepalWidth,PetalLength,PetalWidth,predict/g' *.csv
         $ head iris_training.csv
         $ dffml train \\
             -model tfdnnc \\
             -model-epochs 3000 \\
             -model-steps 20000 \\
-            -model-classification classification:int:1 \\
+            -model-predict predict:int:1 \\
             -model-classifications 0 1 2 \\
             -model-clstype int \\
             -sources iris=csv \\
@@ -368,7 +364,7 @@ class DNNClassifierModel(Model):
         ... lots of output ...
         $ dffml accuracy \\
             -model tfdnnc \\
-            -model-classification classification:int:1 \\
+            -model-predict predict:int:1 \\
             -model-classifications 0 1 2 \\
             -model-clstype int \\
             -sources iris=csv \\
@@ -382,7 +378,7 @@ class DNNClassifierModel(Model):
         0.99996233782
         $ dffml predict all \\
             -model tfdnnc \\
-            -model-classification classification:int:1 \\
+            -model-predict predict:int:1 \\
             -model-classifications 0 1 2 \\
             -model-clstype int \\
             -sources iris=csv \\
@@ -404,7 +400,7 @@ class DNNClassifierModel(Model):
                     "PetalWidth": 1.5,
                     "SepalLength": 5.9,
                     "SepalWidth": 3.0,
-                    "classification": 1
+                    "predict": 1
                 },
                 "last_updated": "2019-07-31T02:00:12Z",
                 "prediction": {
@@ -420,7 +416,7 @@ class DNNClassifierModel(Model):
                     "PetalWidth": 2.1,
                     "SepalLength": 6.9,
                     "SepalWidth": 3.1,
-                    "classification": 2
+                    "predict": 2
                 },
                 "last_updated": "2019-07-31T02:00:12Z",
                 "prediction": {

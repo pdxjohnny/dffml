@@ -39,13 +39,13 @@ Implemented using Tensorflow's DNNClassifier.
     $ wget http://download.tensorflow.org/data/iris_training.csv
     $ wget http://download.tensorflow.org/data/iris_test.csv
     $ head iris_training.csv
-    $ sed -i 's/.*setosa,versicolor,virginica/SepalLength,SepalWidth,PetalLength,PetalWidth,classification/g' *.csv
+    $ sed -i 's/.*setosa,versicolor,virginica/SepalLength,SepalWidth,PetalLength,PetalWidth,predict/g' *.csv
     $ head iris_training.csv
     $ dffml train \
         -model tfdnnc \
         -model-epochs 3000 \
         -model-steps 20000 \
-        -model-classification classification:int:1 \
+        -model-predict predict:int:1 \
         -model-classifications 0 1 2 \
         -model-clstype int \
         -sources iris=csv \
@@ -59,7 +59,7 @@ Implemented using Tensorflow's DNNClassifier.
     ... lots of output ...
     $ dffml accuracy \
         -model tfdnnc \
-        -model-classification classification:int:1 \
+        -model-predict predict:int:1 \
         -model-classifications 0 1 2 \
         -model-clstype int \
         -sources iris=csv \
@@ -73,7 +73,7 @@ Implemented using Tensorflow's DNNClassifier.
     0.99996233782
     $ dffml predict all \
         -model tfdnnc \
-        -model-classification classification:int:1 \
+        -model-predict predict:int:1 \
         -model-classifications 0 1 2 \
         -model-clstype int \
         -sources iris=csv \
@@ -95,7 +95,7 @@ Implemented using Tensorflow's DNNClassifier.
                 "PetalWidth": 1.5,
                 "SepalLength": 5.9,
                 "SepalWidth": 3.0,
-                "classification": 1
+                "predict": 1
             },
             "last_updated": "2019-07-31T02:00:12Z",
             "prediction": {
@@ -111,7 +111,7 @@ Implemented using Tensorflow's DNNClassifier.
                 "PetalWidth": 2.1,
                 "SepalLength": 6.9,
                 "SepalWidth": 3.1,
-                "classification": 2
+                "predict": 2
             },
             "last_updated": "2019-07-31T02:00:12Z",
             "prediction": {
@@ -123,13 +123,13 @@ Implemented using Tensorflow's DNNClassifier.
 
 **Args**
 
-- classification: Feature
+- predict: Feature
 
-  - Feature name holding classification value
+  - Feature name holding predict value
 
 - classifications: List of strings
 
-  - Options for value of classification
+  - Options for value of predict
 
 - features: List of features
 
