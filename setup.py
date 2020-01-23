@@ -76,6 +76,9 @@ setup(
             # Mapping
             "dffml.mapping.extract = dffml.operation.mapping:mapping_extract_value",
             "dffml.mapping.create = dffml.operation.mapping:create_mapping",
+            "dffml.mapping.merge = dffml.operation.mapping:mapping_merge",
+            "dffml.mapping.expand.all.keys = dffml.operation.mapping:mapping_expand_all_keys",
+            "dffml.mapping.expand.all.values = dffml.operation.mapping:mapping_expand_all_values",
             # Dataflow
             "dffml.dataflow.run = dffml.operation.dataflow:run_dataflow",
             # Model
