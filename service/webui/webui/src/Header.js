@@ -16,6 +16,7 @@ import Toolbar from '@material-ui/core/Toolbar';
 import Tooltip from '@material-ui/core/Tooltip';
 import Typography from '@material-ui/core/Typography';
 import { withStyles } from '@material-ui/core/styles';
+import { useRouteMatch } from "react-router-dom";
 
 const lightColor = 'rgba(255, 255, 255, 0.7)';
 
@@ -41,8 +42,16 @@ const styles = theme => ({
   },
 });
 
+/*
+        <Route path={`${match.path}/:topicId`}>
+*/
+
 function Header(props) {
   const { classes, onDrawerToggle } = props;
+
+  let match = useRouteMatch();
+
+  console.log(match);
 
   return (
     <React.Fragment>
@@ -93,7 +102,7 @@ function Header(props) {
           <Grid container alignItems="center" spacing={1}>
             <Grid item xs>
               <Typography color="inherit" variant="h5" component="h1">
-                Authentication
+                {match.path.split("/").reverse().join(" ")}
               </Typography>
             </Grid>
             <Grid item>

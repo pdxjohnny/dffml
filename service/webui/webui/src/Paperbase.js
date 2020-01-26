@@ -4,10 +4,18 @@ import { createMuiTheme, ThemeProvider, withStyles } from '@material-ui/core/sty
 import CssBaseline from '@material-ui/core/CssBaseline';
 import Hidden from '@material-ui/core/Hidden';
 import Typography from '@material-ui/core/Typography';
-import Link from '@material-ui/core/Link';
 import Navigator from './Navigator';
 import Content from './Content';
 import Header from './Header';
+import {
+  HashRouter as Router,
+  Switch,
+  Route,
+  Redirect,
+  Link,
+  useRouteMatch,
+  useParams
+} from "react-router-dom";
 
 let theme = createMuiTheme({
   palette: {
@@ -148,6 +156,25 @@ const styles = {
   },
 };
 
+const views = [
+  { route: 'sources/upload', header: Header, content: Content },
+  { route: 'sources/configure', header: Header, content: Content },
+  { route: 'sources/view', header: Header, content: Content },
+  { route: 'models/configure', header: Header, content: Content },
+  { route: 'models/train', header: Header, content: Content },
+  { route: 'models/predict', header: Header, content: Content },
+  { route: 'operations/view', header: Header, content: Content },
+  { route: 'operations/create', header: Header, content: Content },
+  { route: 'operations/run', header: Header, content: Content },
+  { route: 'dataflows/view', header: Header, content: Content },
+  { route: 'dataflows/create', header: Header, content: Content },
+  { route: 'dataflows/run', header: Header, content: Content },
+  { route: 'dataflows/deploy', header: Header, content: Content },
+  { route: 'settings/backend', header: Header, content: Content },
+];
+
+const DEFAULT_VIEW_ROUTE = "sources/upload";
+
 function Paperbase(props) {
   const { classes } = props;
   const [mobileOpen, setMobileOpen] = React.useState(false);
@@ -158,30 +185,49 @@ function Paperbase(props) {
 
   return (
     <ThemeProvider theme={theme}>
-      <div className={classes.root}>
-        <CssBaseline />
-        <nav className={classes.drawer}>
-          <Hidden smUp implementation="js">
-            <Navigator
-              PaperProps={{ style: { width: drawerWidth } }}
-              variant="temporary"
-              open={mobileOpen}
-              onClose={handleDrawerToggle}
-            />
-          </Hidden>
-          <Hidden xsDown implementation="css">
-            <Navigator PaperProps={{ style: { width: drawerWidth } }} />
-          </Hidden>
-        </nav>
-        <div className={classes.app}>
-          <Header onDrawerToggle={handleDrawerToggle} />
-          <main className={classes.main}>
-            <Content />
-          </main>
-          <footer className={classes.footer}>
-          </footer>
+      <Router>
+        <div className={classes.root}>
+          <CssBaseline />
+          <nav className={classes.drawer}>
+            <Hidden smUp implementation="js">
+              <Navigator
+                PaperProps={{ style: { width: drawerWidth } }}
+                variant="temporary"
+                open={mobileOpen}
+                onClose={handleDrawerToggle}
+              />
+            </Hidden>
+            <Hidden xsDown implementation="css">
+              <Navigator PaperProps={{ style: { width: drawerWidth } }} />
+            </Hidden>
+          </nav>
+          <div className={classes.app}>
+            <Switch>
+              // Begin the views
+              <Route path="/sources/upload">
+                <Header onDrawerToggle={handleDrawerToggle} />
+                <main className={classes.main}>
+                  <Content />
+                </main>
+              </Route>
+              // When URL path is / redirect to the default route
+              <Route
+                path="/"
+                render={({ location }) => (
+                  <Redirect
+                    to={{
+                      pathname: "/" + DEFAULT_VIEW_ROUTE,
+                      state: { from: location }
+                    }}
+                  />
+                )}
+              />
+            </Switch>
+            <footer className={classes.footer}>
+            </footer>
+          </div>
         </div>
-      </div>
+      </Router>
     </ThemeProvider>
   );
 }
@@ -191,3 +237,50 @@ Paperbase.propTypes = {
 };
 
 export default withStyles(styles)(Paperbase);
+
+function Home() {
+  return <h2>Home</h2>;
+}
+
+function About() {
+  return <h2>About</h2>;
+}
+
+function Topics() {
+  let match = useRouteMatch();
+
+  return (
+    <div>
+      <h2>Topics</h2>
+
+      <ul>
+        <li>
+          <Link to={`${match.url}/components`}>Components</Link>
+        </li>
+        <li>
+          <Link to={`${match.url}/props-v-state`}>
+            Props v. State
+          </Link>
+        </li>
+      </ul>
+
+      {/* The Topics page has its own <Switch> with more routes
+          that build on the /topics URL path. You can think of the
+          2nd <Route> here as an "index" page for all topics, or
+          the page that is shown when no topic is selected */}
+      <Switch>
+        <Route path={`${match.path}/:topicId`}>
+          <Topic />
+        </Route>
+        <Route path={match.path}>
+          <h3>Please select a topic.</h3>
+        </Route>
+      </Switch>
+    </div>
+  );
+}
+
+function Topic() {
+  let { topicId } = useParams();
+  return <h3>Requested topic ID: {topicId}</h3>;
+}

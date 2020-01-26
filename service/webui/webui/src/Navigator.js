@@ -2,12 +2,14 @@ import React from 'react';
 import PropTypes from 'prop-types';
 import clsx from 'clsx';
 import { withStyles } from '@material-ui/core/styles';
+import { Link } from "react-router-dom";
 import Divider from '@material-ui/core/Divider';
 import Drawer from '@material-ui/core/Drawer';
 import List from '@material-ui/core/List';
 import ListItem from '@material-ui/core/ListItem';
 import ListItemIcon from '@material-ui/core/ListItemIcon';
 import ListItemText from '@material-ui/core/ListItemText';
+import CloudUploadIcon from '@material-ui/icons/CloudUpload';
 import DnsRoundedIcon from '@material-ui/icons/DnsRounded';
 import PublicIcon from '@material-ui/icons/Public';
 import SettingsEthernetIcon from '@material-ui/icons/SettingsEthernet';
@@ -26,14 +28,15 @@ const categories = [
   {
     id: 'Sources',
     children: [
-      { id: 'Configure', icon: <DnsRoundedIcon />, active: true },
+      { id: 'Upload', icon: <CloudUploadIcon />, active: true },
+      { id: 'Configure', icon: <DnsRoundedIcon /> },
       { id: 'View', icon: <ListIcon /> },
     ],
   },
   {
     id: 'Models',
     children: [
-      { id: 'Configure', icon: <DeveloperBoardIcon  /> },
+      { id: 'Configure', icon: <DeveloperBoardIcon /> },
       { id: 'Train', icon: <FunctionsIcon /> },
       { id: 'Predict', icon: <AllInclusiveIcon /> },
     ],
@@ -111,7 +114,7 @@ function Navigator(props) {
     <Drawer variant="permanent" {...other} >
       <List disablePadding >
         <ListItem className={clsx(classes.firebase, classes.item, classes.itemCategory)}>
-          dataflow.ml
+          DFFML
         </ListItem>
         {categories.map(({ id, children }) => (
           <React.Fragment key={id}>
@@ -125,20 +128,25 @@ function Navigator(props) {
               </ListItemText>
             </ListItem>
             {children.map(({ id: childId, icon, active }) => (
-              <ListItem
+              <Link
                 key={childId}
-                button
-                className={clsx(classes.item, active && classes.itemActiveItem)}
+                style={{ textDecoration: 'none' }}
+                to={"/" + id.toLowerCase() + "/" + childId.toLowerCase()}
               >
-                <ListItemIcon className={classes.itemIcon}>{icon}</ListItemIcon>
-                <ListItemText
-                  classes={{
-                    primary: classes.itemPrimary,
-                  }}
+                <ListItem
+                  button
+                  className={clsx(classes.item, active && classes.itemActiveItem)}
                 >
-                  {childId}
-                </ListItemText>
-              </ListItem>
+                  <ListItemIcon className={classes.itemIcon}>{icon}</ListItemIcon>
+                  <ListItemText
+                    classes={{
+                      primary: classes.itemPrimary,
+                    }}
+                  >
+                    {childId}
+                  </ListItemText>
+                </ListItem>
+              </Link>
             ))}
 
             <Divider className={classes.divider} />
