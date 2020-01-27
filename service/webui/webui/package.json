@@ -30,5 +30,6 @@
   },
   "devDependencies": {
     "miragejs": "^0.1.33"
-  }
+  },
+  "homepage" : "https://intel.github.io/dffml/master/webui"
 }
