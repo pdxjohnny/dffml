@@ -17,6 +17,8 @@ import {
   useParams
 } from "react-router-dom";
 
+import SourcesUpload from './SourcesUpload';
+
 let theme = createMuiTheme({
   palette: {
     primary: {
@@ -156,23 +158,6 @@ const styles = {
   },
 };
 
-const views = [
-  { route: 'sources/upload', header: Header, content: Content },
-  { route: 'sources/configure', header: Header, content: Content },
-  { route: 'sources/view', header: Header, content: Content },
-  { route: 'models/configure', header: Header, content: Content },
-  { route: 'models/train', header: Header, content: Content },
-  { route: 'models/predict', header: Header, content: Content },
-  { route: 'operations/view', header: Header, content: Content },
-  { route: 'operations/create', header: Header, content: Content },
-  { route: 'operations/run', header: Header, content: Content },
-  { route: 'dataflows/view', header: Header, content: Content },
-  { route: 'dataflows/create', header: Header, content: Content },
-  { route: 'dataflows/run', header: Header, content: Content },
-  { route: 'dataflows/deploy', header: Header, content: Content },
-  { route: 'settings/backend', header: Header, content: Content },
-];
-
 const DEFAULT_VIEW_ROUTE = "sources/upload";
 
 function Paperbase(props) {
@@ -207,7 +192,7 @@ function Paperbase(props) {
               <Route path="/sources/upload">
                 <Header onDrawerToggle={handleDrawerToggle} />
                 <main className={classes.main}>
-                  <Content />
+                  <SourcesUpload />
                 </main>
               </Route>
               // When URL path is / redirect to the default route

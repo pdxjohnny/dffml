@@ -30,7 +30,7 @@ const categories = [
     children: [
       { id: 'Upload', icon: <CloudUploadIcon />, active: true },
       { id: 'Configure', icon: <DnsRoundedIcon /> },
-      { id: 'View', icon: <ListIcon /> },
+      { id: 'Explore', icon: <ListIcon /> },
     ],
   },
   {
