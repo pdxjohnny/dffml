@@ -1,6 +1,6 @@
 import { Server } from "miragejs"
 
-var server = new Server({
+var server = {
   routes() {
     this.namespace = "/api"
 
@@ -31,6 +31,8 @@ var server = new Server({
       },
     ])
   },
-})
+}
 
-export default server;
+export default function makeServer() {
+  server = new Server(server);
+};

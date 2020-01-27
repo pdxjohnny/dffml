@@ -6,7 +6,7 @@ import Paperbase from './Paperbase';
 import theme from './theme';
 
 import server from './fakeserver';
-console.log("Using fake server", server);
+console.log("Using fake server", server());
 
 ReactDOM.render(
   <ThemeProvider theme={theme}>

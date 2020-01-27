@@ -109,19 +109,32 @@ async function parseData(data, setFilesInUploadDir) {
   setFilesInUploadDir(files);
 }
 
-function BasicTreeData() {
+function BasicTreeData(props) {
     const [filesInUploadDir, setFilesInUploadDir] = React.useState([]);
     // TODO Change this URL
-    const { data, error } = useSWR('/api/service/files', fetch)
+    var { data, error } = useSWR(props.backend.url + '/service/files', fetch)
 
-    if (error) return <div>failed to load</div>
-    if (!data) return <div>loading...</div>
+    var localization = {};
 
-    parseData(data, setFilesInUploadDir);
+    // TODO, handle error
+    if (error) {
+      data = []
+      localization.body = {
+        emptyDataSourceMessage: "Error loading files",
+      };
+    } else if (!data) {
+      data = []
+      localization.body = {
+        emptyDataSourceMessage: "No files",
+      };
+    } else {
+      parseData(data, setFilesInUploadDir);
+    }
 
     return (
       <MaterialTable
         title="Files"
+        localization={localization}
         data={filesInUploadDir}
         columns={[
           { title: 'Filename', field: 'filename', removable: false },
@@ -160,7 +173,7 @@ class DropzoneAreaExample extends React.Component {
 }
 
 function Content(props) {
-  const { classes } = props;
+  const { classes, backend } = props;
 
   return (
     <React.Fragment>
@@ -195,7 +208,7 @@ function Content(props) {
       </Paper>
       <br />
       <Paper className={classes.paper}>
-        <BasicTreeData />
+        <BasicTreeData backend={backend} />
       </Paper>
     </React.Fragment>
   );
@@ -203,6 +216,7 @@ function Content(props) {
 
 Content.propTypes = {
   classes: PropTypes.object.isRequired,
+  backend: PropTypes.object.isRequired,
 };
 
 export default withStyles(styles)(Content);
