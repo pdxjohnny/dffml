@@ -55,24 +55,63 @@ async function parseData(data, setFilesInUploadDir) {
 
     split.pop();
 
-    directories[split.join("/")] = true;
+    directories[split.join("/") + "/"] = true;
   }
 
-  if (directories.hasOwnProperty("")) {
-    delete directories[""];
+  if (directories.hasOwnProperty("/")) {
+    delete directories["/"];
   }
 
-  console.log(directories);
+  for (var i = 0; i < Object.keys(directories).length; i++) {
+    directories[Object.keys(directories)[i]] = files.length + i;
+  }
+
+  for (var i in directories) {
+    var split = i.split("/");
+
+    split.pop();
+
+    var directory = {
+      id: directories[i],
+      filename: split[split.length - 1] + "/",
+    }
+    split.pop();
+
+    var joined = split.join("/") + "/";
+
+    if (directories.hasOwnProperty(joined)) {
+      directory.parentId = directories[joined];
+    }
+
+    files.push(directory);
+  }
 
   for (var i in files) {
-    files[i].id = Number(i);
+    if (files[i].filename.endsWith("/")) {
+      continue;
+    }
+
+    var split = files[i].filename.split("/");
+
+    files[i].filename = split[split.length - 1];
+
+    split.pop();
+
+    var joined = split.join("/") + "/";
+
+    if (directories.hasOwnProperty(joined)) {
+      files[i].parentId = directories[joined];
+    }
   }
+
+  console.log(files);
 
   setFilesInUploadDir(files);
 }
 
 function BasicTreeData() {
     const [filesInUploadDir, setFilesInUploadDir] = React.useState([]);
+    // TODO Change this URL
     const { data, error } = useSWR('/api/service/files', fetch)
 
     if (error) return <div>failed to load</div>
@@ -86,7 +125,7 @@ function BasicTreeData() {
         data={filesInUploadDir}
         columns={[
           { title: 'Filename', field: 'filename', removable: false },
-          { title: 'Size', field: 'size', type: 'numeric' },
+          { title: 'Size (MB)', field: 'size', type: 'numeric' },
         ]}
         parentChildData={(row, rows) => rows.find(a => a.id === row.parentId)}
         options={{
