@@ -492,8 +492,7 @@ class DataFlow:
             for instance_name, operation in kwargs["operations"].items()
         }
 
-        # TODO Similarly to linked, we should have a default parameter (False)
-        # which decides if we should use load_entrypoint or not. 
+        # Load operations whose names are in entrypoint format
         _implementations = {}
         for _, __op in kwargs["operations"].items():
             _name = __op.name
