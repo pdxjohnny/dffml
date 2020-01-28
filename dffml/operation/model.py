@@ -19,7 +19,7 @@ class ModelPredictConfig:
 
 
 @op(
-    name = "dffml.model.predict",
+    name="dffml.model.predict",
     inputs={
         "features": Definition(
             name="repo_features", primitive="Dict[str, Any]"

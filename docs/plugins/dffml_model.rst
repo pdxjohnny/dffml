@@ -39,13 +39,13 @@ Implemented using Tensorflow's DNNClassifier.
     $ wget http://download.tensorflow.org/data/iris_training.csv
     $ wget http://download.tensorflow.org/data/iris_test.csv
     $ head iris_training.csv
-    $ sed -i 's/.*setosa,versicolor,virginica/SepalLength,SepalWidth,PetalLength,PetalWidth,predict/g' *.csv
+    $ sed -i 's/.*setosa,versicolor,virginica/SepalLength,SepalWidth,PetalLength,PetalWidth,classification/g' *.csv
     $ head iris_training.csv
     $ dffml train \
         -model tfdnnc \
         -model-epochs 3000 \
         -model-steps 20000 \
-        -model-predict predict:int:1 \
+        -model-predict classification:int:1 \
         -model-classifications 0 1 2 \
         -model-clstype int \
         -sources iris=csv \
@@ -59,7 +59,7 @@ Implemented using Tensorflow's DNNClassifier.
     ... lots of output ...
     $ dffml accuracy \
         -model tfdnnc \
-        -model-predict predict:int:1 \
+        -model-predict classification:int:1 \
         -model-classifications 0 1 2 \
         -model-clstype int \
         -sources iris=csv \
@@ -73,7 +73,7 @@ Implemented using Tensorflow's DNNClassifier.
     0.99996233782
     $ dffml predict all \
         -model tfdnnc \
-        -model-predict predict:int:1 \
+        -model-predict classification:int:1 \
         -model-classifications 0 1 2 \
         -model-clstype int \
         -sources iris=csv \
@@ -95,14 +95,14 @@ Implemented using Tensorflow's DNNClassifier.
                 "PetalWidth": 1.5,
                 "SepalLength": 5.9,
                 "SepalWidth": 3.0,
-                "predict": 1
+                "classification": 1
             },
             "last_updated": "2019-07-31T02:00:12Z",
             "prediction": {
                 "confidence": 0.9999997615814209,
                 "value": 1
             },
-            "src_url": "0"
+            "key": "0"
         },
         {
             "extra": {},
@@ -111,14 +111,14 @@ Implemented using Tensorflow's DNNClassifier.
                 "PetalWidth": 2.1,
                 "SepalLength": 6.9,
                 "SepalWidth": 3.1,
-                "predict": 2
+                "classification": 2
             },
             "last_updated": "2019-07-31T02:00:12Z",
             "prediction": {
                 "confidence": 0.9999984502792358,
                 "value": 2
             },
-            "src_url": "1"
+            "key": "1"
         },
 
 **Args**
@@ -129,7 +129,7 @@ Implemented using Tensorflow's DNNClassifier.
 
 - classifications: List of strings
 
-  - Options for value of predict
+  - Options for value of classification
 
 - features: List of features
 
@@ -242,7 +242,7 @@ Generating train and test data
                 "confidence": NaN,
                 "value": 1.1983429193496704
             },
-            "src_url": 0
+            "key": 0
         }
     ]
 
@@ -341,7 +341,7 @@ hash of their feature names.
                 "confidence": 1.0,
                 "value": 90.0
             },
-            "src_url": "0"
+            "key": "0"
         }
     ]
 
@@ -561,7 +561,7 @@ Let us take a simple example:
                 "confidence": 1.0,
                 "value": 70.00000000000001
             },
-            "src_url": 0
+            "key": 0
         }
     ]
 
@@ -625,7 +625,7 @@ Example below uses KMeans Clustering Model on a small randomly generated dataset
             "confidence": 0.6365141682948129,
             "value": 2
         },
-        "src_url": "0"
+        "key": "0"
     }
     ]
 

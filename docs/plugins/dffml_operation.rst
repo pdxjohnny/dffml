@@ -79,6 +79,44 @@ No description
 
 - mapping: mapping(type: map)
 
+dffml.mapping.expand.all.keys
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+*Core*
+
+No description
+
+**Stage: processing**
+
+
+
+**Inputs**
+
+- mapping: mapping(type: map)
+
+**Outputs**
+
+- key: key(type: str)
+
+dffml.mapping.expand.all.values
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+*Core*
+
+No description
+
+**Stage: processing**
+
+
+
+**Inputs**
+
+- mapping: mapping(type: map)
+
+**Outputs**
+
+- value: value(type: generic)
+
 dffml.mapping.extract
 ~~~~~~~~~~~~~~~~~~~~~
 
@@ -98,6 +136,49 @@ No description
 **Outputs**
 
 - value: value(type: generic)
+
+dffml.mapping.merge
+~~~~~~~~~~~~~~~~~~~
+
+*Core*
+
+No description
+
+**Stage: processing**
+
+
+
+**Inputs**
+
+- one: mapping(type: map)
+- two: mapping(type: map)
+
+**Outputs**
+
+- mapping: mapping(type: map)
+
+dffml.model.predict
+~~~~~~~~~~~~~~~~~~~
+
+*Core*
+
+No description
+
+**Stage: processing**
+
+
+
+**Inputs**
+
+- features: repo_features(type: Dict[str, Any])
+
+**Outputs**
+
+- prediction: model_predictions(type: Dict[str, Any])
+
+**Args**
+
+- model: Entrypoint
 
 get_single
 ~~~~~~~~~~
