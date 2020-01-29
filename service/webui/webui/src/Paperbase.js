@@ -3,18 +3,13 @@ import PropTypes from 'prop-types';
 import { createMuiTheme, ThemeProvider, withStyles } from '@material-ui/core/styles';
 import CssBaseline from '@material-ui/core/CssBaseline';
 import Hidden from '@material-ui/core/Hidden';
-import Typography from '@material-ui/core/Typography';
 import Navigator from './Navigator';
-import Content from './Content';
 import Header from './Header';
 import {
   HashRouter as Router,
   Switch,
   Route,
   Redirect,
-  Link,
-  useRouteMatch,
-  useParams
 } from "react-router-dom";
 
 import SetBackendPopup from './SetBackendPopup';
@@ -211,14 +206,14 @@ function Paperbase(props) {
           </nav>
           <div className={classes.app}>
             <Switch>
-              // Begin the views
+              {/* Begin the views */}
               <Route path="/sources/upload">
                 <Header onDrawerToggle={handleDrawerToggle} />
                 <main className={classes.main}>
                   <SourcesUpload backend={backend} />
                 </main>
               </Route>
-              // When URL path is / redirect to the default route
+              {/* When URL path is / redirect to the default route */}
               <Route
                 path="/"
                 render={({ location }) => (
