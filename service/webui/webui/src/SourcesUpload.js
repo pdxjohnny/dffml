@@ -107,6 +107,7 @@ async function parseData(data, setFilesInUploadDir) {
 
 function BasicTreeData(props) {
     const [filesInUploadDir, setFilesInUploadDir] = React.useState([]);
+    console.log("Files and Uploads backend:", props.backend);
     // TODO Change this URL
     var { data, error } = useSWR(props.backend.url + '/service/files', fetch)
 

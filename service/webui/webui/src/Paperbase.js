@@ -181,9 +181,11 @@ function Paperbase(props) {
     } else {
       demoServer.stop();
     }
-    setBackend({
-      api: backend_url,
-    });
+    var backend = {
+      url: backend_url,
+    }
+    setBackend(backend);
+    return backend;
   }
 
   const handleDrawerToggle = () => {
