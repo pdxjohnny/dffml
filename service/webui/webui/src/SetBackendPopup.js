@@ -7,20 +7,18 @@ import DialogContent from '@material-ui/core/DialogContent';
 import DialogContentText from '@material-ui/core/DialogContentText';
 import DialogTitle from '@material-ui/core/DialogTitle';
 
-import server from './fakeserver';
-
 export default function SetBackendPopup(props) {
-  const [open, setOpen] = React.useState(localStorage.getItem('backend') === null);
+  const [open, setOpen] = React.useState(props.open);
 
   var backend_url = "";
 
   const handleCloseDemoMode = () => {
+    props.saveBackend("demo");
     setOpen(false);
   };
 
   const handleCloseSave = () => {
     props.saveBackend(backend_url);
-    console.log("Using fake server", server());
     setOpen(false);
   };
 
@@ -37,7 +35,6 @@ export default function SetBackendPopup(props) {
         <TextField
           autoFocus
           margin="dense"
-          id="backend_url"
           label="URL Of Backend"
           type="url"
           onChange={evt => backend_url = (evt.target.value)}

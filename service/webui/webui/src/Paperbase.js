@@ -158,7 +158,7 @@ const DEFAULT_VIEW_ROUTE = "sources/upload";
 
 var backend_url_initial = localStorage.getItem('backend.url');
 
-if (backend_url_initial === null) {
+if (backend_url_initial === null || backend_url_initial === "demo") {
   backend_url_initial = "/api";
 }
 
@@ -167,15 +167,19 @@ const BACKEND_DEFAULT = {
 };
 
 function Paperbase(props) {
-  const { classes } = props;
+  const { classes, demoServer } = props;
   const [mobileOpen, setMobileOpen] = React.useState(false);
   const [backend, setBackend] = React.useState(BACKEND_DEFAULT);
 
-  console.log(backend);
-
   async function saveBackend(backend_url) {
     localStorage.setItem('backend.url', backend_url);
-    console.log(backend_url)
+
+    if (backend_url === null || backend_url === "demo") {
+      backend_url = "/api";
+      demoServer.start();
+    } else {
+      demoServer.stop();
+    }
     setBackend({
       api: backend_url,
     });
@@ -190,7 +194,11 @@ function Paperbase(props) {
       <Router>
         <div className={classes.root}>
           <CssBaseline />
-          <SetBackendPopup backend={backend} saveBackend={saveBackend} />
+          <SetBackendPopup
+            open={localStorage.getItem('backend.url') === null}
+            backend={backend}
+            saveBackend={saveBackend}
+          />
           <nav className={classes.drawer}>
             <Hidden smUp implementation="js">
               <Navigator
@@ -237,6 +245,7 @@ function Paperbase(props) {
 
 Paperbase.propTypes = {
   classes: PropTypes.object.isRequired,
+  demoServer: PropTypes.object.isRequired,
 };
 
 export default withStyles(styles)(Paperbase);

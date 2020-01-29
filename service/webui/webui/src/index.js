@@ -5,14 +5,16 @@ import { ThemeProvider } from '@material-ui/core/styles';
 import Paperbase from './Paperbase';
 import theme from './theme';
 
-import server from './fakeserver';
-console.log("Using fake server", server());
+import DemoServer from './DemoServer';
+
+var demoServer = new DemoServer();
+demoServer.start();
 
 ReactDOM.render(
   <ThemeProvider theme={theme}>
     {/* CssBaseline kickstart an elegant, consistent, and simple baseline to build upon. */}
     <CssBaseline />
-    <Paperbase />
+    <Paperbase demoServer={demoServer} />
   </ThemeProvider>,
   document.querySelector('#root'),
 );

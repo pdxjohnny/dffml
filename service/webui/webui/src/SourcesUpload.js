@@ -102,8 +102,6 @@ async function parseData(data, setFilesInUploadDir) {
     }
   }
 
-  console.log(files);
-
   setFilesInUploadDir(files);
 }
 

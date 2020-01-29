@@ -58,8 +58,6 @@ function Header(props) {
 
   let match = useRouteMatch();
 
-  console.log(match);
-
   return (
     <React.Fragment>
       <AppBar
