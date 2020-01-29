@@ -14,6 +14,7 @@ import {
 
 import SetBackendPopup from './SetBackendPopup';
 import SourcesUpload from './SourcesUpload';
+import SettingsBackend from './SettingsBackend';
 
 let theme = createMuiTheme({
   palette: {
@@ -219,6 +220,15 @@ function Paperbase(props) {
                 <Header onDrawerToggle={handleDrawerToggle} />
                 <main className={classes.main}>
                   <SourcesUpload backend={backend} />
+                </main>
+              </Route>
+              <Route path="/settings/backend">
+                <Header onDrawerToggle={handleDrawerToggle} />
+                <main className={classes.main}>
+                  <SettingsBackend
+                    backend={backend}
+                    saveBackend={saveBackend}
+                  />
                 </main>
               </Route>
               {/* When URL path is / redirect to the default route */}

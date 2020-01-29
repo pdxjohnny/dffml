@@ -51,6 +51,10 @@ const titles = {
     title: "Explore Data Sources",
     help: "https://intel.github.io/dffml/webui/help/for/sources",
   },
+  "/settings/backend": {
+    title: "Backend Settings",
+    help: "https://intel.github.io/dffml/webui/help/for/backend",
+  },
 };
 
 function Header(props) {
