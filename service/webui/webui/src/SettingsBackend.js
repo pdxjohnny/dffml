@@ -1,19 +1,10 @@
 import React from 'react';
 import PropTypes from 'prop-types';
-import AppBar from '@material-ui/core/AppBar';
-import Toolbar from '@material-ui/core/Toolbar';
 import Paper from '@material-ui/core/Paper';
 import Grid from '@material-ui/core/Grid';
 import Button from '@material-ui/core/Button';
-import Tooltip from '@material-ui/core/Tooltip';
 import TextField from '@material-ui/core/TextField';
-import IconButton from '@material-ui/core/IconButton';
 import { withStyles } from '@material-ui/core/styles';
-import RefreshIcon from '@material-ui/icons/Refresh';
-import MaterialTable from 'material-table';
-import {DropzoneArea} from 'material-ui-dropzone';
-import { CircularProgress } from '@material-ui/core';
-import useSWR from 'swr';
 
 const styles = theme => ({
   paper: {
