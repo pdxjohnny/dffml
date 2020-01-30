@@ -15,6 +15,7 @@ import {
 import SetBackendPopup from './SetBackendPopup';
 import SourcesUpload from './SourcesUpload';
 import SettingsBackend from './SettingsBackend';
+import NotFound from './NotFound';
 
 let theme = createMuiTheme({
   palette: {
@@ -235,6 +236,7 @@ function Paperbase(props) {
               </Route>
               {/* When URL path is / redirect to the default route */}
               <Route
+                exact
                 path="/"
                 render={({ location }) => (
                   <Redirect
@@ -245,6 +247,10 @@ function Paperbase(props) {
                   />
                 )}
               />
+              {/* 404 Handler */}
+              <Route path="*">
+                <NotFound />
+              </Route>
             </Switch>
             <footer className={classes.footer}>
             </footer>

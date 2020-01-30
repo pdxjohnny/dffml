@@ -17,12 +17,14 @@ import SettingsIcon from '@material-ui/icons/Settings';
 import BlurOnIcon from '@material-ui/icons/BlurOn';
 import DesktopMacIcon from '@material-ui/icons/DesktopMac';
 import LayersIcon from '@material-ui/icons/Layers';
-import ListIcon from '@material-ui/icons/List';
+import ExploreIcon from '@material-ui/icons/Explore';
 import PlayArrowIcon from '@material-ui/icons/PlayArrow';
 import FunctionsIcon from '@material-ui/icons/Functions';
 import AllInclusiveIcon from '@material-ui/icons/AllInclusive';
 import DeveloperBoardIcon from '@material-ui/icons/DeveloperBoard';
 import AppsIcon from '@material-ui/icons/Apps';
+import TrackChangesIcon from '@material-ui/icons/TrackChanges';
+
 
 const categories = [
   {
@@ -30,7 +32,7 @@ const categories = [
     children: [
       { id: 'Upload', icon: <CloudUploadIcon />, active: true },
       { id: 'Configure', icon: <DnsRoundedIcon /> },
-      { id: 'Explore', icon: <ListIcon /> },
+      { id: 'Explore', icon: <ExploreIcon /> },
     ],
   },
   {
@@ -38,6 +40,7 @@ const categories = [
     children: [
       { id: 'Configure', icon: <DeveloperBoardIcon /> },
       { id: 'Train', icon: <FunctionsIcon /> },
+      { id: 'Accuracy', icon: <TrackChangesIcon /> },
       { id: 'Predict', icon: <AllInclusiveIcon /> },
     ],
   },
