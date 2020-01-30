@@ -78,6 +78,8 @@ async def pypi_package_contents(self, url: str) -> str:
             prefix="pypi-", suffix=".tar.gz"
         ) as package_src_file:
             package_src_file.write(await resp.read())
+            # HACK Use read to trigger sync with fs
+            package_src_file.read()
             shutil.unpack_archive(package_src_file.name, package_src_dir)
             return {"directory": package_src_dir}
 
