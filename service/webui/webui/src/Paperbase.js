@@ -249,7 +249,10 @@ function Paperbase(props) {
               />
               {/* 404 Handler */}
               <Route path="*">
-                <NotFound />
+                <Header onDrawerToggle={handleDrawerToggle} />
+                <main className={classes.main}>
+                  <NotFound />
+                </main>
               </Route>
             </Switch>
             <footer className={classes.footer}>

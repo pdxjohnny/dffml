@@ -62,6 +62,12 @@ function Header(props) {
 
   let match = useRouteMatch();
 
+  var title = "Not Found";
+
+  if (titles.hasOwnProperty(match.path)) {
+    title = titles[match.path].title;
+  }
+
   return (
     <React.Fragment>
       <AppBar
@@ -75,7 +81,7 @@ function Header(props) {
           <Grid container alignItems="center" spacing={1}>
             <Grid item xs>
               <Typography color="inherit" variant="h5" component="h1">
-                {titles[match.path].title}
+                {title}
               </Typography>
             </Grid>
             <Grid item>
