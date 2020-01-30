@@ -2,7 +2,7 @@ import React from 'react';
 import PropTypes from 'prop-types';
 import clsx from 'clsx';
 import { withStyles } from '@material-ui/core/styles';
-import { Link } from "react-router-dom";
+import { NavLink } from "react-router-dom";
 import Divider from '@material-ui/core/Divider';
 import Drawer from '@material-ui/core/Drawer';
 import List from '@material-ui/core/List';
@@ -77,10 +77,12 @@ const styles = theme => ({
   item: {
     paddingTop: 1,
     paddingBottom: 1,
-    color: 'rgba(255, 255, 255, 0.7)',
     '&:hover,&:focus': {
       backgroundColor: 'rgba(255, 255, 255, 0.08)',
     },
+  },
+  navLink: {
+    color: 'rgba(255, 255, 255, 0.7)',
   },
   itemCategory: {
     backgroundColor: '#232f3e',
@@ -127,15 +129,17 @@ function Navigator(props) {
                 {id}
               </ListItemText>
             </ListItem>
-            {children.map(({ id: childId, icon, active }) => (
-              <Link
+            {children.map(({ id: childId, icon }) => (
+              <NavLink
                 key={childId}
                 style={{ textDecoration: 'none' }}
                 to={"/" + id.toLowerCase() + "/" + childId.toLowerCase()}
+                className={clsx(classes.navLink)}
+                activeClassName={classes.itemActiveItem}
               >
                 <ListItem
                   button
-                  className={clsx(classes.item, active && classes.itemActiveItem)}
+                  className={clsx(classes.item)}
                 >
                   <ListItemIcon className={classes.itemIcon}>{icon}</ListItemIcon>
                   <ListItemText
@@ -146,7 +150,7 @@ function Navigator(props) {
                     {childId}
                   </ListItemText>
                 </ListItem>
-              </Link>
+              </NavLink>
             ))}
 
             <Divider className={classes.divider} />
