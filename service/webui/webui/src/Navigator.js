@@ -24,6 +24,7 @@ import AllInclusiveIcon from '@material-ui/icons/AllInclusive';
 import DeveloperBoardIcon from '@material-ui/icons/DeveloperBoard';
 import AppsIcon from '@material-ui/icons/Apps';
 import TrackChangesIcon from '@material-ui/icons/TrackChanges';
+import LabelIcon from '@material-ui/icons/Label';
 
 
 const categories = [
@@ -33,6 +34,7 @@ const categories = [
       { id: 'Upload', icon: <CloudUploadIcon />, active: true },
       { id: 'Configure', icon: <DnsRoundedIcon /> },
       { id: 'Explore', icon: <ExploreIcon /> },
+      { id: 'Label', icon: <LabelIcon /> },
     ],
   },
   {
