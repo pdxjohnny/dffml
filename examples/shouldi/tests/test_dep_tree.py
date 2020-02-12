@@ -48,7 +48,9 @@ async def package_deps_setup_py(src: str):
 
     setup_py_path = setup_py_path[0]
 
-    deps = SetupPyKWArg.get_kwargs(str(setup_py_path)).get("install_requires", [])
+    deps = SetupPyKWArg.get_kwargs(str(setup_py_path)).get(
+        "install_requires", []
+    )
 
     no_versions = {}
 
@@ -66,12 +68,11 @@ async def package_deps_setup_cfg(src: str):
 async def package_deps_requirements_txt(src: str):
     return {"package": []}
 
+
 SUBFLOW = DataFlow.auto(*[opimp for opimp in opimp_in(sys.modules[__name__])])
 SUBFLOW.seed.append(
     Input(
-        value=[
-            pypi_package_json.op.inputs["package"].name
-        ],
+        value=[pypi_package_json.op.inputs["package"].name],
         definition=GetMulti.op.inputs["spec"],
     )
 )
@@ -79,6 +80,7 @@ SUBFLOW.seed.append(
 # again, since this will cause version numbers and directories to get crossed
 SUBFLOW.flow["pypi_package_json"].inputs["package"] = ["seed"]
 SUBFLOW.update_by_origin()
+
 
 def create_parent_flow():
     """
@@ -98,14 +100,16 @@ def create_parent_flow():
     )
     async def shouldi_dataflow_as_operation(self, package: str):
         async with self.octx.parent(self.config.dataflow) as octx:
-            async for ctx, result in octx.run({
-                package: [
-                    Input(
-                        value=package,
-                        definition=self.parent.op.inputs["package"],
-                    )
-                ]
-            }):
+            async for ctx, result in octx.run(
+                {
+                    package: [
+                        Input(
+                            value=package,
+                            definition=self.parent.op.inputs["package"],
+                        )
+                    ]
+                }
+            ):
                 packages = result[self.parent.op.inputs["package"].name]
                 packages = list(filter(lambda pkg: pkg != package, packages))
                 return {"package": packages}
@@ -113,16 +117,19 @@ def create_parent_flow():
     dataflow = DataFlow.auto(shouldi_dataflow_as_operation, GetMulti)
     dataflow.seed.append(
         Input(
-            value=[
-                pypi_package_json.op.inputs["package"].name
-            ],
+            value=[pypi_package_json.op.inputs["package"].name],
             definition=GetMulti.op.inputs["spec"],
         )
     )
-    dataflow.configs["shouldi_dataflow_as_operation"] = ShouldIDataFlowAsOperationConfig(dataflow=SUBFLOW)
-    dataflow.flow["shouldi_dataflow_as_operation"].inputs["package"].append("seed")
+    dataflow.configs[
+        "shouldi_dataflow_as_operation"
+    ] = ShouldIDataFlowAsOperationConfig(dataflow=SUBFLOW)
+    dataflow.flow["shouldi_dataflow_as_operation"].inputs["package"].append(
+        "seed"
+    )
     dataflow.update_by_origin()
     return dataflow
+
 
 DATAFLOW = create_parent_flow()
 

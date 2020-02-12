@@ -106,6 +106,7 @@ get_n_spec = Definition(name="get_n_spec", primitive="array")
 
 get_n_output = Definition(name="get_n_output", primitive="map")
 
+
 @op(
     name="get_multi",
     inputs={"spec": get_n_spec},
