@@ -75,7 +75,9 @@ SUBFLOW.seed.append(
         definition=GetSingle.op.inputs["spec"],
     )
 )
-SUBFLOW.flow["pypi_package_json"].inputs["package"].append("seed")
+# Do not allow package names in the subflow to re-trigger the whole subflow
+# again, since this will cause version numbers and directories to get crossed
+SUBFLOW.flow["pypi_package_json"].inputs["package"] = ["seed"]
 SUBFLOW.update_by_origin()
 
 def create_parent_flow():
@@ -91,21 +93,23 @@ def create_parent_flow():
     )
     async def shouldi_dataflow_as_operation(self, package: str):
         async with self.octx.parent(self.config.dataflow) as octx:
-            results = [
-                {(await ctx.handle()).as_string(): result}
-                async for ctx, result in octx.run({
-                    package: [
-                        Input(
-                            value=package,
-                            definition=self.parent.op.inputs["package"],
-                        )
-                    ]
-                })
-            ]
+            async for ctx, result in octx.run({
+                package: [
+                    Input(
+                        value=package,
+                        definition=self.parent.op.inputs["package"],
+                    )
+                ]
+            }):
+                print()
+                print()
+                print(result)
+                print()
 
-        return {"results": results}
+                return
+                return {"package": result}
 
-    dataflow = DataFlow.auto(shouldi_dataflow_as_operation, GetSingle)
+    dataflow = DataFlow.auto(shouldi_dataflow_as_operation, GetMulti)
     dataflow.seed.append(
         Input(
             value=[
