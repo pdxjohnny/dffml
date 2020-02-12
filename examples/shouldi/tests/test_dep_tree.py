@@ -9,7 +9,7 @@ from dffml.util.os import chdir
 from dffml.df.base import opimp_in, op
 from dffml.df.types import Input, DataFlow
 from dffml.service.dev import SetupPyKWArg
-from dffml.operation.output import GetSingle
+from dffml.operation.output import GetMulti
 from dffml.df.memory import MemoryOrchestrator
 from dffml.util.asynctestcase import AsyncTestCase
 
@@ -72,7 +72,7 @@ SUBFLOW.seed.append(
         value=[
             pypi_package_json.op.inputs["package"].name
         ],
-        definition=GetSingle.op.inputs["spec"],
+        definition=GetMulti.op.inputs["spec"],
     )
 )
 # Do not allow package names in the subflow to re-trigger the whole subflow
@@ -81,6 +81,11 @@ SUBFLOW.flow["pypi_package_json"].inputs["package"] = ["seed"]
 SUBFLOW.update_by_origin()
 
 def create_parent_flow():
+    """
+    This function exists so that shouldi_dataflow_as_operation doesn't end up
+    in the subflow when we grab from sys.modules[__name__]
+    """
+
     @config
     class ShouldIDataFlowAsOperationConfig:
         dataflow: DataFlow
@@ -101,13 +106,9 @@ def create_parent_flow():
                     )
                 ]
             }):
-                print()
-                print()
-                print(result)
-                print()
-
-                return
-                return {"package": result}
+                packages = result[self.parent.op.inputs["package"].name]
+                packages = list(filter(lambda pkg: pkg != package, packages))
+                return {"package": packages}
 
     dataflow = DataFlow.auto(shouldi_dataflow_as_operation, GetMulti)
     dataflow.seed.append(
@@ -115,7 +116,7 @@ def create_parent_flow():
             value=[
                 pypi_package_json.op.inputs["package"].name
             ],
-            definition=GetSingle.op.inputs["spec"],
+            definition=GetMulti.op.inputs["spec"],
         )
     )
     dataflow.configs["shouldi_dataflow_as_operation"] = ShouldIDataFlowAsOperationConfig(dataflow=SUBFLOW)

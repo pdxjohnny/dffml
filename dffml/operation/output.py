@@ -102,18 +102,17 @@ class GroupBy(OperationImplementationContext):
             return want
 
 
-get_single_spec = Definition(name="get_single_spec", primitive="array")
+get_n_spec = Definition(name="get_n_spec", primitive="array")
 
-get_single_output = Definition(name="get_single_output", primitive="map")
-
+get_n_output = Definition(name="get_n_output", primitive="map")
 
 @op(
-    name="get_single",
-    inputs={"spec": get_single_spec},
-    outputs={"output": get_single_output},
+    name="get_multi",
+    inputs={"spec": get_n_spec},
+    outputs={"output": get_n_output},
     stage=Stage.OUTPUT,
 )
-class GetSingle(OperationImplementationContext):
+class GetMulti(OperationImplementationContext):
     async def run(self, inputs: Dict[str, Any]) -> Dict[str, Any]:
         # TODO Address the need to copy operation implementation inputs dict
         # In case the input is used elsewhere in the network
@@ -131,9 +130,29 @@ class GetSingle(OperationImplementationContext):
             # Group each requested output
             for definition in exported:
                 async for item in od.inputs(definition):
-                    want[definition.name] = item.value
-                    break
+                    want.setdefault(definition.name, [])
+                    want[definition.name].append(item.value)
             return want
+
+
+get_single_spec = Definition(name="get_single_spec", primitive="array")
+
+get_single_output = Definition(name="get_single_output", primitive="map")
+
+
+@op(
+    name="get_single",
+    inputs={"spec": get_single_spec},
+    outputs={"output": get_single_output},
+    stage=Stage.OUTPUT,
+)
+class GetSingle(GetMulti):
+    async def run(self, inputs: Dict[str, Any]) -> Dict[str, Any]:
+        # Output dict
+        want = await super().run(inputs)
+        for key, value in want.items():
+            want[key] = value.pop()
+        return want
 
 
 associate_spec = Definition(name="associate_spec", primitive="List[str]")
