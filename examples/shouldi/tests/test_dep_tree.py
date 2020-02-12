@@ -4,29 +4,16 @@ import argparse
 import unittest.mock
 import importlib.util
 
-from dffml.df.types import Input, DataFlow
-from dffml.df.base import opimp_in, op
-from dffml.df.memory import MemoryOrchestrator
-from dffml.operation.output import GetSingle
-from dffml.util.asynctestcase import AsyncTestCase
+from dffml.base import config
 from dffml.util.os import chdir
+from dffml.df.base import opimp_in, op
+from dffml.df.types import Input, DataFlow
+from dffml.service.dev import SetupPyKWArg
+from dffml.operation.output import GetSingle
+from dffml.df.memory import MemoryOrchestrator
+from dffml.util.asynctestcase import AsyncTestCase
 
 from shouldi.pypi import *
-
-
-def get_kwargs(setup_filepath: str):
-    setup_kwargs = {}
-
-    def grab_setup_kwargs(**kwargs):
-        setup_kwargs.update(kwargs)
-
-    with chdir(pathlib.Path(setup_filepath).parent):
-        spec = importlib.util.spec_from_file_location("setup", setup_filepath)
-        with unittest.mock.patch("setuptools.setup", new=grab_setup_kwargs):
-            setup = importlib.util.module_from_spec(spec)
-            spec.loader.exec_module(setup)
-
-    return setup_kwargs
 
 
 def remove_package_versions(packages):
@@ -61,7 +48,7 @@ async def package_deps_setup_py(src: str):
 
     setup_py_path = setup_py_path[0]
 
-    deps = get_kwargs(str(setup_py_path)).get("install_requires", [])
+    deps = SetupPyKWArg.get_kwargs(str(setup_py_path)).get("install_requires", [])
 
     no_versions = {}
 
@@ -79,15 +66,60 @@ async def package_deps_setup_cfg(src: str):
 async def package_deps_requirements_txt(src: str):
     return {"package": []}
 
+SUBFLOW = DataFlow.auto(*[opimp for opimp in opimp_in(sys.modules[__name__])])
+SUBFLOW.seed.append(
+    Input(
+        value=[
+            pypi_package_json.op.inputs["package"].name
+        ],
+        definition=GetSingle.op.inputs["spec"],
+    )
+)
+SUBFLOW.flow["pypi_package_json"].inputs["package"].append("seed")
+SUBFLOW.update_by_origin()
 
-@op(
-    inputs={"package": pypi_package_json.op.inputs["package"]},
-    outputs={"src": pypi_package_contents.op.outputs["directory"],},
-async def shouldi_dataflow_as_operation(src: str):
+def create_parent_flow():
+    @config
+    class ShouldIDataFlowAsOperationConfig:
+        dataflow: DataFlow
 
-DATAFLOW = DataFlow.auto(*[opimp for opimp in opimp_in(sys.modules[__name__]))
-DATAFLOW.flow["pypi_package_json"].inputs["package"].append("seed")
-DATAFLOW.update_by_origin()
+    @op(
+        inputs={"package": pypi_package_json.op.inputs["package"]},
+        outputs={"package": pypi_package_json.op.inputs["package"]},
+        expand=["package"],
+        config_cls=ShouldIDataFlowAsOperationConfig,
+    )
+    async def shouldi_dataflow_as_operation(self, package: str):
+        async with self.octx.parent(self.config.dataflow) as octx:
+            results = [
+                {(await ctx.handle()).as_string(): result}
+                async for ctx, result in octx.run({
+                    package: [
+                        Input(
+                            value=package,
+                            definition=self.parent.op.inputs["package"],
+                        )
+                    ]
+                })
+            ]
+
+        return {"results": results}
+
+    dataflow = DataFlow.auto(shouldi_dataflow_as_operation, GetSingle)
+    dataflow.seed.append(
+        Input(
+            value=[
+                pypi_package_json.op.inputs["package"].name
+            ],
+            definition=GetSingle.op.inputs["spec"],
+        )
+    )
+    dataflow.configs["shouldi_dataflow_as_operation"] = ShouldIDataFlowAsOperationConfig(dataflow=SUBFLOW)
+    dataflow.flow["shouldi_dataflow_as_operation"].inputs["package"].append("seed")
+    dataflow.update_by_origin()
+    return dataflow
+
+DATAFLOW = create_parent_flow()
 
 
 class TestOperations(AsyncTestCase):
@@ -104,13 +136,6 @@ class TestOperations(AsyncTestCase):
                                     "package"
                                 ],
                             ),
-                            Input(
-                                value=[
-                                    pypi_package_json.op.inputs["package"].name
-                                ],
-                                definition=GetSingle.op.inputs["spec"],
-                                # definition=GetMulti.op.inputs["spec"],
-                            ),
                         ]
                         for package_name in check.keys()
                     }
@@ -118,6 +143,7 @@ class TestOperations(AsyncTestCase):
                     ctx_str = (await ctx.handle()).as_string()
                     with self.subTest(package=ctx_str):
                         print(ctx_str, results)
+                        print(DATAFLOW.flow)
                         continue
                         self.assertEqual(
                             check[ctx_str],
