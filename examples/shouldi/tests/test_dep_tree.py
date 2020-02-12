@@ -80,7 +80,12 @@ async def package_deps_requirements_txt(src: str):
     return {"package": []}
 
 
-DATAFLOW = DataFlow.auto(*opimp_in(sys.modules[__name__]))
+@op(
+    inputs={"package": pypi_package_json.op.inputs["package"]},
+    outputs={"src": pypi_package_contents.op.outputs["directory"],},
+async def shouldi_dataflow_as_operation(src: str):
+
+DATAFLOW = DataFlow.auto(*[opimp for opimp in opimp_in(sys.modules[__name__]))
 DATAFLOW.flow["pypi_package_json"].inputs["package"].append("seed")
 DATAFLOW.update_by_origin()
 
