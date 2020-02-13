@@ -1,4 +1,5 @@
 import shutil
+import pathlib
 import tempfile
 from typing import Dict, Any
 
@@ -75,7 +76,7 @@ async def pypi_package_contents(self, url: str) -> str:
     async with self.parent.session.get(url) as resp:
         # Create a temporary file to extract to
         with tempfile.NamedTemporaryFile(
-            prefix="pypi-", suffix=".tar.gz"
+            prefix="pypi-", suffix="".join(pathlib.Path(url).suffixes)
         ) as package_src_file:
             package_src_file.write(await resp.read())
             # HACK Use read to trigger sync with fs

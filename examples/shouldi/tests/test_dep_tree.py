@@ -61,11 +61,13 @@ async def package_deps_setup_py(src: str):
 
 @op(**PACKAGE_DEPS_KWARGS)
 async def package_deps_setup_cfg(src: str):
+    # TODO
     return {"package": []}
 
 
 @op(**PACKAGE_DEPS_KWARGS)
 async def package_deps_requirements_txt(src: str):
+    # TODO
     return {"package": []}
 
 
@@ -111,7 +113,9 @@ def create_parent_flow():
                 }
             ):
                 packages = result[self.parent.op.inputs["package"].name]
+                # Remove input package from list
                 packages = list(filter(lambda pkg: pkg != package, packages))
+                # TODO Deduplicate
                 return {"package": packages}
 
     dataflow = DataFlow.auto(shouldi_dataflow_as_operation, GetMulti)
