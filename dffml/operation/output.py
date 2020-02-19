@@ -156,7 +156,13 @@ class GetSingle(GetMulti):
         return want
 
 
-tree_spec = Definition(name="tree_spec", primitive="List[str]")
+class TreeSpec(NamedTuple):
+    definition: str
+    value: str
+    subs: str
+
+tree_spec = Definition(name="tree_spec", primitive="List[str]", spec=TreeSpec,
+        subspec=True)
 
 tree_output = Definition(
     name="tree_output", primitive="Dict[str, Any]"
@@ -171,26 +177,29 @@ tree_output = Definition(
 )
 class Tree(OperationImplementationContext):
     async def run(self, inputs: Dict[str, Any]) -> Dict[str, Any]:
+        # Output dict
+        want = {}
         # TODO Address the need to copy operation implementation inputs dict
         # In case the input is used elsewhere in the network
         exported = copy.deepcopy(inputs["spec"])
         # Look up the definiton for each
-        for i, convert in enumerate(exported):
-            exported[i] = await self.octx.ictx.definition(self.ctx, convert)
-        # Make exported into key, value which it will be in output
-        key, value = exported
-        # Acquire all definitions within the context
-        async with self.octx.ictx.definitions(self.ctx) as od:
-            # TODO finishe this
-            # Output dict
-            want = {}
-            async for item in od.inputs(value):
-                parents = item.get_parents()
-                for parent in parents:
-                    if key == parent.definition:
-                        want[parent.value] = item.value
-                        break
-            return {value.name: want}
+        for convert in enumerate(exported):
+            spec = convert._replace(definition=await self.octx.ictx.definition(self.ctx, convert.definition))
+            want[spec.definition.name] = {}
+            # Inputs which have been added to output dict
+            added = []
+            added_refs = []
+            # Acquire all definitions within the context
+            async with self.octx.ictx.definitions(self.ctx) as od:
+                # All inputs of definition
+                inputs = [item async for item in od.inputs()]
+                while inputs:
+                    for item in inputs:
+                        for parent in filter(lambda parent: parent.definition == definition, item.parents):
+                            if parent in added:
+                                pass
+                            # elif
+        return want
 
 
 associate_spec = Definition(name="associate_spec", primitive="List[str]")

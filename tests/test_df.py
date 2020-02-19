@@ -29,7 +29,7 @@ from dffml.df.memory import (
     MemoryInputSetConfig,
 )
 
-from dffml.operation.output import GetSingle
+from dffml.operation.output import GetSingle, Tree
 from dffml.util.asynctestcase import AsyncTestCase
 
 definitions = [
@@ -138,6 +138,96 @@ class TestMemoryOperationImplementationNetwork(AsyncTestCase):
             with self.assertRaises(OperationImplementationNotInstantiated):
                 with patch.object(ctx, "instantiable", new=return_true):
                     await ctx.run(None, None, add.op, {"numbers": [40, 2]})
+
+
+class TestOperationOutput(AsyncTestCase):
+    async def test_tree(self):
+        async with MemoryOrchestrator.withconfig({}) as orchestrator:
+            async with orchestrator(DataFlow.auto(Tree)) as octx:
+                root = Input(
+                    value="root",
+                    definition=parse_line.op.inputs["line"]
+                )
+                node0 = Input(
+                    value="node0",
+                    parents=[root],
+                    definition=parse_line.op.inputs["line"]
+                )
+                node1 = Input(
+                    value="node1",
+                    parents=[root],
+                    definition=parse_line.op.inputs["line"]
+                )
+                leaf0 = Input(
+                    value="leaf0",
+                    parents=[node0],
+                    definition=parse_line.op.inputs["line"]
+                )
+                leaf1 = Input(
+                    value="leaf1",
+                    parents=[node0],
+                    definition=parse_line.op.inputs["line"]
+                )
+                leaf2 = Input(
+                    value="leaf2",
+                    parents=[node1],
+                    definition=parse_line.op.inputs["line"]
+                )
+                leaf3 = Input(
+                    value="leaf3",
+                    parents=[node1],
+                    definition=parse_line.op.inputs["line"]
+                )
+                async for ctx, results in octx.run([
+                    Input(
+                        value=[
+                            {
+                                "definition": parse_line.op.inputs["line"].name,
+                                "value": "found",
+                                "subs": "under",
+                            }
+                        ],
+                        definition=Tree.op.inputs["spec"],
+                    ),
+                    root,
+                    node0,
+                    node1,
+                    leaf0,
+                    leaf1,
+                    leaf2,
+                    leaf3
+                ]):
+                    print(results)
+                    self.assertEqual(
+                        results[parse_line.op.inputs["line"].name],
+                        {
+                            "found": "root",
+                            "under": [
+                                {
+                                    "found": "node0",
+                                    "under": [
+                                        {
+                                            "found": "leaf0",
+                                        },
+                                        {
+                                            "found": "leaf1",
+                                        }
+                                    ]
+                                },
+                                {
+                                    "found": "node1",
+                                    "under": [
+                                        {
+                                            "found": "leaf2",
+                                        },
+                                        {
+                                            "found": "leaf3",
+                                        }
+                                    ]
+                                }
+                            ]
+                        }
+                    )
 
 
 class TestOrchestrator(AsyncTestCase):
