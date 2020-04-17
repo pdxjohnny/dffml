@@ -2,12 +2,16 @@
 High level abstraction interfaces to DFFML. These are probably going to be used
 in a lot of quick and dirty python files.
 """
+import asyncio
 import pathlib
-from typing import Union, Dict, Any, AsyncIterator
+from typing import Optional, Tuple, List, Union, Dict, Any, AsyncIterator
 
 from .record import Record
+from .df.types import DataFlow, Input
+from .df.memory import MemoryOrchestrator
 from .source.source import Sources, BaseSource
 from .source.memory import MemorySource, MemorySourceConfig
+from .df.base import BaseInputSetContext, BaseOrchestrator, BaseInputSet
 
 
 def _records_to_sources(*args):
@@ -41,6 +45,102 @@ def _records_to_sources(*args):
     if records:
         sources.append(MemorySource(MemorySourceConfig(records=records)))
     return sources
+
+
+async def run(
+    dataflow: DataFlow,
+    *input_sets: Union[List[Input], BaseInputSet],
+    orchestrator: Optional[BaseOrchestrator] = None,
+    strict: bool = True,
+    ctx: Optional[BaseInputSetContext] = None,
+    halt: Optional[asyncio.Event] = None,
+) -> AsyncIterator[Tuple[BaseInputSetContext, Dict[str, Any]]]:
+    """
+    Run a DataFlow
+
+    Run a DataFlow using the the default orchestrator
+    (:py:class:`MemoryOrchestrator <dffml.df.memory.MemoryOrchestrator>`),
+    or the specified one.
+
+    Parameters
+    ----------
+    dataflow : DataFlow
+        :py:class:`DataFlow <dffml.df.types.DataFlow>` to run.
+    input_sets : InputSet, list, dict, optional
+        :py:class:`Inputs <dffml.df.types.Input>` to give to the
+        :py:class:`DataFlow <dffml.df.types.DataFlow>` when it starts. Can be in
+        multiple formats.
+
+        If each element is a ``list`` then it's expected that each element of
+        that list be an :py:class:`Input <dffml.df.types.Input>`, in this case
+        an :py:class:`InputSet <dffml.df.base.BaseInputSet>` will be created
+        with a random string used as the
+        :py:class:`StringInputSetContext <dffml.df.base.StringInputSetContext>`.
+
+        If a ``dict`` is given then each key will become a
+        :py:class:`StringInputSetContext <dffml.df.base.StringInputSetContext>`.
+        The value for each key should be a ``list`` of
+        :py:class:`Input <dffml.df.types.Input>` objects.
+
+        If each element is a :py:class:`InputSet <dffml.df.base.BaseInputSet>`
+        then each context
+        :py:class:`InputSetContext <dffml.df.base.BaseInputSetContext>`
+        will have its respective :py:class:`Inputs <dffml.df.types.Input>` added
+        to it.
+    orchestrator : BaseOrchestrator, optional
+        Orchestrator to use, defaults to
+        :py:class:`MemoryOrchestrator <dffml.df.memory.MemoryOrchestrator>`
+        if ``None``.
+    strict : bool, optional
+        If true (default), raise exceptions when they occur in operations. If
+        false, log exceptions without raising.
+    ctx : BaseInputSetContext, optional
+        If given and input_sets is a ``list`` then add inputs under the given
+        context. Otherwise they are added under randomly generated contexts.
+    halt : Event, optional
+        If given, keep the dataflow running until this :py:class:`asyncio.Event`
+        is set.
+
+    Returns
+    -------
+    asynciterator
+        ``tuple`` of
+        :py:class:`InputSetContext <dffml.df.base.BaseInputSetContext>`
+        and ``dict`` where contents are determined by output operations.
+        If multiple output operations are used, then the top level keys will be
+        the names of the output operations. If only one is used, then the
+        ``dict`` will be whatever the return value of that output operation was.
+
+    Examples
+    --------
+
+    >>> # TODO Add demo using asyncgen op and
+    >>> # https://docs.python.org/3/library/socketserver.html#asynchronous-mixins
+    >>> dataflow = DataFlow.auto()
+    >>>
+    >>> async def main():
+    ...     async for ctx, results in run():
+    ...         source,
+    ...         Record(
+    ...             "myrecord",
+    ...             data={
+    ...                 "features": {"Years": 0, "Expertise": 1, "Trust": 0.1},
+    ...                 "prediction": {"Salary": {"value": 10, "confidence": 1.0}},
+    ...             }
+    ...         )
+    ...     )
+    ...     print(pathlib.Path("save.csv").read_text().strip())
+    >>>
+    >>> asyncio.run(run())
+    key,tag,Expertise,Trust,Years,prediction_Salary,confidence_Salary
+    myrecord,untagged,1,0.1,0,10,1.0
+    """
+    if orchestrator is None:
+        orchestrator = MemoryOrchestrator.withconfig({})
+    async with orchestrator:
+        async with orchestrator(dataflow) as ctx:
+            async for ctx, results in ctx.run(*input_sets):
+                yield ctx, results
 
 
 async def save(source: BaseSource, *args: Record) -> None:
