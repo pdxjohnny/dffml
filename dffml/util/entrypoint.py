@@ -56,18 +56,23 @@ def entrypoint(label):
     This decorator sets the ENTRY_POINT_ORIG_LABEL and ENTRY_POINT_LABEL class
     proprieties to the same value, label.
 
-    For example in setup.py (dict would be the setup() function in this case).
-    EntrypointSubclassClass in this case needs to have this decorator applied to
-    it with label set to mylabel.
-    >>> dict(
-    >>>     entry_points={
-    >>>         'dffml.entrypoint': [
-    >>>             'mylabel = module.path.to:EntrypointSubclassClass',
-    >>>         ]
-    >>>     }
-    >>> )
+    Examples
+    --------
+
     >>> @entrypoint('mylabel')
     >>> class EntrypointSubclassClass(Entrypoint): pass
+
+    In setup.py, EntrypointSubclassClass needs to have this decorator applied to
+    it with label set to mylabel.
+
+    .. code-block:: python
+
+            entry_points={
+                'dffml.entrypoint': [
+                    'mylabel = module.path.to:EntrypointSubclassClass',
+                ]
+            }
+
     """
 
     def add_entry_point_label(cls):
