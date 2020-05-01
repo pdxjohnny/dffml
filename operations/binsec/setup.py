@@ -18,7 +18,12 @@ with open(
 with open(os.path.join(self_path, "README.md"), "r", encoding="utf-8") as f:
     readme = f.read()
 
-INSTALL_REQUIRES = ["aiohttp>=3.6.2", "rpmfile>=1.0.2", "pyelftools>=0.25"] + (
+INSTALL_REQUIRES = [
+    "aiohttp>=3.6.2",
+    "beautifulsoup4>=4.9.0",
+    "rpmfile>=1.0.2",
+    "pyelftools>=0.25",
+] + (
     ["dffml>=0.3.7"]
     if not any(
         list(
@@ -64,6 +69,9 @@ setup(
     install_requires=INSTALL_REQUIRES,
     packages=find_packages(),
     entry_points={
+        "dffml.service.cli": [
+            "binsec = dffml_operations_binsec.cli:BinSecCMD",
+        ],
         "dffml.operation": [
             "url_to_urlbytes = dffml_operations_binsec.operations:url_to_urlbytes",
             "urlbytes_to_tarfile = dffml_operations_binsec.operations:urlbytes_to_tarfile",
