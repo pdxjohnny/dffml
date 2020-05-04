@@ -27,13 +27,6 @@ from .definitions import (
     binary_is_PIE,
 )
 
-url_to_urlbytes = Operation(
-    name="url_to_urlbytes",
-    inputs={"URL": URL},
-    outputs={"download": URLBytes},
-    conditions=[],
-)
-
 
 class URLBytesObject(NamedTuple):
     URL: str
@@ -47,36 +40,18 @@ class URLBytesObject(NamedTuple):
         )
 
 
-class URLToURLBytesContext(OperationImplementationContext):
-    async def run(self, inputs: Dict[str, Any]) -> Dict[str, Any]:
-        self.logger.debug("Start resp: %s", inputs["URL"])
-        async with self.parent.session.get(inputs["URL"]) as resp:
-            return {
-                "download": URLBytesObject(
-                    URL=inputs["URL"], body=await resp.read()
-                )
-            }
-
-
-class URLToURLBytes(OperationImplementation):
-
-    op = url_to_urlbytes
-    CONTEXT = URLToURLBytesContext
-
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        self.client = None
-        self.session = None
-
-    async def __aenter__(self) -> "OperationImplementationContext":
-        self.client = aiohttp.ClientSession(trust_env=True)
-        self.session = await self.client.__aenter__()
-        return self
-
-    async def __aexit__(self, exc_type, exc_value, traceback):
-        await self.client.__aexit__(exc_type, exc_value, traceback)
-        self.client = None
-        self.session = None
+@op(
+    inputs={"URL": URL},
+    outputs={"download": URLBytes},
+    imp_enter={"session": (lambda self: aiohttp.ClientSession())},
+)
+async def url_to_urlbytes(self, URL: str) -> Dict[str, Any]:
+    """
+    Download the information on the package in JSON format.
+    """
+    self.logger.debug("Start resp: %s", URL)
+    async with self.parent.session.get(URL) as resp:
+        return {"download": URLBytesObject(URL=URL, body=await resp.read())}
 
 
 @op(inputs={"download": URLBytes}, outputs={"rpm": RPMObject})
