@@ -17,11 +17,12 @@ from dataclasses import is_dataclass
 from contextlib import asynccontextmanager
 
 from .exceptions import NotOpImp
-from .types import Operation, Input, Parameter, Stage, Definition, NO_DEFAULT
+from .types import Operation, Input, Parameter, Stage, Definition, DataFlow, NO_DEFAULT
 
 from .log import LOGGER
 
 from ..base import (
+    config,
     BaseConfig,
     BaseDataFlowFacilitatorObjectContext,
     BaseDataFlowFacilitatorObject,
@@ -1019,6 +1020,19 @@ class OperationException(Exception):
     """
     Raised by the orchestrator when an operation throws an exception.
     """
+
+
+@config
+class BaseOrchestratorContextConfig:
+    dataflow: DataFlow
+    # Maximum number of contexts to run concurrently
+    max_ctxs: int = None
+    # Context objects to reuse. If not given a new context object will be created
+    rctx: BaseRedundancyCheckerContext = None
+    ictx: BaseInputNetworkContext = None
+    octx: BaseOperationNetworkContext = None
+    lctx: BaseLockNetworkContext = None
+    nctx: BaseOperationImplementationNetworkContext = None
 
 
 class BaseOrchestratorConfig(BaseConfig, NamedTuple):

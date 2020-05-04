@@ -65,6 +65,7 @@ from .base import (
     OperationImplementationNotInstantiable,
     BaseOperationImplementationNetworkContext,
     BaseOperationImplementationNetwork,
+    BaseOrchestratorContextConfig,
     BaseOrchestratorConfig,
     BaseOrchestratorContext,
     BaseOrchestrator,
@@ -1226,6 +1227,17 @@ class MemoryOrchestratorContextConfig:
     reuse: Dict[str, BaseDataFlowObjectContext]
 
 
+class MemoryOrchestratorConfig(BaseOrchestratorConfig):
+    """
+    Same as base orchestrator config
+    """
+
+
+@config
+class MemoryOrchestratorContextConfig(BaseOrchestratorContextConfig):
+    pass
+
+
 class MemoryOrchestratorContext(BaseOrchestratorContext):
     def __init__(
         self,
@@ -1236,6 +1248,7 @@ class MemoryOrchestratorContext(BaseOrchestratorContext):
         self._stack = None
         # Maps instance_name to OrchestratorContext
         self.subflows = {}
+        self.lock = None
 
     async def __aenter__(self) -> "BaseOrchestratorContext":
         # TODO(subflows) In all of these contexts we are about to enter, they
@@ -1261,11 +1274,15 @@ class MemoryOrchestratorContext(BaseOrchestratorContext):
         }
         # If we were told to reuse a context, don't enter it. Just set the
         # attribute now.
-        for name, ctx in self.config.reuse.items():
-            if name in enter:
+        remove = []
+        for name in enter:
+            ctx = getattr(self.config, name, None)
+            if ctx is not None:
+                remove.append(name)
                 self.logger.debug("Reusing %s: %s", name, ctx)
-                del enter[name]
                 setattr(self, name, ctx)
+        for name in remove:
+            del enter[name]
         # Creat the exit stack and enter all the contexts we won't be reusing
         self._stack = AsyncExitStack()
         self._stack = await aenter_stack(self, enter)
@@ -1452,8 +1469,12 @@ class MemoryOrchestratorContext(BaseOrchestratorContext):
         # TODO Make some way to cap the number of context's who have operations
         # executing. Or maybe just the number of operations. Or both.
         tasks = set()
+        # Track the number of contexts running
+        num_ctxs = 0
         # Create tasks to wait on the results of each of the contexts submitted
-        for ctx in ctxs:
+        for ctxs_index in range(0, len(ctxs)):
+            # Grab the context by it's index
+            ctx = ctxs[ctxs_index]
             self.logger.debug(
                 "kickstarting context: %s", (await ctx.handle()).as_string()
             )
@@ -1462,6 +1483,13 @@ class MemoryOrchestratorContext(BaseOrchestratorContext):
                     self.run_operations_for_ctx(ctx, strict=strict)
                 )
             )
+            # Ensure we don't run more contexts conncurrently than requested
+            num_ctxs += 1
+            if (
+                self.config.max_ctxs is not None
+                and num_ctxs >= self.config.max_ctxs
+            ):
+                break
         try:
             # Return when outstanding operations reaches zero
             while tasks:
@@ -1473,6 +1501,7 @@ class MemoryOrchestratorContext(BaseOrchestratorContext):
                 for task in done:
                     # Remove the task from the set of tasks we are waiting for
                     tasks.remove(task)
+                    num_ctxs -= 1
                     # Get the tasks exception if any
                     exception = task.exception()
                     if strict and exception is not None:
@@ -1489,6 +1518,28 @@ class MemoryOrchestratorContext(BaseOrchestratorContext):
                         # output operations
                         ctx, results = task.result()
                         yield ctx, results
+                    # Create more tasks to wait on the results of each of the
+                    # contexts submitted if we are caping the number of them
+                    while (
+                        self.config.max_ctxs is not None
+                        and num_ctxs < self.config.max_ctxs
+                        and ctxs_index < len(ctxs)
+                    ):
+                        # Grab the context by it's index
+                        ctx = ctxs[ctxs_index]
+                        self.logger.debug(
+                            "kickstarting context: %s",
+                            (await ctx.handle()).as_string(),
+                        )
+                        tasks.add(
+                            asyncio.create_task(
+                                self.run_operations_for_ctx(ctx, strict=strict)
+                            )
+                        )
+                        # Keep track of which index we're at
+                        ctxs_index += 1
+                        # Ensure we don't run more contexts conncurrently than requested
+                        num_ctxs += 1
                 self.logger.debug("ctx.outstanding: %d", len(tasks) - 1)
         finally:
             # Cancel tasks which we don't need anymore now that we know we are done
@@ -1758,11 +1809,13 @@ class MemoryOrchestrator(BaseOrchestrator, BaseMemoryDataFlowObject):
         await self._stack.aclose()
 
     def __call__(
-        self, dataflow: DataFlow, **kwargs
+        self,
+        dataflow: Union[DataFlow, MemoryOrchestratorContextConfig],
+        **kwargs,
     ) -> BaseDataFlowObjectContext:
-        return self.CONTEXT(
-            MemoryOrchestratorContextConfig(
-                uid=secrets.token_hex(), dataflow=dataflow, reuse=kwargs
-            ),
-            self,
-        )
+        config = dataflow
+        if isinstance(dataflow, DataFlow):
+            config = MemoryOrchestratorContextConfig(
+                uid=secrets.token_hex(), dataflow=dataflow, **kwargs
+            )
+        return self.CONTEXT(config, self)
