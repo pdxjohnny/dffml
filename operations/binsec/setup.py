@@ -65,7 +65,7 @@ setup(
     packages=find_packages(),
     entry_points={
         "dffml.operation": [
-            "url_to_urlbytes = dffml_operations_binsec.operations:URLToURLBytes",
+            "url_to_urlbytes = dffml_operations_binsec.operations:url_to_urlbytes",
             "urlbytes_to_tarfile = dffml_operations_binsec.operations:urlbytes_to_tarfile",
             "urlbytes_to_rpmfile = dffml_operations_binsec.operations:urlbytes_to_rpmfile",
             "files_in_rpm = dffml_operations_binsec.operations:files_in_rpm",
