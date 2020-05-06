@@ -7,10 +7,12 @@ import shutil
 import asyncio
 import pathlib
 import getpass
+import inspect
 import tempfile
 import importlib
 import subprocess
 import contextlib
+import dataclasses
 import configparser
 import pkg_resources
 import unittest.mock
@@ -304,6 +306,10 @@ class Export(CMD):
                             await loader.dumpb(
                                 obj.export(linked=not self.not_linked)
                             )
+                        )
+                    elif inspect.isclass(obj) and hasattr(obj, "_cls_asdict"):
+                        sys.stdout.buffer.write(
+                            await loader.dumpb(obj._cls_asdict())
                         )
                     elif hasattr(obj, "export"):
                         sys.stdout.buffer.write(

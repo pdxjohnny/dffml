@@ -215,6 +215,45 @@ def _fromdict(cls, **kwargs):
     return cls(**kwargs)
 
 
+def _cls_asdict(cls):
+    """
+    Convert a dataclass into a dict. From which it can be recreated.
+    """
+    # Grab the function signature of field, so that we know the names of its
+    # arguments and their values
+    sig_cls = inspect.signature(cls)
+    sig_field = inspect.signature(dataclasses.field)
+    # Create a dict mapping the field names to a dict containing the argument
+    # names of field to their values as they exist in the field
+    out = {
+        field.name: dict(
+            map(
+                lambda name: (name, getattr(field, name),),
+                sig_field.parameters,
+            )
+        )
+        for field in dataclasses.fields(cls)
+    }
+    # Add data types
+    for name, arg in sig_cls.parameters.items():
+        out[name]["annotation"] = arg.annotation
+    # Remove any fields whose values match the default value in the call to
+    # field for that argument name
+    for field_name, field_args in out.items():
+        remove = []
+        for name, arg in sig_field.parameters.items():
+            if (
+                field_args[name] == arg.default
+                or arg.default is None
+                and field_args[name] == {}
+            ):
+                remove.append(name)
+        for name in remove:
+            del field_args[name]
+    # Convert anything else
+    return export_dict(**out)
+
+
 def field(description: str, *args, metadata: Optional[dict] = None, **kwargs):
     """
     Creates an instance of :py:func:`dataclasses.field`. The first argument,
@@ -237,6 +276,7 @@ def config(cls):
     """
     datacls = dataclasses.dataclass(eq=True, init=True)(cls)
     datacls._fromdict = classmethod(_fromdict)
+    datacls._cls_asdict = classmethod(_cls_asdict)
     datacls._replace = lambda self, *args, **kwargs: dataclasses.replace(
         self, *args, **kwargs
     )
@@ -251,6 +291,7 @@ def make_config(cls_name: str, fields, *args, namespace=None, **kwargs):
     if namespace is None:
         namespace = {}
     namespace.setdefault("_fromdict", classmethod(_fromdict))
+    namespace.setdefault("_cls_asdict", classmethod(_cls_asdict))
     namespace.setdefault(
         "_replace",
         lambda self, *args, **kwargs: dataclasses.replace(

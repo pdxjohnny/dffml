@@ -204,8 +204,11 @@ class FakeTesting3(BaseTesting):
     CONFIG = FakeTestingConfig3
 
 
-class TestCONFIG(unittest.TestCase):
-    def test_CONFIG(self):
+class TestConfig(unittest.TestCase):
+    def test_init_all_default(self):
         with self.assertRaises(TypeError):
             config = FakeTesting2()
         config = FakeTesting3()
+
+    def test_cls_asdict(self):
+        self.assertEqual(FakeTestingConfig._cls_asdict(), {})
