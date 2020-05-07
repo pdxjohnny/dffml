@@ -203,7 +203,11 @@ def op(*args, imp_enter=None, ctx_enter=None, config_cls=None, **kwargs):
             sig = inspect.signature(func)
             kwargs["inputs"] = {}
 
-            for name, param in sig.parameters.items():
+            for i, (name, param) in enumerate(sig.parameters.items()):
+                # Skip self
+                if i == 0 and name == "self":
+                    continue
+
                 name_list = [func.__qualname__, name]
                 if func.__module__ != "__main__":
                     name_list.insert(0, func.__module__)
