@@ -342,6 +342,46 @@ def op(*args, imp_enter=None, ctx_enter=None, config_cls=None, **kwargs):
         if not "conditions" in kwargs:
             kwargs["conditions"] = []
 
+        primitive_types = (int, float, str, bool, dict, list)
+        # Used to convert python types in to their programming language agnostic
+        # names
+        # TODO Combine with logic in dffml.util.data
+        primitive_convert = {dict: "map", list: "array"}
+
+        if not "inputs" in kwargs:
+            sig = inspect.signature(func)
+            kwargs["inputs"] = {}
+
+            for i, (name, param) in enumerate(sig.parameters.items()):
+                # Skip self
+                if i == 0 and name == "self":
+                    continue
+
+                name_list = [func.__qualname__, name]
+                if func.__module__ != "__main__":
+                    name_list.insert(0, func.__module__)
+
+                if param.annotation in primitive_types:
+                    kwargs["inputs"][name] = Definition(
+                        name=".".join(name_list),
+                        primitive=primitive_convert.get(
+                            param.annotation, param.annotation.__name__
+                        ),
+                    )
+                else:
+                    raise OpCouldNotDeterminePrimitive(
+                        f"The primitive of {name} could not be determined"
+                    )
+
+        func.op = Operation(**kwargs)
+        func.ENTRY_POINT_NAME = ["operation"]
+        cls_name = (
+            func.op.name.replace(".", " ")
+            .replace("_", " ")
+            .title()
+            .replace(" ", "")
+        )
+
         sig = inspect.signature(func)
         # Check if the function uses the operation implementation context
         uses_self = bool(
