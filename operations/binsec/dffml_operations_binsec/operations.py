@@ -44,6 +44,7 @@ class URLBytesObject(NamedTuple):
     inputs={"URL": URL},
     outputs={"download": URLBytes},
     imp_enter={"session": (lambda self: aiohttp.ClientSession())},
+    retry=1000,
 )
 async def url_to_urlbytes(self, URL: str) -> Dict[str, Any]:
     """
