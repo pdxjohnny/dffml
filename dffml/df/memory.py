@@ -909,7 +909,7 @@ class MemoryOperationImplementationNetworkContext(
                     operation.instance_name
                 )
 
-    async def run(
+    async def run_no_retry(
         self,
         ctx: BaseInputSetContext,
         octx: BaseOrchestratorContext,
@@ -917,7 +917,7 @@ class MemoryOperationImplementationNetworkContext(
         inputs: Dict[str, Any],
     ) -> Union[bool, Dict[str, Any]]:
         """
-        Run an operation in our network.
+        Run an operation in our network without retry if it fails
         """
         # Check that our network contains the operation
         await self.ensure_contains(operation)
@@ -960,6 +960,33 @@ class MemoryOperationImplementationNetworkContext(
             )
             self.logger.debug("---")
             return outputs
+
+    async def run(
+        self,
+        ctx: BaseInputSetContext,
+        octx: BaseOrchestratorContext,
+        operation: Operation,
+        inputs: Dict[str, Any],
+    ) -> Union[bool, Dict[str, Any]]:
+        """
+        Run an operation in our network.
+        """
+        if not operation.retry:
+            return await self.run_no_retry(ctx, octx, operation, inputs)
+        for retry in range(0, operation.retry):
+            try:
+                return await self.run_no_retry(ctx, octx, operation, inputs)
+            except Exception:
+                # Raise if no more tries left
+                if (retry + 1) == operation.retry:
+                    raise
+                # Otherwise if there was an exception log it
+                self.logger.error(
+                    "%r: try %d: %s",
+                    operation.instance_name,
+                    retry + 1,
+                    traceback.format_exc().rstrip(),
+                )
 
     async def operation_completed(self):
         await self.completed_event.wait()
@@ -1046,6 +1073,8 @@ class MemoryOperationImplementationNetworkContext(
         task = asyncio.create_task(
             self.run_dispatch(octx, operation, parameter_set)
         )
+        task.operation = operation
+        task.parameter_set = parameter_set
         task.add_done_callback(ignore_args(self.completed_event.set))
         return task
 
@@ -1063,6 +1092,8 @@ class MemoryOperationImplementationNetworkContext(
             task = asyncio.create_task(
                 self.run_dispatch(octx, operation, empty_parameter_set)
             )
+            task.operation = operation
+            task.parameter_set = empty_parameter_set
             task.add_done_callback(ignore_args(self.completed_event.set))
             yield task
 
@@ -1514,10 +1545,6 @@ class MemoryOrchestratorContext(BaseOrchestratorContext):
                                 dispatch_operation = await self.nctx.dispatch(
                                     self, operation, parameter_set
                                 )
-                                dispatch_operation.operation = operation
-                                dispatch_operation.parameter_set = (
-                                    parameter_set
-                                )
                                 tasks.add(dispatch_operation)
                                 self.logger.debug(
                                     "[%s]: dispatch operation: %s",
@@ -1541,10 +1568,6 @@ class MemoryOrchestratorContext(BaseOrchestratorContext):
                                 # Dispatch the operation and input set for running
                                 dispatch_operation = await self.nctx.dispatch(
                                     self, operation, parameter_set
-                                )
-                                dispatch_operation.operation = operation
-                                dispatch_operation.parameter_set = (
-                                    parameter_set
                                 )
                                 tasks.add(dispatch_operation)
                                 self.logger.debug(

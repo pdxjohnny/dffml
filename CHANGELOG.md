@@ -22,6 +22,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Complete example for dataflow run cli command
 - Tests for default configs instantiation.
 - Documentation for creating Source for new File types taking `.ini` as an example.
+- Retry parameter to `Operation`. Allows for setting number of times operation
+  should be retried before it's exception should be raised.
 ### Changed
 - `Edit on Github` button now hidden for plugins.
 - Doctests now run via unittests
