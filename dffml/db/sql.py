@@ -3,7 +3,7 @@ Base classes to wrap various SQL based databases in dffml.db abstraction.
 """
 from typing import Dict, Any, List, Tuple, Optional
 
-from dffml.db.base import BaseDatabaseContext, Conditions
+from .base import BaseDatabaseContext, Conditions
 
 
 class SQLDatabaseContext(BaseDatabaseContext):
@@ -233,7 +233,7 @@ class SQLDatabaseContext(BaseDatabaseContext):
             Variables to bind
         """
         condition_dict = self.make_condition_expression(conditions)
-
+        query_values = []
         if condition_dict is not None:
             condition_exp = condition_dict["expression"]
             query_values = condition_dict["values"]

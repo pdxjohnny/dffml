@@ -27,20 +27,22 @@ import contextlib
 
 from typing import Optional
 
-from dffml.util.packaging import is_develop
+from .packaging import is_develop
 
 
 class AsyncTestCase(unittest.TestCase):
     """
     Runs any test_ methods as coroutines in the default event loop.
 
-    USAGE
-    >>> from dffml.util.asynctestcase import AsyncTestCase
+    Examples
+    --------
+
+    >>> import asyncio
+    >>> from dffml import AsyncTestCase
     >>>
-    >>> class AsyncTestCase(unittest.AsyncTestCase):
-    >>>
-    >>>     async def test_sleep(self):
-    >>>         await asyncio.sleep(1)
+    >>> class AsyncTestCase(AsyncTestCase):
+    ...     async def test_sleep(self):
+    ...         await asyncio.sleep(1)
     """
 
     # The event loop to run test_ functions in
@@ -112,6 +114,9 @@ class AsyncExitStackTestCase(AsyncTestCase):
         if text:
             pathlib.Path(filename).write_text(inspect.cleandoc(text) + "\n")
         return filename
+
+    def mktempdir(self):
+        return self._stack.enter_context(tempfile.TemporaryDirectory())
 
 
 def relative_path(*args):

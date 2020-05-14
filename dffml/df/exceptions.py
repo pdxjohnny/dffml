@@ -12,3 +12,11 @@ class DefinitionNotInContext(Exception):
 
 class NotOpImp(Exception):
     pass
+
+
+class InputValidationError(Exception):
+    pass
+
+
+class ValidatorMissing(Exception):
+    pass

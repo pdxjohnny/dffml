@@ -9,12 +9,23 @@ import asyncio
 import argparse
 from typing import Dict, Any
 
-from ...repo import Repo
+from ...record import Record
 from ...feature import Feature
 
+from ..data import export_dict
 from .arg import Arg, parse_unknown
 
 DisplayHelp = "Display help message"
+
+
+class CMDOutputOverride:
+    """
+    Override dumping of results
+    """
+
+
+if sys.platform == "win32":  # pragma: no cov
+    asyncio.set_event_loop(asyncio.ProactorEventLoop())
 
 
 class ParseLoggingAction(argparse.Action):
@@ -32,7 +43,7 @@ class JSONEncoder(json.JSONEncoder):
 
     def default(self, obj):
         typename_lower = str(type(obj)).lower()
-        if isinstance(obj, Repo):
+        if isinstance(obj, Record):
             return obj.dict()
         elif isinstance(obj, Feature):
             return obj.NAME
@@ -89,6 +100,7 @@ class CMD(object):
 
     JSONEncoder = JSONEncoder
     EXTRA_CONFIG_ARGS = {}
+    ENTRY_POINT_NAME = ["service"]
 
     arg_log = Arg(
         "-log",
@@ -160,7 +172,7 @@ class CMD(object):
         if getattr(args, "cmd", None) is None:
             parser.print_help()
             return DisplayHelp
-        if getattr(args.cmd, "run", None) is None:
+        if not inspect.isfunction(getattr(args.cmd, "run", None)):
             args.parser.print_help()
             return DisplayHelp
         cmd = args.cmd(**cls.sanitize_args(vars(args)))
@@ -179,9 +191,14 @@ class CMD(object):
     @classmethod
     async def _main(cls, *args):
         result = await cls.cli(*args)
-        if not result is None and result is not DisplayHelp:
+        if (
+            result is not None
+            and result is not DisplayHelp
+            and result is not CMDOutputOverride
+            and result != [CMDOutputOverride]
+        ):
             json.dump(
-                result,
+                export_dict(result=result)["result"],
                 sys.stdout,
                 sort_keys=True,
                 indent=4,
@@ -202,7 +219,11 @@ class CMD(object):
             # is the default and may cause BlockingIOErrors when many
             # subprocesses are created
             # https://docs.python.org/3/library/asyncio-policy.html#asyncio.FastChildWatcher
-            if sys.version_info.major == 3 and sys.version_info.minor == 7:
+            if (
+                sys.version_info.major == 3
+                and sys.version_info.minor == 7
+                and sys.platform != "win32"
+            ):
                 watcher = asyncio.FastChildWatcher()
                 asyncio.set_child_watcher(watcher)
                 watcher.attach_loop(loop)

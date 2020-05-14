@@ -1,8 +1,9 @@
-Integrating Machine Learning
-============================
+Automating Classification
+=========================
 
 This example will show you how to automate a manual classification process,
-determining if a Git repo is maintained or abandoned.
+determining if a Git repo is maintained or abandoned. We'll be integrating
+Machine Learning into an existing legacy application.
 
 For this example assume you are a very curious open source software people (if
 you're here you already are). Since you love looking at GitHub repos in your
@@ -38,7 +39,7 @@ Create a virtual environment for Python 3.7.
 
 .. code-block:: console
 
-    $ python3.7 -m venv .venv
+    $ python3 -m venv .venv
     $ . .venv/bin/activate
 
 Install DFFML.
@@ -143,6 +144,27 @@ since that creates more user friendly configs than ``json``.
 
     $ pip install -U dffml-feature-git dffml-config-yaml
 
+The git operations / features rely on ``tokei``. We need to download and install
+it first.
+
+On Linux
+
+.. code-block:: console
+
+    $ curl -sSL 'https://github.com/XAMPPRocky/tokei/releases/download/v10.1.1/tokei-v10.1.1-x86_64-apple-darwin.tar.gz' \
+      | tar -xvz && \
+      echo '22699e16e71f07ff805805d26ee86ecb9b1052d7879350f7eb9ed87beb0e6b84fbb512963d01b75cec8e80532e4ea29a tokei' | sha384sum -c - && \
+      sudo mv tokei /usr/local/bin/
+
+On OSX
+
+.. code-block:: console
+
+    $ curl -sSL 'https://github.com/XAMPPRocky/tokei/releases/download/v10.1.1/tokei-v10.1.1-x86_64-apple-darwin.tar.gz' \
+      | tar -xvz && \
+      echo '8c8a1d8d8dd4d8bef93dabf5d2f6e27023777f8553393e269765d7ece85e68837cba4374a2615d83f071dfae22ba40e2 tokei' | sha384sum -c - && \
+      sudo mv tokei /usr/local/bin/
+
 Operations are just Python functions, or classes. They define a routine which
 will be run concurrently with other operations. Here's an example of the
 ``git_commits`` operation, which will find the number of commits within a date
@@ -152,8 +174,8 @@ range.
 
 .. literalinclude:: /../feature/git/dffml_feature_git/feature/operations.py
     :linenos:
-    :lineno-start: 367
-    :lines: 367-394
+    :lineno-start: 363
+    :lines: 363-394
 
 Since operations are run concurrently with each other, DFFML manages locking of
 input data, such as git repositories. This is done via ``Definitions`` which are
@@ -242,9 +264,9 @@ This command runs the dataflow on a set of repos, that set being the URLs in
 
 .. code-block:: console
 
-    $ dffml dataflow run repos set \
+    $ dffml dataflow run records set \
         -keys $(cat /tmp/urls) \
-        -repo-def URL \
+        -record-def URL \
         -dataflow cgi-bin/dataflow.yaml \
         -sources gathered=json \
         -source-filename /tmp/data.json \
@@ -363,7 +385,7 @@ up as expected.
 
 .. code-block:: console
 
-    $ dffml list repos -sources db=demoapp
+    $ dffml list records -sources db=demoapp
 
 Training our Model
 ------------------
@@ -421,9 +443,9 @@ Run the operations on the new repo: ``https://github.com/intel/dffml.git``
 
 .. code-block:: console
 
-    $ dffml dataflow run repos set \
+    $ dffml dataflow run records set \
         -keys https://github.com/intel/dffml.git \
-        -repo-def URL \
+        -record-def URL \
         -dataflow cgi-bin/dataflow.yaml \
         -sources db=demoapp
 
@@ -431,7 +453,7 @@ Now that we have the data for the new repo, ask the model for a prediction.
 
 .. code-block:: console
 
-    $ dffml predict repo \
+    $ dffml predict record \
         -keys https://github.com/intel/dffml.git \
         -model tfdnnc \
         -model-predict maintained:str:1 \

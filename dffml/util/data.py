@@ -5,10 +5,11 @@ Run doctests with
 
 python -m doctest -v dffml/util/data.py
 """
-
-import inspect
+import ast
+import types
 import pydoc
 import inspect
+import dataclasses
 from functools import wraps
 import pathlib
 from typing import Callable
@@ -28,18 +29,23 @@ def merge(one, two, list_append: bool = True):
 
 def traverse_config_set(target, *args):
     """
+    Examples
+    --------
+
+    >>> from dffml import traverse_config_set
+    >>>
     >>> traverse_config_set({
     ...     "level": {
-    ...         "arg": None,
+    ...         "plugin": None,
     ...         "config": {
     ...             "one": {
-    ...                 "arg": 1,
+    ...                 "plugin": 1,
     ...                 "config": {},
     ...             },
     ...         },
     ...     },
     ... }, "level", "one", 42)
-    {'level': {'arg': None, 'config': {'one': {'arg': 42, 'config': {}}}}}
+    {'level': {'plugin': None, 'config': {'one': {'plugin': 42, 'config': {}}}}}
     """
     # Seperate the path down from the value to set
     path, value = args[:-1], args[-1]
@@ -47,21 +53,26 @@ def traverse_config_set(target, *args):
     last = target
     for level in path:
         if not level in current:
-            current[level] = {"arg": None, "config": {}}
+            current[level] = {"plugin": None, "config": {}}
         last = current[level]
         current = last["config"]
-    last["arg"] = value
+    last["plugin"] = value
     return target
 
 
 def traverse_config_get(target, *args):
     """
+    Examples
+    --------
+
+    >>> from dffml import traverse_config_get
+    >>>
     >>> traverse_config_get({
     ...     "level": {
-    ...         "arg": None,
+    ...         "plugin": None,
     ...         "config": {
     ...             "one": {
-    ...                 "arg": 1,
+    ...                 "plugin": 1,
     ...                 "config": {},
     ...             },
     ...         },
@@ -74,12 +85,18 @@ def traverse_config_get(target, *args):
     for level in args:
         last = current[level]
         current = last["config"]
-    return last["arg"]
+    return last["plugin"]
 
 
 def traverse_get(target, *args):
     """
     Travel down through a dict
+
+    Examples
+    --------
+
+    >>> from dffml import traverse_get
+    >>>
     >>> traverse_get({"one": {"two": 3}}, "one", "two")
     3
     """
@@ -142,12 +159,19 @@ def export_value(obj, key, value):
     if isinstance(value, list) and value and inspect.isgenerator(value[0]):
         obj[key] = list(value[0])
     # export and _asdict are not classmethods
+    if hasattr(value, "ENTRY_POINT_ORIG_LABEL") and hasattr(value, "config"):
+        obj[key] = {"plugin": value.ENTRY_POINT_ORIG_LABEL}
+        export_value(obj[key], "config", value.config)
     elif inspect.isclass(value):
         obj[key] = value.__qualname__
+    elif isinstance(value, pathlib.Path):
+        obj[key] = str(value)
     elif hasattr(value, "export"):
         obj[key] = value.export()
     elif hasattr(value, "_asdict"):
         obj[key] = value._asdict()
+    elif dataclasses.is_dataclass(value):
+        obj[key] = export_dict(**dataclasses.asdict(value))
     elif getattr(value, "__module__", None) == "typing":
         obj[key] = STANDARD_TYPES.get(
             str(value).replace("typing.", ""), "generic"
@@ -159,8 +183,10 @@ def export_value(obj, key, value):
 def export_list(iterable):
     for i, value in enumerate(iterable):
         export_value(iterable, i, value)
-        if isinstance(iterable[i], dict):
+        if isinstance(value, (dict, types.MappingProxyType)):
             iterable[i] = export_dict(**iterable[i])
+        elif dataclasses.is_dataclass(value):
+            iterable[i] = export_dict(**dataclasses.asdict(value))
         elif isinstance(value, list):
             iterable[i] = export_list(iterable[i])
     return iterable
@@ -180,7 +206,7 @@ def export_dict(**kwargs):
     """
     for key, value in kwargs.items():
         export_value(kwargs, key, value)
-        if isinstance(kwargs[key], dict):
+        if isinstance(kwargs[key], (dict, types.MappingProxyType)):
             kwargs[key] = export_dict(**kwargs[key])
         elif isinstance(kwargs[key], list):
             kwargs[key] = export_list(kwargs[key])
@@ -191,9 +217,13 @@ def explore_directories(path_dict: dict):
     """
     Recursively explores any path binded to a key in `path_dict`
 
+    Examples
+    --------
+
     >>> import pathlib
     >>> import tempfile
-
+    >>> from dffml import explore_directories
+    >>>
     >>> with tempfile.TemporaryDirectory() as root:
     ...     # Setup directories for example
     ...     STRUCTURE = '''
@@ -260,3 +290,40 @@ async def nested_apply(target: dict, func: Callable):
             else:
                 target[key] = func(val)
     return target
+
+
+def parser_helper(value):
+    """
+    Calls checks if value is string and if it is it converts it to a bool if
+    the string is a string representation of common boolean value (on, off,
+    true, false, yes, no). Otherwise it tries to call
+    :py:func:`ast.literal_eval`, if that doesn't succeed the string value is
+    returned.
+
+
+    Examples
+    --------
+
+    >>> from dffml import parser_helper
+    >>>
+    >>> parser_helper("on")
+    True
+    >>> parser_helper("[1, 2, 3]")
+    [1, 2, 3]
+    >>> parser_helper("hello")
+    'hello'
+    >>> parser_helper("'on'")
+    'on'
+    """
+    if not isinstance(value, str):
+        return value
+    if value.lower() in ["null", "nil", "none"]:
+        return None
+    elif value.lower() in ["yes", "true", "on"]:
+        return True
+    elif value.lower() in ["no", "false", "off"]:
+        return False
+    try:
+        return ast.literal_eval(value)
+    except:
+        return value

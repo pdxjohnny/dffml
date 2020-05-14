@@ -1,22 +1,11 @@
 # SPDX-License-Identifier: MIT
 # Copyright (c) 2019 Intel Corporation
-import os
-import io
-import atexit
-import shutil
-import random
-import inspect
-import asyncio
-import logging
-import tempfile
-import unittest
-import collections
-from unittest.mock import patch, mock_open, Mock
-from functools import wraps
+import pathlib
+from unittest.mock import patch, mock_open
 from contextlib import contextmanager
-from typing import List, Dict, Any, Optional, Tuple, AsyncIterator
+from typing import AsyncIterator
 
-from dffml.repo import Repo
+from dffml.record import Record
 from dffml.source.source import BaseSourceContext
 from dffml.source.file import FileSource, FileSourceConfig
 from dffml.util.cli.arg import Arg, parse_unknown
@@ -24,13 +13,13 @@ from dffml.util.asynctestcase import AsyncTestCase
 
 
 class FakeFileSourceContext(BaseSourceContext):
-    async def update(self, repo: Repo):
+    async def update(self, record: Record):
         pass  # pragma: no cover
 
-    async def repos(self) -> AsyncIterator[Repo]:
-        yield Repo("")  # pragma: no cover
+    async def records(self) -> AsyncIterator[Record]:
+        yield Record("")  # pragma: no cover
 
-    async def repo(self, key: str):
+    async def record(self, key: str):
         pass  # pragma: no cover
 
 
@@ -56,17 +45,17 @@ class TestFileSource(AsyncTestCase):
             FileSource.args({}),
             {
                 "source": {
-                    "arg": None,
+                    "plugin": None,
                     "config": {
                         "file": {
-                            "arg": None,
+                            "plugin": None,
                             "config": {
                                 "filename": {
-                                    "arg": Arg(type=str),
+                                    "plugin": Arg(type=str),
                                     "config": {},
                                 },
                                 "readwrite": {
-                                    "arg": Arg(
+                                    "plugin": Arg(
                                         type=bool,
                                         action="store_true",
                                         default=False,
@@ -74,15 +63,17 @@ class TestFileSource(AsyncTestCase):
                                     "config": {},
                                 },
                                 "allowempty": {
-                                    "arg": Arg(
+                                    "plugin": Arg(
                                         type=bool,
                                         action="store_true",
                                         default=False,
                                     ),
                                     "config": {},
                                 },
-                                "label": {
-                                    "arg": Arg(type=str, default="unlabeled"),
+                                "tag": {
+                                    "plugin": Arg(
+                                        type=str, default="untagged"
+                                    ),
                                     "config": {},
                                 },
                             },
@@ -97,7 +88,7 @@ class TestFileSource(AsyncTestCase):
             parse_unknown("--source-file-filename", "feedface")
         )
         self.assertEqual(config.filename, "feedface")
-        self.assertEqual(config.label, "unlabeled")
+        self.assertEqual(config.tag, "untagged")
         self.assertFalse(config.readwrite)
         self.assertFalse(config.allowempty)
 
@@ -106,24 +97,24 @@ class TestFileSource(AsyncTestCase):
             parse_unknown(
                 "--source-file-filename",
                 "feedface",
-                "--source-file-label",
-                "default-label",
+                "--source-file-tag",
+                "default-tag",
                 "--source-file-readwrite",
                 "--source-file-allowempty",
             )
         )
         self.assertEqual(config.filename, "feedface")
-        self.assertEqual(config.label, "default-label")
+        self.assertEqual(config.tag, "default-tag")
         self.assertTrue(config.readwrite)
         self.assertTrue(config.allowempty)
 
     def config(
-        self, filename, label="unlabeled", readwrite=True, allowempty=True
+        self, filename, tag="untagged", readwrite=True, allowempty=True
     ):
         return FileSourceConfig(
             filename=filename,
             readwrite=readwrite,
-            label=label,
+            tag=tag,
             allowempty=allowempty,
         )
 
@@ -135,10 +126,10 @@ class TestFileSource(AsyncTestCase):
             async with FakeFileSource(
                 self.config("testfile", readwrite=False)
             ):
-                m_open.assert_called_once_with("testfile", "r")
+                pass
+            m_open.assert_called_once_with(pathlib.Path("testfile"), "r")
 
     async def test_open_gz(self):
-        source = FakeFileSource("testfile.gz")
         m_open = mock_open()
         with patch("os.path.exists", return_value=True), patch(
             "gzip.open", m_open
@@ -146,7 +137,9 @@ class TestFileSource(AsyncTestCase):
             async with FakeFileSource(
                 self.config("testfile.gz", readwrite=False)
             ):
-                m_open.assert_called_once_with("testfile.gz", "rt")
+                m_open.assert_called_once_with(
+                    pathlib.Path("testfile.gz"), "rt"
+                )
 
     async def test_open_bz2(self):
         m_open = mock_open()
@@ -156,7 +149,9 @@ class TestFileSource(AsyncTestCase):
             async with FakeFileSource(
                 self.config("testfile.bz2", readwrite=False)
             ):
-                m_open.assert_called_once_with("testfile.bz2", "rt")
+                m_open.assert_called_once_with(
+                    pathlib.Path("testfile.bz2"), "rt"
+                )
 
     async def test_open_lzma(self):
         m_open = mock_open()
@@ -166,7 +161,9 @@ class TestFileSource(AsyncTestCase):
             async with FakeFileSource(
                 self.config("testfile.lzma", readwrite=False)
             ):
-                m_open.assert_called_once_with("testfile.lzma", "rt")
+                m_open.assert_called_once_with(
+                    pathlib.Path("testfile.lzma"), "rt"
+                )
 
     async def test_open_xz(self):
         m_open = mock_open()
@@ -176,7 +173,9 @@ class TestFileSource(AsyncTestCase):
             async with FakeFileSource(
                 self.config("testfile.xz", readwrite=False)
             ):
-                m_open.assert_called_once_with("testfile.xz", "rt")
+                m_open.assert_called_once_with(
+                    pathlib.Path("testfile.xz"), "rt"
+                )
 
     async def test_open_zip(self):
         source = FakeFileSource(self.config("testfile.zip", readwrite=False))
@@ -202,7 +201,7 @@ class TestFileSource(AsyncTestCase):
         ):
             async with FakeFileSource(self.config("testfile")):
                 pass
-            m_open.assert_called_once_with("testfile", "w+")
+            m_open.assert_called_once_with(pathlib.Path("testfile"), "w+")
 
     async def test_close_gz(self):
         m_open = mock_open()
@@ -211,7 +210,7 @@ class TestFileSource(AsyncTestCase):
         ):
             async with FakeFileSource(self.config("testfile.gz")):
                 pass
-            m_open.assert_called_once_with("testfile.gz", "wt")
+            m_open.assert_called_once_with(pathlib.Path("testfile.gz"), "wt")
 
     async def test_close_bz2(self):
         m_open = mock_open()
@@ -220,7 +219,7 @@ class TestFileSource(AsyncTestCase):
         ):
             async with FakeFileSource(self.config("testfile.bz2")):
                 pass
-            m_open.assert_called_once_with("testfile.bz2", "wt")
+            m_open.assert_called_once_with(pathlib.Path("testfile.bz2"), "wt")
 
     async def test_close_lzma(self):
         m_open = mock_open()
@@ -229,7 +228,7 @@ class TestFileSource(AsyncTestCase):
         ):
             async with FakeFileSource(self.config("testfile.lzma")):
                 pass
-            m_open.assert_called_once_with("testfile.lzma", "wt")
+            m_open.assert_called_once_with(pathlib.Path("testfile.lzma"), "wt")
 
     async def test_close_xz(self):
         m_open = mock_open()
@@ -238,7 +237,7 @@ class TestFileSource(AsyncTestCase):
         ):
             async with FakeFileSource(self.config("testfile.xz")):
                 pass
-            m_open.assert_called_once_with("testfile.xz", "wt")
+            m_open.assert_called_once_with(pathlib.Path("testfile.xz"), "wt")
 
     async def test_close_zip(self):
         source = FakeFileSource(self.config("testfile.zip"))

@@ -1,11 +1,13 @@
 import unittest
 from typing import List
+import pathlib
 
 from dffml.base import (
     BaseDataFlowFacilitatorObject,
     config,
     field,
     list_action,
+    BaseDataFlowFacilitatorObjectContext,
 )
 from dffml.feature.feature import DefFeature, Feature, Features
 from dffml.source.source import BaseSource
@@ -45,18 +47,21 @@ class TestAutoArgsConfig(unittest.TestCase):
             FakeTesting.args({}),
             {
                 "test": {
-                    "arg": None,
+                    "plugin": None,
                     "config": {
                         "fake": {
-                            "arg": None,
+                            "plugin": None,
                             "config": {
-                                "num": {"arg": Arg(type=float), "config": {}},
+                                "num": {
+                                    "plugin": Arg(type=float),
+                                    "config": {},
+                                },
                                 "files": {
-                                    "arg": Arg(type=str, nargs="+"),
+                                    "plugin": Arg(type=str, nargs="+"),
                                     "config": {},
                                 },
                                 "features": {
-                                    "arg": Arg(
+                                    "plugin": Arg(
                                         type=Feature.load,
                                         nargs="+",
                                         action=list_action(Features),
@@ -64,13 +69,13 @@ class TestAutoArgsConfig(unittest.TestCase):
                                     "config": {},
                                 },
                                 "name": {
-                                    "arg": Arg(
+                                    "plugin": Arg(
                                         type=str, help="Name of FakeTesting"
                                     ),
                                     "config": {},
                                 },
                                 "readonly": {
-                                    "arg": Arg(
+                                    "plugin": Arg(
                                         type=bool,
                                         action="store_true",
                                         default=False,
@@ -78,11 +83,13 @@ class TestAutoArgsConfig(unittest.TestCase):
                                     "config": {},
                                 },
                                 "label": {
-                                    "arg": Arg(type=str, default="unlabeled"),
+                                    "plugin": Arg(
+                                        type=str, default="unlabeled"
+                                    ),
                                     "config": {},
                                 },
                                 "source": {
-                                    "arg": Arg(
+                                    "plugin": Arg(
                                         type=BaseSource.load,
                                         default=JSONSource,
                                     ),
@@ -119,7 +126,9 @@ class TestAutoArgsConfig(unittest.TestCase):
         self.assertEqual(config.label, "unlabeled")
         self.assertFalse(config.readonly)
         self.assertTrue(isinstance(config.source, JSONSource))
-        self.assertEqual(config.source.config.filename, "file.json")
+        self.assertEqual(
+            config.source.config.filename, pathlib.Path("file.json")
+        )
         self.assertEqual(
             config.features,
             Features(
@@ -156,10 +165,52 @@ class TestAutoArgsConfig(unittest.TestCase):
         self.assertEqual(config.label, "default-label")
         self.assertTrue(config.readonly)
         self.assertTrue(isinstance(config.source, CSVSource))
-        self.assertEqual(config.source.config.filename, "file.csv")
+        self.assertEqual(
+            config.source.config.filename, pathlib.Path("file.csv")
+        )
         self.assertEqual(
             config.features,
             Features(
                 DefFeature("Year", int, 1), DefFeature("Commits", int, 10)
             ),
         )
+
+
+class FakeTestingContext(BaseDataFlowFacilitatorObjectContext):
+    """
+    Fake Testing Context
+    """
+
+
+@config
+class FakeTestingConfig2:
+    name: str = field("Name of FakeTesting2")
+    num: float
+    features: Features = Features(
+        DefFeature("default", int, 1), DefFeature("features", int, 10)
+    )
+    label: str = "unlabeled"
+
+
+@entrypoint("fake2")
+class FakeTesting2(BaseTesting):
+    CONTEXT = FakeTestingContext
+    CONFIG = FakeTestingConfig2
+
+
+@config
+class FakeTestingConfig3:
+    label: str = "unlabeled"
+
+
+@entrypoint("fake3")
+class FakeTesting3(BaseTesting):
+    CONTEXT = FakeTestingContext
+    CONFIG = FakeTestingConfig3
+
+
+class TestCONFIG(unittest.TestCase):
+    def test_CONFIG(self):
+        with self.assertRaises(TypeError):
+            config = FakeTesting2()
+        config = FakeTesting3()

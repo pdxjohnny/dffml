@@ -2,45 +2,29 @@
 This file contains integration tests. We use the CLI to exercise functionality of
 various DFFML classes and constructs.
 """
-import re
-import os
-import io
-import json
 import inspect
 import pathlib
-import asyncio
 import contextlib
-import unittest.mock
-from typing import Dict, Any
 
-from dffml.repo import Repo
-from dffml.base import config
-from dffml.df.types import Definition, Operation, DataFlow, Input
-from dffml.df.base import op
 from dffml.cli.cli import CLI
-from dffml.model.model import Model
-from dffml.service.dev import Develop
-from dffml.util.packaging import is_develop
-from dffml.util.entrypoint import load
-from dffml.config.config import BaseConfigLoader
-from dffml.util.asynctestcase import AsyncTestCase, IntegrationCLITestCase
+from dffml.util.asynctestcase import IntegrationCLITestCase
 
 
 class TestList(IntegrationCLITestCase):
-    async def test_repos(self):
+    async def test_records(self):
         keys = ["A", "B", "C"]
-        with contextlib.redirect_stdout(self.stdout):
-            await CLI.cli(
-                "list",
-                "repos",
-                "-sources",
-                "feed=memory",
-                "-source-repos",
-                *keys,
-            )
-        stdout = self.stdout.getvalue()
+        records = await CLI.cli(
+            "list",
+            "records",
+            "-sources",
+            "feed=memory",
+            "-source-records",
+            *keys,
+        )
+        records = list(map(lambda r: r.export(), records))
+        records = dict(map(lambda r: (r["key"], r), records))
         for key in keys:
-            self.assertIn(key, stdout)
+            self.assertIn(key, records)
 
 
 class TestMerge(IntegrationCLITestCase):
@@ -53,25 +37,25 @@ class TestMerge(IntegrationCLITestCase):
             "src=memory",
             "-source-dest-filename",
             filename,
-            "-source-src-repos",
+            "-source-src-records",
             *keys,
             "-source-src-allowempty",
             "-source-dest-allowempty",
             "-source-src-readwrite",
             "-source-dest-readwrite",
         )
-        with contextlib.redirect_stdout(self.stdout):
-            await CLI.cli(
-                "list",
-                "repos",
-                "-sources",
-                "tmp=json",
-                "-source-tmp-filename",
-                filename,
-            )
-        stdout = self.stdout.getvalue()
+        records = await CLI.cli(
+            "list",
+            "records",
+            "-sources",
+            "tmp=json",
+            "-source-tmp-filename",
+            filename,
+        )
+        records = list(map(lambda r: r.export(), records))
+        records = dict(map(lambda r: (r["key"], r), records))
         for key in keys:
-            self.assertIn(key, stdout)
+            self.assertIn(key, records)
 
     async def test_memory_to_csv(self):
         keys = ["A", "B", "C"]
@@ -82,7 +66,7 @@ class TestMerge(IntegrationCLITestCase):
             "src=memory",
             "-source-dest-filename",
             filename,
-            "-source-src-repos",
+            "-source-src-records",
             *keys,
             "-source-src-allowempty",
             "-source-dest-allowempty",
@@ -93,10 +77,10 @@ class TestMerge(IntegrationCLITestCase):
             pathlib.Path(filename).read_text(),
             inspect.cleandoc(
                 """
-                key,label,prediction,confidence
-                A,unlabeled,,
-                B,unlabeled,,
-                C,unlabeled,,
+                key,tag
+                A,untagged
+                B,untagged
+                C,untagged
                 """
             )
             + "\n",

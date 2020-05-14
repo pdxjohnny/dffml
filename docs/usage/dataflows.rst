@@ -1,5 +1,5 @@
-DataFlow Deployment
-===================
+DataFlow HTTP Deployment
+========================
 
 In the :doc:`/tutorials/operations` we created a command line meta static
 analysis tool, ``shouldi``.
@@ -23,7 +23,7 @@ without the need to hardcode in ``import`` statements.
       --header "Content-Type: application/json" \
       --request POST \
       --data '{"insecure-package": [{"value":"insecure-package","definition":"package"}]}' \
-      http://localhost:8080/shouldi | python3.7 -m json.tool
+      http://localhost:8080/shouldi | python3 -m json.tool
     {
         "insecure-package": {
             "safety_check_number_of_issues": 1,
@@ -54,7 +54,7 @@ to look at JSON.
 
 .. code-block:: console
 
-    $ python3.7 -m pip install dffml-config-yaml
+    $ python3 -m pip install dffml-config-yaml
 
 We'll be working from the top level directory of the ``shouldi`` package we
 created in the :doc:`/tutorials/operations`.
@@ -103,7 +103,7 @@ Let's install the HTTP API service.
 
 .. code-block:: console
 
-    $ python3.7 -m pip install dffml-service-http
+    $ python3 -m pip install dffml-service-http
 
 HTTP Channel Config
 -------------------
@@ -155,7 +155,7 @@ items that you want evaluated.
       --header "Content-Type: application/json" \
       --request POST \
       --data '{"insecure-package": [{"value":"insecure-package","definition":"package"}]}' \
-      http://localhost:8080/shouldi | python3.7 -m json.tool
+      http://localhost:8080/shouldi | python3 -m json.tool
     {
         "bandit_output": {
             "CONFIDENCE.HIGH": 0,
@@ -184,15 +184,31 @@ We'll be using those operations, so we need to install them
 
 .. code-block:: console
 
-    $ python3.7 -m pip install dffml-feature-git
+    $ python3 -m pip install dffml-feature-git
 
 The ``lines_of_code_to_comments`` operation will give use the ratio of the
 number of lines of comments to the number of lines of code.
 
-.. note::
+You need to install `tokei <https://github.com/XAMPPRocky/tokei>`_ before you
+can use ``lines_of_code_to_comments``.
 
-    You need to install `tokei <https://github.com/XAMPPRocky/tokei>`_ before
-    you can use ``lines_of_code_to_comments``.
+On Linux
+
+.. code-block:: console
+
+    $ curl -sSL 'https://github.com/XAMPPRocky/tokei/releases/download/v10.1.1/tokei-v10.1.1-x86_64-apple-darwin.tar.gz' \
+      | tar -xvz && \
+      echo '22699e16e71f07ff805805d26ee86ecb9b1052d7879350f7eb9ed87beb0e6b84fbb512963d01b75cec8e80532e4ea29a tokei' | sha384sum -c - && \
+      sudo mv tokei /usr/local/bin/
+
+On OSX
+
+.. code-block:: console
+
+    $ curl -sSL 'https://github.com/XAMPPRocky/tokei/releases/download/v10.1.1/tokei-v10.1.1-x86_64-apple-darwin.tar.gz' \
+      | tar -xvz && \
+      echo '8c8a1d8d8dd4d8bef93dabf5d2f6e27023777f8553393e269765d7ece85e68837cba4374a2615d83f071dfae22ba40e2 tokei' | sha384sum -c - && \
+      sudo mv tokei /usr/local/bin/
 
 The ``lines_of_code_to_comments`` operation needs the output given by
 ``lines_of_code_by_language``, which needs a Git repos source code.
@@ -202,7 +218,7 @@ The ``lines_of_code_to_comments`` operation needs the output given by
 
 A ``git_repository_checked_out`` is defined as:
 
- - repo: git_repository_checked_out(type: Dict[str, str])
+ - record: git_repository_checked_out(type: Dict[str, str])
 
   - URL: str
   - directory: str
@@ -299,7 +315,7 @@ Here's an example of evaluating two packages using the new DataFlow.
       --header "Content-Type: application/json" \
       --request POST \
       --data '{"insecure-package": [{"value":"insecure-package","definition":"package"}], "dffml": [{"value":"dffml","definition":"package"}]}' \
-      http://localhost:8080/shouldi | python3.7 -m json.tool
+      http://localhost:8080/shouldi | python3 -m json.tool
     {
         "dffml": {
             "bandit_output": {

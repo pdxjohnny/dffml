@@ -23,7 +23,7 @@ unless you uninstall it first!
 
 .. code-block:: console
 
-    $ python3.7 -m pip uninstall dffml
+    $ python3 -m pip uninstall dffml
 
 Once you're sure DFFML is not installed on your system, install it in
 development mode.
@@ -44,7 +44,7 @@ development work on DFFML (such as documentation generation utilities).
 
     $ git clone https://github.com/intel/dffml
     $ cd dffml
-    $ python3.7 -m pip install --prefix=~/.local -e .[dev]
+    $ python3 -m pip install --prefix=~/.local -e .[dev]
 
 Verify you can use ``dffml`` from the command line.
 
@@ -70,7 +70,12 @@ For example, to install the TensorFlow models
 
 .. code-block:: console
 
-    $ python3.7 -m pip install --prefix=~/.local -e model/tensorflow
+    $ python3 -m pip install --prefix=~/.local -e model/tensorflow
+
+.. _dev_env_install_official_plugins:
+
+Installing Plugins In Development Mode
+--------------------------------------
 
 To install all the plugins in development mode use the development service's
 install command.
@@ -98,14 +103,19 @@ Create the virtual environment.
 
 .. code-block:: console
 
-    $ python3.7 -m venv .venv
+    $ python3 -m venv .venv
 
-
-Activate it.
+Activate it (on Linux / OSX / UNIX variants)
 
 .. code-block:: console
 
     $ . .venv/bin/activate
+
+Activate it (on Widows)
+
+.. code-block:: console
+
+    $ .\.venv\Scripts\activate
 
 Install the packages in development mode.
 
@@ -174,7 +184,7 @@ all the packages in development mode.
     $ mkdir -p .venv
     $ export HOME="${PWD}/.venv"
     $ export PATH="${HOME}/.local/bin:${PATH}"
-    $ pip install --user -U setuptools
+    $ pip install --user -U pip setuptools
     $ pip install --prefix=~/.local -e .[dev]
     $ dffml service dev install -user
 

@@ -3,33 +3,21 @@
 import os
 import io
 import json
-import atexit
-import shutil
 import random
-import inspect
-import asyncio
-import logging
 import tempfile
-import unittest
 import contextlib
-import collections
 from pathlib import Path
 from unittest.mock import patch
-from functools import wraps
-from contextlib import contextmanager, ExitStack
-from typing import List, Dict, Any, Optional, Tuple, AsyncIterator
+from typing import List, AsyncIterator
 
-from dffml.repo import Repo
-from dffml.feature import Feature, Features, DefFeature
+from dffml.record import Record
+from dffml.feature import Feature, Features
 from dffml.source.source import Sources
-from dffml.source.memory import MemorySource, MemorySourceConfig
 from dffml.source.file import FileSourceConfig
 from dffml.source.json import JSONSource
 from dffml.source.csv import CSVSource, CSVSourceConfig
 from dffml.model.model import ModelContext, Model
-from dffml.df.types import Operation
-from dffml.df.base import OperationImplementation
-from dffml.accuracy import Accuracy as AccuracyType
+from dffml.model.accuracy import Accuracy as AccuracyType
 from dffml.util.entrypoint import entrypoint
 from dffml.util.asynctestcase import (
     AsyncExitStackTestCase,
@@ -42,24 +30,24 @@ from dffml.cli import Merge, Dataflow, Train, Accuracy, Predict, List
 from .test_df import OPERATIONS, OPIMPS
 
 
-class ReposTestCase(AsyncExitStackTestCase):
+class RecordsTestCase(AsyncExitStackTestCase):
     async def setUp(self):
         await super().setUp()
-        self.repos = [Repo(str(random.random())) for _ in range(0, 10)]
+        self.records = [Record(str(random.random())) for _ in range(0, 10)]
         self.temp_filename = self.mktempfile()
         self.sconfig = FileSourceConfig(
             filename=self.temp_filename, readwrite=True, allowempty=True
         )
         async with JSONSource(self.sconfig) as source:
             async with source() as sctx:
-                for repo in self.repos:
-                    await sctx.update(repo)
+                for record in self.records:
+                    await sctx.update(record)
         contents = json.loads(Path(self.sconfig.filename).read_text())
-        # Ensure there are repos in the file
+        # Ensure there are records in the file
         self.assertEqual(
-            len(contents.get(self.sconfig.label)),
-            len(self.repos),
-            "ReposTestCase JSON file erroneously initialized as empty",
+            len(contents.get(self.sconfig.tag)),
+            len(self.records),
+            "RecordsTestCase JSON file erroneously initialized as empty",
         )
         # TODO(p3) For some reason patching Model.load doesn't work
         # self._stack.enter_context(patch("dffml.model.model.Model.load",
@@ -85,6 +73,7 @@ class ReposTestCase(AsyncExitStackTestCase):
 @config
 class FakeConfig:
     features: Features
+    predict: Feature
     directory: str = os.path.join(
         os.path.expanduser("~"), ".cache", "dffml", "test_cli", "fake"
     )
@@ -100,18 +89,6 @@ class FakeFeature(Feature):
     def length(self):
         return 1  # pragma: no cov
 
-    async def applicable(self, data):
-        return True
-
-    async def fetch(self, data):
-        pass
-
-    async def parse(self, data):
-        pass
-
-    async def calc(self, data):
-        return float(data.key)
-
 
 class FakeModelContext(ModelContext):
     async def train(self, sources: Sources):
@@ -120,10 +97,13 @@ class FakeModelContext(ModelContext):
     async def accuracy(self, sources: Sources) -> AccuracyType:
         return AccuracyType(0.42)
 
-    async def predict(self, repos: AsyncIterator[Repo]) -> AsyncIterator[Repo]:
-        async for repo in repos:
-            repo.predicted(random.random(), float(repo.key))
-            yield repo
+    async def predict(
+        self, records: AsyncIterator[Record]
+    ) -> AsyncIterator[Record]:
+        target = self.parent.config.predict.NAME
+        async for record in records:
+            record.predicted(target, random.random(), float(record.key))
+            yield record
 
 
 @entrypoint("fake")
@@ -155,15 +135,15 @@ def opimp_load(loading=None):
     return OPIMPS
 
 
-class TestMerge(ReposTestCase):
-    async def test_json_label(self):
+class TestMerge(RecordsTestCase):
+    async def test_json_tag(self):
         await Merge.cli(
             "dest=json",
             "src=json",
             "-source-dest-filename",
             self.temp_filename,
-            "-source-dest-label",
-            "somelabel",
+            "-source-dest-tag",
+            "sometag",
             "-source-src-filename",
             self.temp_filename,
             "-source-src-allowempty",
@@ -171,24 +151,22 @@ class TestMerge(ReposTestCase):
             "-source-src-readwrite",
             "-source-dest-readwrite",
         )
-        # Check the unlabeled source
-        with self.subTest(labeled=None):
+        # Check the untagged source
+        with self.subTest(tagged=None):
             async with JSONSource(
                 FileSourceConfig(filename=self.temp_filename)
             ) as source:
                 async with source() as sctx:
-                    repos = [repo async for repo in sctx.repos()]
-                    self.assertEqual(len(repos), len(self.repos))
-        # Check the labeled source
-        with self.subTest(labeled="somelabel"):
+                    records = [record async for record in sctx.records()]
+                    self.assertEqual(len(records), len(self.records))
+        # Check the tagged source
+        with self.subTest(tagged="sometag"):
             async with JSONSource(
-                FileSourceConfig(
-                    filename=self.temp_filename, label="somelabel"
-                )
+                FileSourceConfig(filename=self.temp_filename, tag="sometag")
             ) as source:
                 async with source() as sctx:
-                    repos = [repo async for repo in sctx.repos()]
-                    self.assertEqual(len(repos), len(self.repos))
+                    records = [record async for record in sctx.records()]
+                    self.assertEqual(len(records), len(self.records))
 
     async def test_json_to_csv(self):
         with non_existant_tempfile() as csv_tempfile:
@@ -209,13 +187,15 @@ class TestMerge(ReposTestCase):
             contents = Path(csv_tempfile).read_text()
             self.assertEqual(
                 contents,
-                "key,label,prediction,confidence\n"
-                + "\n".join([f"{repo.key},unlabeled,," for repo in self.repos])
+                "key,tag\n"
+                + "\n".join(
+                    [f"{record.key},untagged" for record in self.records]
+                )
                 + "\n",
                 "Incorrect data in csv file",
             )
 
-    async def test_csv_label(self):
+    async def test_csv_tag(self):
         with non_existant_tempfile() as csv_tempfile:
             # Move the pre-populated json data to a csv source
             with self.subTest(json_to_csv=True):
@@ -231,15 +211,15 @@ class TestMerge(ReposTestCase):
                     "-source-src-readwrite",
                     "-source-dest-readwrite",
                 )
-            # Merge one label to another within the same file
+            # Merge one tag to another within the same file
             with self.subTest(merge_same_file=True):
                 await Merge.cli(
                     "dest=csv",
                     "src=csv",
                     "-source-dest-filename",
                     csv_tempfile,
-                    "-source-dest-label",
-                    "somelabel",
+                    "-source-dest-tag",
+                    "sometag",
                     "-source-src-filename",
                     csv_tempfile,
                     "-source-src-allowempty",
@@ -248,58 +228,58 @@ class TestMerge(ReposTestCase):
                     "-source-dest-readwrite",
                 )
             contents = Path(csv_tempfile).read_text()
-            self.assertIn("unlabeled", contents)
-            self.assertIn("somelabel", contents)
-            # Check the unlabeled source
-            with self.subTest(labeled=None):
+            self.assertIn("untagged", contents)
+            self.assertIn("sometag", contents)
+            # Check the untagged source
+            with self.subTest(tagged=None):
                 async with CSVSource(
                     CSVSourceConfig(filename=csv_tempfile)
                 ) as source:
                     async with source() as sctx:
-                        repos = [repo async for repo in sctx.repos()]
-                        self.assertEqual(len(repos), len(self.repos))
+                        records = [record async for record in sctx.records()]
+                        self.assertEqual(len(records), len(self.records))
             contents = Path(csv_tempfile).read_text()
-            self.assertIn("somelabel", contents)
-            self.assertIn("unlabeled", contents)
-            # Check the labeled source
-            with self.subTest(labeled="somelabel"):
+            self.assertIn("sometag", contents)
+            self.assertIn("untagged", contents)
+            # Check the tagged source
+            with self.subTest(tagged="sometag"):
                 async with CSVSource(
-                    CSVSourceConfig(filename=csv_tempfile, label="somelabel")
+                    CSVSourceConfig(filename=csv_tempfile, tag="sometag")
                 ) as source:
                     async with source() as sctx:
-                        repos = [repo async for repo in sctx.repos()]
-                        self.assertEqual(len(repos), len(self.repos))
+                        records = [record async for record in sctx.records()]
+                        self.assertEqual(len(records), len(self.records))
             contents = Path(csv_tempfile).read_text()
-            self.assertIn("somelabel", contents)
-            self.assertIn("unlabeled", contents)
+            self.assertIn("sometag", contents)
+            self.assertIn("untagged", contents)
 
 
-class TestListRepos(ReposTestCase):
+class TestListRecords(RecordsTestCase):
     async def test_run(self):
-        stdout = io.StringIO()
-        with contextlib.redirect_stdout(stdout):
-            result = await List.cli(
-                "repos",
-                "-sources",
-                "primary=json",
-                "-source-primary-filename",
-                self.temp_filename,
-                "-source-primary-readwrite",
-                "true",
-            )
-        for repo in self.repos:
-            self.assertIn(repo.key, stdout.getvalue())
+        result = await List.cli(
+            "records",
+            "-sources",
+            "primary=json",
+            "-source-primary-filename",
+            self.temp_filename,
+            "-source-primary-readwrite",
+            "true",
+        )
+        result = list(map(lambda r: r.export(), result))
+        result = dict(map(lambda r: (r["key"], r), result))
+        for record in self.records:
+            self.assertIn(record.key, result)
 
 
-class TestDataflowRunAllRepos(ReposTestCase):
+class TestDataflowRunAllRecords(RecordsTestCase):
     async def test_run(self):
-        self.repo_keys = {"add 40 and 2": 42, "multiply 42 and 10": 420}
-        self.repos = list(map(Repo, self.repo_keys.keys()))
+        self.record_keys = {"add 40 and 2": 42, "multiply 42 and 10": 420}
+        self.records = list(map(Record, self.record_keys.keys()))
         os.unlink(self.temp_filename)
         async with JSONSource(self.sconfig) as source:
             async with source() as sctx:
-                for repo in self.repos:
-                    await sctx.update(repo)
+                for record in self.records:
+                    await sctx.update(record)
         with tempfile.NamedTemporaryFile(suffix=".json") as dataflow_file:
             dataflow = io.StringIO()
             with contextlib.redirect_stdout(dataflow):
@@ -313,7 +293,7 @@ class TestDataflowRunAllRepos(ReposTestCase):
             dataflow_file.seek(0)
             results = await Dataflow.cli(
                 "run",
-                "repos",
+                "records",
                 "all",
                 "-dataflow",
                 dataflow_file.name,
@@ -322,7 +302,7 @@ class TestDataflowRunAllRepos(ReposTestCase):
                 "primary=json",
                 "-source-filename",
                 self.temp_filename,
-                "-repo-def",
+                "-record-def",
                 "calc_string",
                 "-inputs",
                 '["result"]=get_single_spec',
@@ -330,21 +310,23 @@ class TestDataflowRunAllRepos(ReposTestCase):
             results = {
                 result.key: result.feature("result") for result in results
             }
-            for repo in self.repos:
-                self.assertIn(repo.key, results)
-                self.assertEqual(self.repo_keys[repo.key], results[repo.key])
+            for record in self.records:
+                self.assertIn(record.key, results)
+                self.assertEqual(
+                    self.record_keys[record.key], results[record.key]
+                )
 
 
-class TestDataflowRunRepoSet(ReposTestCase):
+class TestDataflowRunRecordSet(RecordsTestCase):
     async def test_run(self):
         test_key = "multiply 42 and 10"
-        self.repo_keys = {"add 40 and 2": 42, "multiply 42 and 10": 420}
-        self.repos = list(map(Repo, self.repo_keys.keys()))
+        self.record_keys = {"add 40 and 2": 42, "multiply 42 and 10": 420}
+        self.records = list(map(Record, self.record_keys.keys()))
         os.unlink(self.temp_filename)
         async with JSONSource(self.sconfig) as source:
             async with source() as sctx:
-                for repo in self.repos:
-                    await sctx.update(repo)
+                for record in self.records:
+                    await sctx.update(record)
         with tempfile.NamedTemporaryFile(suffix=".json") as dataflow_file:
             dataflow = io.StringIO()
             with contextlib.redirect_stdout(dataflow):
@@ -358,7 +340,7 @@ class TestDataflowRunRepoSet(ReposTestCase):
             dataflow_file.seek(0)
             results = await Dataflow.cli(
                 "run",
-                "repos",
+                "records",
                 "set",
                 "-keys",
                 test_key,
@@ -369,18 +351,18 @@ class TestDataflowRunRepoSet(ReposTestCase):
                 "primary=json",
                 "-source-filename",
                 self.temp_filename,
-                "-repo-def",
+                "-record-def",
                 "calc_string",
                 "-inputs",
                 '["result"]=get_single_spec',
             )
             self.assertEqual(len(results), 1)
             self.assertEqual(
-                self.repo_keys[test_key], results[0].feature("result")
+                self.record_keys[test_key], results[0].feature("result")
             )
 
 
-class TestTrain(ReposTestCase):
+class TestTrain(RecordsTestCase):
     async def test_run(self):
         await Train.cli(
             "-sources",
@@ -391,10 +373,12 @@ class TestTrain(ReposTestCase):
             "fake",
             "-model-features",
             "fake",
+            "-model-predict",
+            "fake",
         )
 
 
-class TestAccuracy(ReposTestCase):
+class TestAccuracy(RecordsTestCase):
     async def test_run(self):
         result = await Accuracy.cli(
             "-sources",
@@ -405,11 +389,13 @@ class TestAccuracy(ReposTestCase):
             "fake",
             "-model-features",
             "fake",
+            "-model-predict",
+            "fake",
         )
         self.assertEqual(result, 0.42)
 
 
-class TestPredict(ReposTestCase):
+class TestPredict(RecordsTestCase):
     async def test_all(self):
         results = await Predict.cli(
             "all",
@@ -421,21 +407,28 @@ class TestPredict(ReposTestCase):
             "fake",
             "-model-features",
             "fake",
+            "-model-predict",
+            "fake",
         )
-        results = {repo.key: repo.prediction().confidence for repo in results}
-        for repo in self.repos:
-            self.assertEqual(float(repo.key), results[repo.key])
+        results = {
+            record.key: record.prediction("fake").confidence
+            for record in results
+        }
+        for record in self.records:
+            self.assertEqual(float(record.key), results[record.key])
 
-    async def test_repo(self):
-        subset = self.repos[: (int(len(self.repos) / 2))]
-        subset_urls = list(map(lambda repo: repo.key, subset))
+    async def test_record(self):
+        subset = self.records[: (int(len(self.records) / 2))]
+        subset_urls = list(map(lambda record: record.key, subset))
         results = await Predict.cli(
-            "repo",
+            "record",
             "-sources",
             "primary=json",
             "-source-filename",
             self.temp_filename,
             "-model",
+            "fake",
+            "-model-predict",
             "fake",
             "-model-features",
             "fake",
@@ -443,6 +436,9 @@ class TestPredict(ReposTestCase):
             *subset_urls,
         )
         self.assertEqual(len(results), len(subset))
-        results = {repo.key: repo.prediction().confidence for repo in results}
-        for repo in subset:
-            self.assertEqual(float(repo.key), results[repo.key])
+        results = {
+            record.key: record.prediction("fake").confidence
+            for record in results
+        }
+        for record in subset:
+            self.assertEqual(float(record.key), results[record.key])

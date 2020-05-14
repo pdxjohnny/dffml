@@ -6,6 +6,162 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 ### Added
+- Vowpal Wabbit Models
+- Python 3.8 support
+- binsec branch to `operations/binsec`
+- Doctestable example for `model_predict` operation.
+- Doctestable examples to `operation/mapping.py`
+- shouldi got an operation to run Dependency-check on java code.
+- `load` and `run` functions in high level API
+- Doctestable examples to `db` operations.
+- Source for parsing `.ini` file formats
+- Tests for noasync high level API.
+- Tests for load and save functions in high level API.
+- `Operation` inputs and ouputs default to empty `dict` if not given.
+- Ability to export any object with `dffml service dev export`
+- Complete example for dataflow run cli command
+- Tests for default configs instantiation.
+- Example ffmpeg operation.
+- Operations to deploy docker container on receving github webhook.
+- New use case `Redeploying dataflow on webhook` in docs.
+- Documentation for creating Source for new File types taking `.ini` as an example.
+- New input modes, output modes for HTTP API dataflow registration.
+### Changed
+- `Edit on Github` button now hidden for plugins.
+- Doctests now run via unittests
+- Every class and function can now be imported from the top level module
+- `op` attempts to create `Definition`s for each argument if an `inputs` are not
+  given.
+- Classes now use `CONFIG` if it has a default for every field and `config` is `None`
+- Models now dynamically import third party modules.
+- `dffml list records` command prints Records as JSON using `.export()`
+- FileSource takes pathlib.Path as filename
+### Fixed
+- Race condition in `MemoryRedundancyChecker` when more than 4 possible
+  parameter sets for an operation.
+### Removed
+- Monitor class and associated tests (unused)
+
+## [0.3.7] - 2020-04-14
+### Added
+- IO operations demo and `literal_eval` operation.
+- Python prompts `>>>` can now be enabled or disabled for easy copying of code into interactive sessions.
+- Whitespace check now checks .rst and .md files too.
+- `GetMulti` operation which gets all Inputs of a given definition
+- Python usage example for LogisticRegression and its related tests.
+- Support for async generator operations
+- Example CLI commands and Python code for `SLRModel`
+- `save` function in high level API to quickly save all given records to a
+  source
+- Ability to configure sources and models for HTTP API from command line when
+  starting server
+- Documentation page for command line usage of HTTP API
+- Usage of HTTP API to the quickstart to use trained model
+### Changed
+- Renamed `"arg"` to `"plugin"`.
+- CSV source sorts feature names within headers when saving
+- Moved HTTP service testing code to HTTP service `util.testing`
+### Fixed
+- Exporting plugins
+- Issue parsing string values when using the `dataflow run` command and
+  specifying extra inputs.
+### Removed
+- Unused imports
+
+## [0.3.6] - 2020-04-04
+### Added
+- Operations for taking input from the user `AcceptUserInput` and for printing the output `print_output`
+- Hugging Face Transformers tensorflow based NER models.
+- PNG ConfigLoader for reading images as arrays to predict using MNIST trained models
+- Docstrings and doctestable examples to `record.py`.
+- Inputs can be validated using operations
+  - `validate` parameter in `Input` takes `Operation.instance_name`
+- New db source can utilize any database that inherits from `BaseDatabase`
+- Logistic Regression with SAG optimizer
+- Test tensorflow DNNEstimator documentation examples in CI
+- shouldi got an operation to run cargo-audit on rust code.
+- Moved all the downloads to tests/downloads to speed the CI test.
+- Test tensorflow DNNEstimator documentation exaples in CI
+- Add python code for tensorflow DNNEstimator
+- Ability to run a subflow as if it were an operation using the
+  `dffml.dataflow.run` operation.
+- Support for operations without inputs.
+- Partial doctestable examples to `features.py`
+- Doctestable examples for `BaseSource`
+- Instructions for setting up debugging environment in VSCode
+### Fixed
+- New model tutorial mentions file paths that should be edited.
+- DataFlow is no longer a dataclass to prevent it from being exported
+  incorrectly.
+- `operations_parameter_set_pairs` moved to `MemoryOrchestratorContext`
+- Ignore generated files in `docs/plugins/`
+- Treat `"~"` as the the home directory rather than a literal
+- Windows support by selecting `asyncio.ProactorEventLoop` and not using
+  `asyncio.FastChildWatcher`.
+- Moved SLR into the main dffml package and removed `scratch:slr`.
+### Changed
+- Refactor `model/tensroflow`
+
+## [0.3.5] - 2020-03-10
+### Added
+- Parent flows can now forward inputs to active contexts of subflows.
+  - `forward` parameter in `DataFlow`
+  - `subflow` in `OperationImplementationContext`
+- Documentation on writing examples and running doctests
+- Doctestable Examples to high-level API.
+- Shouldi got an operation to run npm-audit on JavaScript code
+- Docstrings and doctestable examples for `record.py` (features and evaluated)
+- Simplified model API with SimpleModel
+- Documentation on how DataFlows work conceptually.
+- Style guide now contains information on class, variable, and function naming.
+### Changed
+- Restructured contributing documentation
+- Use randomly generated data for scikit tests
+- Change Core to Official to clarify who maintains each plugin
+- Name of output of unsupervised model from "Prediction" to "cluster"
+- Test scikit LR documentation examples in CI
+- Create a fresh archive of the git repo for release instead of cleaning
+  existing repo with `git clean` for development service release command.
+- Simplified SLR tests for scratch model
+- Test tensorflow DNNClassifier documentation exaples in CI
+- config directories and files associated with ConfigLoaders have been renamed
+  to configloader.
+- Model config directory parameters are now `pathlib.Path` objects
+- New model tutorial and `skel/model` use simplifeid model API.
+
+## [0.3.4] - 2020-02-28
+### Added
+- Tensorflow hub NLP models.
+- Notes on development dependencies in `setup.py` files to codebase notes.
+- Test for `cached_download`
+- `dffml.util.net.cached_download_unpack_archive` to run a cached download and
+  unpack the archive, very useful for testing. Documented on the Networking
+  Helpers API docs page.
+- Directions on how to read the CI under the Git and GitHub page of the
+  contributing documentation.
+- HTTP API
+  - Static file serving from a dirctory with `-static`
+  - `api.js` file serving with the `-js` flag
+  - Docs page for JavaScript example
+- shouldi got an operation to run golangci-lint on Golang code
+- Note about using black via VSCode
+### Fixed
+- Port assignment for the HTTP API via the `-port` flag
+### Changed
+- `repo`/`Repo` to `record`/`Record`
+- Definitions with a `spec` can use the `subspec` parameter to declare that they
+  are a list or a dict where the values are of the `spec` type. Rather than the
+  list or dict itself being of the `spec` type.
+- Fixed the URL mentioned in example to configure a model.
+- Sphinx doctests are now run in the CI in the DOCS task.
+- Lint JavaScript files with js-beautify and enforce with CI
+### Removed
+- Unused imports
+
+## [0.3.3] - 2020-02-10
+### Added
+- Moved from TensorFlow 1 to TensorFlow 2.
+- IDX Sources to read binary data files and train models on MNIST Dataset
 - scikit models
   - Clusterers
     - KMeans
@@ -28,6 +184,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - MySQL connector
 - Documented style for imports.
 - Documented use of numpy docstrings.
+- `Inputs` can now be sanitized using function passed in `validate` parameter
+- Helper utilities to take callables with numpy style docstrings and
+  create config classes out of them using `make_config`.
+- File listing endpoint to HTTP service.
+- When an operation throws an exception the name of the instance and the
+  parameters it was executed with will be thrown via an `OperationException`.
+- Network utilities to preformed cached downloads with hash validation.
+- Development service got a new command, which can retrieve an argument passed
+  to setuptools `setup` function within a `setup.py` file.
 ### Changed
 - All instances of `src_url` changed to `key`.
 - `readonly` parameter in source config is now changed to `readwrite`.
@@ -40,13 +205,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Use `FastChildWatcher` when run via the CLI to prevent `BlockingIOError`s.
 - TensorFlow based neural network classifier had the `classification` parameter
   in it's config changed to `predict`.
+- SciKit models use `make_config_numpy`.
+- Predictions in `repos` are now dictionary.
+- All instances of `label` changed to `tag`
+- Subclasses of `BaseConfigurable` will now auto instantiate their respective
+  config classes using `kwargs` if the config argument isn't given and keyword
+  arguments are.
+- The quickstart documentation was improved as well as the structure of docs.
 ### Fixed
 - CONTRIBUTING.md has `-e` in the wrong place in the getting setup section.
 - Since moving to auto `args()` and `config()`, BaseConfigurable no longer
   produces odd typenames in conjunction with docs.py.
+- Autoconvert Definitions with spec into their spec
 ### Removed
 - The model predict operation erroneously had a `msg` parameter in it's config.
 - Unused imports identified by deepsource.io
+- Evaluation code from feature.py file as well as tests for those evaluations.
 
 ## [0.3.2] - 2020-01-03
 ### Added
@@ -76,7 +250,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Automatic documentation deployment to GitHub Pages
 - Function to create a config class dynamically, analogous to `make_dataclass`
 - `ConfigLoaders` class which loads config files from a file or directory to a dictionary.
-
 ### Changed
 - CLI tests and integration tests derive from `AsyncExitStackTestCase`
 - SciKit models now use the auto args and config methods.

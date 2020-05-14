@@ -1,10 +1,11 @@
 import os
 import json
-import uuid
 import secrets
+import inspect
 import pathlib
 import traceback
-from functools import wraps, partial
+import pkg_resources
+from functools import wraps
 from http import HTTPStatus
 from functools import partial
 from dataclasses import dataclass
@@ -14,24 +15,25 @@ from typing import List, Union, AsyncIterator, Type, NamedTuple, Dict
 from aiohttp import web
 import aiohttp_cors
 
-from dffml.repo import Repo
-from dffml.base import BaseConfig, MissingConfig
+from dffml.record import Record
 from dffml.df.types import DataFlow, Input
 from dffml.df.multicomm import MultiCommInAtomicMode, BaseMultiCommContext
-from dffml.source.source import BaseSource
 from dffml.df.memory import (
     MemoryOrchestrator,
     MemoryInputSet,
     MemoryInputSetConfig,
     StringInputSetContext,
 )
-from dffml.base import MissingConfig
 from dffml.model import Model
-from dffml.feature import Features
+from dffml.base import MissingConfig
+from dffml.util.data import traverse_get
 from dffml.source.source import BaseSource, SourcesContext
 from dffml.util.entrypoint import EntrypointNotFound, entrypoint
-from dffml.df.base import OperationImplementationNotInstantiable
 
+# Serve the javascript API
+API_JS_BYTES = pathlib.Path(
+    pkg_resources.resource_filename("dffml_service_http", "api.js")
+).read_bytes()
 
 # TODO Add test for this
 # Bits of randomness in secret tokens
@@ -59,15 +61,15 @@ class JSONEncoder(json.JSONEncoder):
 @dataclass
 class IterkeyEntry:
     """
-    iterkeys will hold the first repo within the next iteration and ths
-    iterator. The first time around the first repo is None, since we haven't
+    iterkeys will hold the first record within the next iteration and ths
+    iterator. The first time around the first record is None, since we haven't
     iterated yet. We do this because if the chunk_size is the same as the number
     of iterations then we'll need to iterate one time more than chunk_size in
     order to hit the StopAsyncIteration exception.
     """
 
-    first: Union[Repo, None]
-    repos: AsyncIterator[Repo]
+    first: Union[Record, None]
+    records: AsyncIterator[Record]
 
 
 def mcctx_route(handler):
@@ -131,10 +133,56 @@ def mctx_route(handler):
 
 
 class HTTPChannelConfig(NamedTuple):
+    """
+    Config for channels.
+
+    Parameters
+    ++++++++++
+        path : str
+            Route in server.
+        dataflow : DataFlow
+            Flow to which inputs from request to path is forwarded too.
+        input_mode : str
+            Mode according to which input data is passed to the dataflow,default:"default".
+                - "default" :
+                    Inputs are expected to be mapping of context to list of input
+                        to definition mappings
+                        eg:'{
+                        "insecure-package":
+                            [
+                                {
+                                    "value":"insecure-package",
+                                    "definition":"package"
+                                }
+                            ]
+                        }'
+                - "preprocess:definition_name" :
+                    Input as whole is treated as value with the given definition.
+                    Supported 'preporcess' tags : [json,text,bytes,stream]
+        output_mode : str
+            Mode according to which output from dataflow is treated.
+                - bytes:content_type:OUTPUT_KEYS :
+                    OUTPUT_KEYS are . seperated string which is used as keys to traverse the
+                    ouput of the flow.
+                    eg:
+                        `results = {
+                            "post_input":
+                                {
+                                    "hex":b'speak'
+                                }
+                        }`
+                    then bytes:post_input.hex will return b'speak'.
+                - text:OUTPUT_KEYS
+                - json
+                    - output of dataflow (Dict) is passes as json
+
+    """
+
     path: str
-    presentation: str
-    asynchronous: bool
     dataflow: DataFlow
+    output_mode: str = "json"
+    asynchronous: bool = False
+    input_mode: str = "default"
 
     @classmethod
     def _fromdict(cls, **kwargs):
@@ -144,7 +192,7 @@ class HTTPChannelConfig(NamedTuple):
 
 @entrypoint("http")
 class Routes(BaseMultiCommContext):
-    PRESENTATION_OPTIONS = ["json", "blob", "text"]
+    IO_MODES = ["json", "text", "bytes", "stream"]
 
     async def get_registered_handler(self, request):
         return self.app["multicomm_routes"].get(request.path, None)
@@ -156,37 +204,82 @@ class Routes(BaseMultiCommContext):
         inputs = []
         # If data was sent add those inputs
         if request.method == "POST":
-            # Accept a list of input data
-            # TODO validate that input data is dict of list of inputs each item
-            # has definition and value properties
-            for ctx, client_inputs in (await request.json()).items():
-                for input_data in client_inputs:
-                    if (
-                        not input_data["definition"]
-                        in config.dataflow.definitions
-                    ):
-                        return web.json_response(
-                            {
-                                "error": f"Missing definition for {input_data['definition']} in dataflow"
-                            },
-                            status=HTTPStatus.NOT_FOUND,
+            # Accept a list of input data according to config.input_mode
+            if config.input_mode == "default":
+                # TODO validate that input data is dict of list of inputs each item
+                # has definition and value properties
+                for ctx, client_inputs in (await request.json()).items():
+                    for input_data in client_inputs:
+                        if (
+                            not input_data["definition"]
+                            in config.dataflow.definitions
+                        ):
+                            return web.json_response(
+                                {
+                                    "error": f"Missing definition for {input_data['definition']} in dataflow"
+                                },
+                                status=HTTPStatus.NOT_FOUND,
+                            )
+                    inputs.append(
+                        MemoryInputSet(
+                            MemoryInputSetConfig(
+                                ctx=StringInputSetContext(ctx),
+                                inputs=[
+                                    Input(
+                                        value=input_data["value"],
+                                        definition=config.dataflow.definitions[
+                                            input_data["definition"]
+                                        ],
+                                    )
+                                    for input_data in client_inputs
+                                ],
+                            )
                         )
+                    )
+            elif ":" in config.input_mode:
+                preprocess_mode, input_def = config.input_mode.split(":")
+                if input_def not in config.dataflow.definitions:
+                    return web.json_response(
+                        {
+                            "error": f"Missing definition for {input_data['definition']} in dataflow"
+                        },
+                        status=HTTPStatus.NOT_FOUND,
+                    )
+                if preprocess_mode == "json":
+                    value = await request.json()
+                elif preprocess_mode == "str":
+                    value = await request.text()
+                elif preprocess_mode == "bytes":
+                    value = await request.read()
+                elif preprocess == "stream":
+                    value = request.content
+                else:
+                    return web.json_response(
+                        {
+                            "error": f"preprocess tag must be one of {IO_MODES}, got {preprocess}"
+                        },
+                        status=HTTPStatus.NOT_FOUND,
+                    )
                 inputs.append(
                     MemoryInputSet(
                         MemoryInputSetConfig(
-                            ctx=StringInputSetContext(ctx),
+                            ctx=StringInputSetContext("post_input"),
                             inputs=[
                                 Input(
-                                    value=input_data["value"],
+                                    value=value,
                                     definition=config.dataflow.definitions[
-                                        input_data["definition"]
+                                        input_def
                                     ],
                                 )
-                                for input_data in client_inputs
                             ],
                         )
                     )
                 )
+            else:
+                raise NotImplementedError(
+                    "Input modes other than default,preprocess:definition_name  not yet implemented"
+                )
+
         # Run the operation in an orchestrator
         # TODO(dfass) Create the orchestrator on startup of the HTTP API itself
         async with MemoryOrchestrator.basic_config() as orchestrator:
@@ -195,15 +288,37 @@ class Routes(BaseMultiCommContext):
                 results = {
                     str(ctx): result async for ctx, result in octx.run(*inputs)
                 }
-                # TODO Implement input and presentation stages?
-                """
-                if config.presentation == "blob":
-                    return web.Response(body=results)
-                elif config.presentation == "text":
-                    return web.Response(text=results)
+                if config.output_mode == "json":
+                    return web.json_response(results)
+
+                # content_info is a List[str] ([content_type,output_keys])
+                # in case of stream,bytes and string in others
+                postprocess_mode, *content_info = config.output_mode.split(":")
+
+                if postprocess_mode == "stream":
+                    # stream:text/plain:get_single.beef
+                    raise NotImplementedError(
+                        "output mode  not yet implemented"
+                    )
+
+                elif postprocess_mode == "bytes":
+                    content_type, output_keys = content_info
+                    output_data = traverse_get(
+                        results, *output_keys.split(".")
+                    )
+                    return web.Response(body=output_data)
+
+                elif postprocess_mode == "text":
+                    output_data = traverse_get(
+                        results, *content_info[0].split(".")
+                    )
+                    return web.Response(text=output_data)
+
                 else:
-                """
-                return web.json_response(results)
+                    return web.json_response(
+                        {"error": f"output mode not valid"},
+                        status=HTTPStatus.NOT_FOUND,
+                    )
 
     async def multicomm_dataflow_asynchronous(self, config, request):
         # TODO allow list of valid definitions to seed
@@ -300,6 +415,24 @@ class Routes(BaseMultiCommContext):
                 f.write(chunk)
 
         return web.json_response(OK)
+
+    async def service_files(self, request):
+        if self.upload_dir is None:
+            return web.json_response(
+                {"error": "File listing not allowed"},
+                status=HTTPStatus.NOT_IMPLEMENTED,
+                headers={"Cache-Control": "no-cache"},
+            )
+
+        files: List[Dict[str, Any]] = []
+
+        for filepath in pathlib.Path(self.upload_dir).rglob("**/*.*"):
+            filename = str(filepath).replace(self.upload_dir + "/", "")
+            files.append(
+                {"filename": filename, "size": filepath.stat().st_size}
+            )
+
+        return web.json_response(files)
 
     async def list_sources(self, request):
         return web.json_response(
@@ -438,10 +571,10 @@ class Routes(BaseMultiCommContext):
     @mcctx_route
     async def multicomm_register(self, request, mcctx):
         config = mcctx.register_config()._fromdict(**(await request.json()))
-        if config.presentation not in self.PRESENTATION_OPTIONS:
+        if config.output_mode not in self.IO_MODES:
             return web.json_response(
                 {
-                    "error": f"{config.presentation!r} is not a valid presentation option: {self.PRESENTATION_OPTIONS!r}"
+                    "error": f"{config.output_mode!r} is not a valid output_mode option: {self.IO_MODES!r}"
                 },
                 status=HTTPStatus.BAD_REQUEST,
             )
@@ -456,78 +589,78 @@ class Routes(BaseMultiCommContext):
         return web.json_response(OK)
 
     @sctx_route
-    async def source_repo(self, request, sctx):
+    async def source_record(self, request, sctx):
         return web.json_response(
-            (await sctx.repo(request.match_info["key"])).export()
+            (await sctx.record(request.match_info["key"])).export()
         )
 
     @sctx_route
     async def source_update(self, request, sctx):
         await sctx.update(
-            Repo(request.match_info["key"], data=await request.json())
+            Record(request.match_info["key"], data=await request.json())
         )
         return web.json_response(OK)
 
-    async def _iter_repos(self, iterkey, chunk_size) -> List[Repo]:
+    async def _iter_records(self, iterkey, chunk_size) -> List[Record]:
         """
-        Iterates over a repos async generator and returns a list with chunk_size
-        or less repos in it (if iteration completed). It also returns the
+        Iterates over a records async generator and returns a list with chunk_size
+        or less records in it (if iteration completed). It also returns the
         iterkey, which will be None if iteration completed.
         """
-        if not iterkey in self.app["source_repos_iterkeys"]:
+        if not iterkey in self.app["source_records_iterkeys"]:
             raise web.HTTPNotFound(reason="iterkey not found")
-        entry = self.app["source_repos_iterkeys"][iterkey]
-        # Make repo_list start with the last repo that was retrieved from
-        # iteration the last time _iter_repos was called. If this is the first
-        # time then repo_list is an empty list
-        repo_list = [entry.first] if entry.first is not None else []
+        entry = self.app["source_records_iterkeys"][iterkey]
+        # Make record_list start with the last record that was retrieved from
+        # iteration the last time _iter_records was called. If this is the first
+        # time then record_list is an empty list
+        record_list = [entry.first] if entry.first is not None else []
         # We need to iterate one more time than chunk_size the first time
-        # _iter_repos is called so that we return the chunk_size and set
+        # _iter_records is called so that we return the chunk_size and set
         # entry.first for the subsequent iterations
-        iter_until = chunk_size + 1 if not repo_list else chunk_size
+        iter_until = chunk_size + 1 if not record_list else chunk_size
         for i in range(0, iter_until):
             try:
-                # On last iteration make the repo the first repo in the next
+                # On last iteration make the record the first record in the next
                 # iteration
                 if i == (iter_until - 1):
-                    entry.first = await entry.repos.__anext__()
+                    entry.first = await entry.records.__anext__()
                 else:
-                    repo_list.append(await entry.repos.__anext__())
+                    record_list.append(await entry.records.__anext__())
             except StopAsyncIteration:
-                # If we're done iterating over repos and can remove the
+                # If we're done iterating over records and can remove the
                 # reference to the iterator from iterkeys
-                del self.app["source_repos_iterkeys"][iterkey]
+                del self.app["source_records_iterkeys"][iterkey]
                 iterkey = None
                 break
-        return iterkey, repo_list
+        return iterkey, record_list
 
     @sctx_route
-    async def source_repos(self, request, sctx):
+    async def source_records(self, request, sctx):
         iterkey = secrets.token_hex(nbytes=SECRETS_TOKEN_BYTES)
         # TODO Add test that iterkey is removed on last iteration
-        self.app["source_repos_iterkeys"][iterkey] = IterkeyEntry(
-            first=None, repos=sctx.repos()
+        self.app["source_records_iterkeys"][iterkey] = IterkeyEntry(
+            first=None, records=sctx.records()
         )
-        iterkey, repos = await self._iter_repos(
+        iterkey, records = await self._iter_records(
             iterkey, int(request.match_info["chunk_size"])
         )
         return web.json_response(
             {
                 "iterkey": iterkey,
-                "repos": {repo.key: repo.export() for repo in repos},
+                "records": {record.key: record.export() for record in records},
             }
         )
 
     @sctx_route
-    async def source_repos_iter(self, request, sctx):
-        iterkey, repos = await self._iter_repos(
+    async def source_records_iter(self, request, sctx):
+        iterkey, records = await self._iter_records(
             request.match_info["iterkey"],
             int(request.match_info["chunk_size"]),
         )
         return web.json_response(
             {
                 "iterkey": iterkey,
-                "repos": {repo.key: repo.export() for repo in repos},
+                "records": {record.key: record.export() for record in records},
             }
         )
 
@@ -576,25 +709,31 @@ class Routes(BaseMultiCommContext):
                 {"error": "Multiple request iteration not yet supported"},
                 status=HTTPStatus.BAD_REQUEST,
             )
-        # Get the repos
-        repos: Dict[str, Repo] = {
-            key: Repo(key, data=repo_data)
-            for key, repo_data in (await request.json()).items()
+        # Get the records
+        records: Dict[str, Record] = {
+            key: Record(key, data=record_data)
+            for key, record_data in (await request.json()).items()
         }
-        # Create an async generator to feed repos
-        async def repo_gen():
-            for repo in repos.values():
-                yield repo
+        # Create an async generator to feed records
+        async def record_gen():
+            for record in records.values():
+                yield record
 
         # Feed them through prediction
         return web.json_response(
             {
                 "iterkey": None,
-                "repos": {
-                    repo.key: repo.export()
-                    async for repo in mctx.predict(repo_gen())
+                "records": {
+                    record.key: record.export()
+                    async for record in mctx.predict(record_gen())
                 },
             }
+        )
+
+    async def api_js(self, request):
+        return web.Response(
+            body=API_JS_BYTES,
+            headers={"Content-Type": "application/javascript"},
         )
 
     async def on_shutdown(self, app):
@@ -619,11 +758,39 @@ class Routes(BaseMultiCommContext):
         self.app.on_shutdown.append(self.on_shutdown)
         self.app["multicomm_contexts"] = {"self": self}
         self.app["multicomm_routes"] = {}
-        self.app["sources"] = {}
-        self.app["source_contexts"] = {}
-        self.app["source_repos_iterkeys"] = {}
-        self.app["models"] = {}
-        self.app["model_contexts"] = {}
+        self.app["source_records_iterkeys"] = {}
+
+        # Instantiate sources if they aren't instantiated yet
+        for i, source in enumerate(self.sources):
+            if inspect.isclass(source):
+                self.sources[i] = source.withconfig(self.extra_config)
+
+        await self.app["exit_stack"].enter_async_context(self.sources)
+        self.app["sources"] = {
+            source.ENTRY_POINT_LABEL: source for source in self.sources
+        }
+
+        mctx = await self.app["exit_stack"].enter_async_context(self.sources())
+        self.app["source_contexts"] = {
+            source_ctx.parent.ENTRY_POINT_LABEL: source_ctx
+            for source_ctx in mctx
+        }
+
+        # Instantiate models if they aren't instantiated yet
+        for i, model in enumerate(self.models):
+            if inspect.isclass(model):
+                self.models[i] = model.withconfig(self.extra_config)
+
+        await self.app["exit_stack"].enter_async_context(self.models)
+        self.app["models"] = {
+            model.ENTRY_POINT_LABEL: model for model in self.models
+        }
+
+        mctx = await self.app["exit_stack"].enter_async_context(self.models())
+        self.app["model_contexts"] = {
+            model_ctx.parent.ENTRY_POINT_LABEL: model_ctx for model_ctx in mctx
+        }
+
         self.app.update(kwargs)
         # Allow no routes other than pre-registered if in atomic mode
         self.routes = (
@@ -632,6 +799,7 @@ class Routes(BaseMultiCommContext):
             else [
                 # HTTP Service specific APIs
                 ("POST", "/service/upload/{filepath:.+}", self.service_upload),
+                ("GET", "/service/files", self.service_files),
                 # DFFML APIs
                 ("GET", "/list/sources", self.list_sources),
                 (
@@ -662,17 +830,17 @@ class Routes(BaseMultiCommContext):
                     self.multicomm_register,
                 ),
                 # Source APIs
-                ("GET", "/source/{label}/repo/{key}", self.source_repo),
+                ("GET", "/source/{label}/record/{key}", self.source_record),
                 ("POST", "/source/{label}/update/{key}", self.source_update),
                 (
                     "GET",
-                    "/source/{label}/repos/{chunk_size}",
-                    self.source_repos,
+                    "/source/{label}/records/{chunk_size}",
+                    self.source_records,
                 ),
                 (
                     "GET",
-                    "/source/{label}/repos/{iterkey}/{chunk_size}",
-                    self.source_repos_iter,
+                    "/source/{label}/records/{iterkey}/{chunk_size}",
+                    self.source_records_iter,
                 ),
                 # TODO route to delete iterkey before iteration has completed
                 # Model APIs
@@ -686,10 +854,17 @@ class Routes(BaseMultiCommContext):
                 ),
             ]
         )
+        # Serve api.js
+        if self.js:
+            self.routes.append(("GET", "/api.js", self.api_js))
+        # Add all the routes and make them cors if needed
         for route in self.routes:
             route = self.app.router.add_route(*route)
             # Add cors to all routes
             if self.cors_domains:
                 self.cors.add(route)
+        # Serve static content
+        if self.static:
+            self.app.router.add_static("/", self.static)
         self.runner = web.AppRunner(self.app)
         await self.runner.setup()

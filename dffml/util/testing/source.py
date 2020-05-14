@@ -5,7 +5,7 @@ import abc
 import random
 import tempfile
 
-from ...repo import Repo
+from ...record import Record, RecordPrediction
 from ..asynctestcase import AsyncTestCase
 
 
@@ -13,24 +13,16 @@ class SourceTest(abc.ABC):
     """
     Test case class used to test a Source implementation. Subclass from and
     implement the setUpSource method.
-
-    >>> from dffml.source.file import FileSourceConfig
-    >>> from dffml.source.json import JSONSource
-    >>> from dffml.util.testing.source import SourceTest
-    >>> from dffml.util.asynctestcase import AsyncTestCase
-    >>> class TestCustomSQliteSource(SourceTest, AsyncTestCase):
-    >>>     async def setUpSource(self):
-    >>>         return MemorySource(MemorySourceConfig(repos=[Repo('a')]))
     """
 
     @abc.abstractmethod
-    async def setUpSource(self, fileobj):
+    async def setUpSource(self):
         pass  # pragma: no cover
 
     async def test_update(self):
         full_key = "0"
         empty_key = "1"
-        full_repo = Repo(
+        full_record = Record(
             full_key,
             data={
                 "features": {
@@ -39,10 +31,14 @@ class SourceTest(abc.ABC):
                     "SepalLength": 5.8,
                     "SepalWidth": 2.7,
                 },
-                "prediction": {"value": "feedface", "confidence": 0.42},
+                "prediction": {
+                    "target_name": RecordPrediction(
+                        value="feedface", confidence=0.42
+                    )
+                },
             },
         )
-        empty_repo = Repo(
+        empty_record = Record(
             empty_key,
             data={
                 "features": {
@@ -58,44 +54,49 @@ class SourceTest(abc.ABC):
         async with source as testSource:
             # Open, update, and close
             async with testSource() as sourceContext:
-                await sourceContext.update(full_repo)
-                await sourceContext.update(empty_repo)
+                await sourceContext.update(full_record)
+                await sourceContext.update(empty_record)
         async with source as testSource:
             # Open and confirm we saved and loaded correctly
             async with testSource() as sourceContext:
                 with self.subTest(key=full_key):
-                    repo = await sourceContext.repo(full_key)
-                    self.assertEqual(repo.data.prediction.value, "feedface")
-                    self.assertEqual(repo.data.prediction.confidence, 0.42)
-                with self.subTest(key=empty_key):
-                    repo = await sourceContext.repo(empty_key)
-                    self.assertFalse(repo.data.prediction.value)
-                    self.assertFalse(repo.data.prediction.confidence)
-                with self.subTest(both=[full_key, empty_key]):
-                    repos = {
-                        repo.key: repo async for repo in sourceContext.repos()
-                    }
-                    self.assertIn(full_key, repos)
-                    self.assertIn(empty_key, repos)
+                    record = await sourceContext.record(full_key)
                     self.assertEqual(
-                        repos[full_key].features(), full_repo.features()
+                        record.data.prediction["target_name"]["value"],
+                        "feedface",
                     )
                     self.assertEqual(
-                        repos[empty_key].features(), empty_repo.features()
+                        record.data.prediction["target_name"]["confidence"],
+                        0.42,
+                    )
+                with self.subTest(key=empty_key):
+                    record = await sourceContext.record(empty_key)
+                    self.assertEqual(
+                        [
+                            val["value"]
+                            for _, val in record.data.prediction.items()
+                        ],
+                        ["undetermined"] * (len(record.data.prediction)),
+                    )
+                with self.subTest(both=[full_key, empty_key]):
+                    records = {
+                        record.key: record
+                        async for record in sourceContext.records()
+                    }
+                    self.assertIn(full_key, records)
+                    self.assertIn(empty_key, records)
+
+                    self.assertEqual(
+                        records[full_key].features(), full_record.features()
+                    )
+                    self.assertEqual(
+                        records[empty_key].features(), empty_record.features()
                     )
 
 
 class FileSourceTest(SourceTest):
     """
     Test case class used to test a FileSource implementation.
-
-    >>> from dffml.source.file import FileSourceConfig
-    >>> from dffml.source.json import JSONSource
-    >>> from dffml.util.testing.source import FileSourceTest
-    >>> from dffml.util.asynctestcase import AsyncTestCase
-    >>> class TestCustomSQliteSource(FileSourceTest, AsyncTestCase):
-    >>>     async def setUpSource(self):
-    >>>         return JSONSource(FileSourceConfig(filename=self.testfile))
     """
 
     async def test_update(self):
@@ -110,23 +111,23 @@ class FileSourceTest(SourceTest):
                     )
                     await super().test_update()
 
-    async def test_label(self):
+    async def test_tag(self):
         with tempfile.TemporaryDirectory() as testdir:
             self.testfile = os.path.join(testdir, str(random.random()))
-            unlabeled = await self.setUpSource()
-            labeled = await self.setUpSource()
-            labeled.config = labeled.config._replace(label="somelabel")
-            async with unlabeled, labeled:
-                async with unlabeled() as uctx, labeled() as lctx:
+            untagged = await self.setUpSource()
+            tagged = await self.setUpSource()
+            tagged.config = tagged.config._replace(tag="sometag")
+            async with untagged, tagged:
+                async with untagged() as uctx, tagged() as lctx:
                     await uctx.update(
-                        Repo("0", data={"features": {"feed": 1}})
+                        Record("0", data={"features": {"feed": 1}})
                     )
                     await lctx.update(
-                        Repo("0", data={"features": {"face": 2}})
+                        Record("0", data={"features": {"face": 2}})
                     )
-            async with unlabeled, labeled:
-                async with unlabeled() as uctx, labeled() as lctx:
-                    repo = await uctx.repo("0")
-                    self.assertIn("feed", repo.features())
-                    repo = await lctx.repo("0")
-                    self.assertIn("face", repo.features())
+            async with untagged, tagged:
+                async with untagged() as uctx, tagged() as lctx:
+                    record = await uctx.record("0")
+                    self.assertIn("feed", record.features())
+                    record = await lctx.record("0")
+                    self.assertIn("face", record.features())

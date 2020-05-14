@@ -1,6 +1,7 @@
 from ..source.source import SubsetSources
 from ..util.cli.arg import Arg
 from ..util.cli.cmd import CMD
+from ..high_level import train, predict, accuracy
 from ..util.cli.cmds import SourcesCMD, ModelCMD, KeysCMD
 
 
@@ -22,18 +23,14 @@ class Train(MLCMD):
     """
 
     async def run(self):
-        async with self.sources as sources, self.model as model:
-            async with sources() as sctx, model() as mctx:
-                return await mctx.train(sctx)
+        return await train(self.model, self.sources)
 
 
 class Accuracy(MLCMD):
     """Assess model accuracy on data from given sources"""
 
     async def run(self):
-        async with self.sources as sources, self.model as model:
-            async with sources() as sctx, model() as mctx:
-                return float(await mctx.accuracy(sctx))
+        return await accuracy(self.model, self.sources)
 
 
 class PredictAll(MLCMD):
@@ -41,27 +38,21 @@ class PredictAll(MLCMD):
 
     arg_update = Arg(
         "-update",
-        help="Update repo with sources",
+        help="Update record with sources",
         required=False,
         default=False,
         action="store_true",
     )
 
-    async def predict(self, mctx, sctx, repos):
-        async for repo in mctx.predict(repos):
-            yield repo
-            if self.update:
-                await sctx.update(repo)
-
     async def run(self):
-        async with self.sources as sources, self.model as model:
-            async with sources() as sctx, model() as mctx:
-                async for repo in self.predict(mctx, sctx, sctx.repos()):
-                    yield repo
+        async for record in predict(
+            self.model, self.sources, update=self.update, keep_record=True
+        ):
+            yield record
 
 
-class PredictRepo(PredictAll, KeysCMD):
-    """Predictions for individual repos"""
+class PredictRecord(PredictAll, KeysCMD):
+    """Predictions for individual records"""
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -69,7 +60,7 @@ class PredictRepo(PredictAll, KeysCMD):
 
 
 class Predict(CMD):
-    """Evaluate features against repos and produce a prediction"""
+    """Evaluate features against records and produce a prediction"""
 
-    repo = PredictRepo
+    record = PredictRecord
     _all = PredictAll

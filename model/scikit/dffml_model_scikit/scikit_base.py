@@ -3,26 +3,24 @@
 """
 Base class for Scikit models
 """
-import os
 import json
 import hashlib
-from pathlib import Path
+import pathlib
+import importlib
+
 from typing import AsyncIterator, Tuple, Any, NamedTuple
 
-import joblib
-import numpy as np
-import pandas as pd
 from sklearn.metrics import silhouette_score, mutual_info_score
 
-from dffml.repo import Repo
+from dffml.record import Record
 from dffml.source.source import Sources
-from dffml.accuracy import Accuracy
+from dffml.model.accuracy import Accuracy
 from dffml.model.model import ModelConfig, ModelContext, Model, ModelNotTrained
 from dffml.feature.feature import Features, Feature
 
 
 class ScikitConfig(ModelConfig, NamedTuple):
-    directory: str
+    directory: pathlib.Path
     predict: Feature
     features: Features
     tcluster: Feature
@@ -31,6 +29,9 @@ class ScikitConfig(ModelConfig, NamedTuple):
 class ScikitContext(ModelContext):
     def __init__(self, parent):
         super().__init__(parent)
+        self.pd = importlib.import_module("pandas")
+        self.np = importlib.import_module("numpy")
+        self.joblib = importlib.import_module("joblib")
         self.features = self.applicable_features(self.parent.config.features)
         self._features_hash = self._feature_predict_hash()
         self.clf = None
@@ -55,14 +56,13 @@ class ScikitContext(ModelContext):
             "".join([params] + self.features).encode()
         ).hexdigest()
 
-    def _filename(self):
-        return os.path.join(
-            self.parent.config.directory, self._features_hash + ".joblib"
-        )
+    @property
+    def _filepath(self):
+        return self.parent.config.directory / (self._features_hash + ".joblib")
 
     async def __aenter__(self):
-        if os.path.isfile(self._filename()):
-            self.clf = joblib.load(self._filename())
+        if self._filepath.is_file():
+            self.clf = self.joblib.load(str(self._filepath))
         else:
             config = self.parent.config._asdict()
             del config["directory"]
@@ -76,46 +76,46 @@ class ScikitContext(ModelContext):
 
     async def train(self, sources: Sources):
         data = []
-        async for repo in sources.with_features(
+        async for record in sources.with_features(
             self.features + [self.parent.config.predict.NAME]
         ):
-            feature_data = repo.features(
+            feature_data = record.features(
                 self.features + [self.parent.config.predict.NAME]
             )
             data.append(feature_data)
-        df = pd.DataFrame(data)
-        xdata = np.array(df.drop([self.parent.config.predict.NAME], 1))
-        ydata = np.array(df[self.parent.config.predict.NAME])
-        self.logger.info("Number of input repos: {}".format(len(xdata)))
+        df = self.pd.DataFrame(data)
+        xdata = self.np.array(df.drop([self.parent.config.predict.NAME], 1))
+        ydata = self.np.array(df[self.parent.config.predict.NAME])
+        self.logger.info("Number of input records: {}".format(len(xdata)))
         self.clf.fit(xdata, ydata)
-        joblib.dump(self.clf, self._filename())
+        self.joblib.dump(self.clf, str(self._filepath))
 
     async def accuracy(self, sources: Sources) -> Accuracy:
-        if not os.path.isfile(self._filename()):
+        if not self._filepath.is_file():
             raise ModelNotTrained("Train model before assessing for accuracy.")
         data = []
-        async for repo in sources.with_features(self.features):
-            feature_data = repo.features(
+        async for record in sources.with_features(self.features):
+            feature_data = record.features(
                 self.features + [self.parent.config.predict.NAME]
             )
             data.append(feature_data)
-        df = pd.DataFrame(data)
-        xdata = np.array(df.drop([self.parent.config.predict.NAME], 1))
-        ydata = np.array(df[self.parent.config.predict.NAME])
-        self.logger.debug("Number of input repos: {}".format(len(xdata)))
+        df = self.pd.DataFrame(data)
+        xdata = self.np.array(df.drop([self.parent.config.predict.NAME], 1))
+        ydata = self.np.array(df[self.parent.config.predict.NAME])
+        self.logger.debug("Number of input records: {}".format(len(xdata)))
         self.confidence = self.clf.score(xdata, ydata)
         self.logger.debug("Model Accuracy: {}".format(self.confidence))
         return self.confidence
 
     async def predict(
-        self, repos: AsyncIterator[Repo]
-    ) -> AsyncIterator[Tuple[Repo, Any, float]]:
-        if not os.path.isfile(self._filename()):
+        self, records: AsyncIterator[Record]
+    ) -> AsyncIterator[Tuple[Record, Any, float]]:
+        if not self._filepath.is_file():
             raise ModelNotTrained("Train model before prediction.")
-        async for repo in repos:
-            feature_data = repo.features(self.features)
-            df = pd.DataFrame(feature_data, index=[0])
-            predict = np.array(df)
+        async for record in records:
+            feature_data = record.features(self.features)
+            df = self.pd.DataFrame(feature_data, index=[0])
+            predict = self.np.array(df)
             self.logger.debug(
                 "Predicted Value of {} for {}: {}".format(
                     self.parent.config.predict,
@@ -123,53 +123,57 @@ class ScikitContext(ModelContext):
                     self.clf.predict(predict),
                 )
             )
-            repo.predicted(self.clf.predict(predict)[0], self.confidence)
-            yield repo
+            target = self.parent.config.predict.NAME
+            record.predicted(
+                target, self.clf.predict(predict)[0], self.confidence
+            )
+            yield record
 
 
 class ScikitContextUnsprvised(ScikitContext):
     async def __aenter__(self):
-        if os.path.isfile(self._filename()):
-            self.clf = joblib.load(self._filename())
+        if self._filepath.is_file():
+            self.clf = self.joblib.load(str(self._filepath))
         else:
             config = self.parent.config._asdict()
             del config["directory"]
             del config["features"]
             del config["tcluster"]
+            del config["predict"]
             self.clf = self.parent.SCIKIT_MODEL(**config)
         return self
 
     async def train(self, sources: Sources):
         data = []
-        async for repo in sources.with_features(self.features):
-            feature_data = repo.features(self.features)
+        async for record in sources.with_features(self.features):
+            feature_data = record.features(self.features)
             data.append(feature_data)
-        df = pd.DataFrame(data)
-        xdata = np.array(df)
-        self.logger.info("Number of input repos: {}".format(len(xdata)))
+        df = self.pd.DataFrame(data)
+        xdata = self.np.array(df)
+        self.logger.info("Number of input records: {}".format(len(xdata)))
         self.clf.fit(xdata)
-        joblib.dump(self.clf, self._filename())
+        self.joblib.dump(self.clf, str(self._filepath))
 
     async def accuracy(self, sources: Sources) -> Accuracy:
-        if not os.path.isfile(self._filename()):
+        if not self._filepath.is_file():
             raise ModelNotTrained("Train model before assessing for accuracy.")
         data = []
         target = []
         estimator_type = self.clf._estimator_type
-        if estimator_type is "clusterer":
+        if estimator_type == "clusterer":
             target = (
                 []
                 if self.parent.config.tcluster is None
                 else [self.parent.config.tcluster.NAME]
             )
-        async for repo in sources.with_features(self.features):
-            feature_data = repo.features(self.features + target)
+        async for record in sources.with_features(self.features):
+            feature_data = record.features(self.features + target)
             data.append(feature_data)
-        df = pd.DataFrame(data)
-        xdata = np.array(df.drop(target, axis=1))
-        self.logger.debug("Number of input repos: {}".format(len(xdata)))
+        df = self.pd.DataFrame(data)
+        xdata = self.np.array(df.drop(target, axis=1))
+        self.logger.debug("Number of input records: {}".format(len(xdata)))
         if target:
-            ydata = np.array(df[target]).flatten()
+            ydata = self.np.array(df[target]).flatten()
             if hasattr(self.clf, "predict"):
                 # xdata can be training data or unseen data
                 # inductive clusterer with ground truth
@@ -199,12 +203,12 @@ class ScikitContextUnsprvised(ScikitContext):
         return self.confidence
 
     async def predict(
-        self, repos: AsyncIterator[Repo]
-    ) -> AsyncIterator[Tuple[Repo, Any, float]]:
-        if not os.path.isfile(self._filename()):
+        self, records: AsyncIterator[Record]
+    ) -> AsyncIterator[Tuple[Record, Any, float]]:
+        if not self._filepath.is_file():
             raise ModelNotTrained("Train model before prediction.")
         estimator_type = self.clf._estimator_type
-        if estimator_type is "clusterer":
+        if estimator_type == "clusterer":
             if hasattr(self.clf, "predict"):
                 # inductive clusterer
                 predictor = self.clf.predict
@@ -213,21 +217,25 @@ class ScikitContextUnsprvised(ScikitContext):
                 self.logger.critical(
                     "Predict found transductive clusterer, ensure data being passed is training data"
                 )
-                labels = [
-                    (yield label) for label in self.clf.labels_.astype(np.int)
-                ]
+
+                def yield_labels():
+                    for label in self.clf.labels_.astype(self.np.int):
+                        yield label
+
+                labels = yield_labels()
                 predictor = lambda predict: [next(labels)]
 
-        async for repo in repos:
-            feature_data = repo.features(self.features)
-            df = pd.DataFrame(feature_data, index=[0])
-            predict = np.array(df)
+        async for record in records:
+            feature_data = record.features(self.features)
+            df = self.pd.DataFrame(feature_data, index=[0])
+            predict = self.np.array(df)
             prediction = predictor(predict)
             self.logger.debug(
-                "Predicted cluster for {}: {}".format(predict, prediction,)
+                "Predicted cluster for {}: {}".format(predict, prediction)
             )
-            repo.predicted(prediction[0], self.confidence)
-            yield repo
+            target = self.parent.config.predict.NAME
+            record.predicted(target, prediction[0], self.confidence)
+            yield record
 
 
 class Scikit(Model):
@@ -235,28 +243,27 @@ class Scikit(Model):
         super().__init__(config)
         self.saved = {}
 
-    def _filename(self):
-        return os.path.join(
-            self.config.directory,
+    @property
+    def _filepath(self):
+        return self.config.directory / (
             hashlib.sha384(self.config.predict.NAME.encode()).hexdigest()
-            + ".json",
+            + ".json"
         )
 
     async def __aenter__(self) -> "Scikit":
-        path = Path(self._filename())
-        if path.is_file():
-            self.saved = json.loads(path.read_text())
+        if self._filepath.is_file():
+            self.saved = json.loads(self._filepath.read_text())
         return self
 
     async def __aexit__(self, exc_type, exc_value, traceback):
-        Path(self._filename()).write_text(json.dumps(self.saved))
+        self._filepath.write_text(json.dumps(self.saved))
 
 
 class ScikitUnsprvised(Scikit):
-    def _filename(self):
+    @property
+    def _filepath(self):
         model_name = self.SCIKIT_MODEL.__name__
-        return os.path.join(
-            self.config.directory,
+        return self.config.directory / (
             hashlib.sha384(
                 (
                     "".join(
@@ -267,5 +274,5 @@ class ScikitUnsprvised(Scikit):
                     )
                 ).encode()
             ).hexdigest()
-            + ".json",
+            + ".json"
         )

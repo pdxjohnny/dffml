@@ -1,7 +1,6 @@
 import unittest
 
-from dffml.util.testing.source import FileSourceTest
-from dffml.util.asynctestcase import AsyncTestCase
+from dffml import AsyncTestCase, FileSourceTest
 
 from .custom_sqlite import CustomSQLiteSourceConfig, CustomSQLiteSource
 
@@ -12,8 +11,8 @@ class TestCustomSQliteSource(FileSourceTest, AsyncTestCase):
             CustomSQLiteSourceConfig(filename=self.testfile)
         )
 
-    @unittest.skip("Labels not implemented")
-    async def test_label(self):
+    @unittest.skip("tags not implemented")
+    async def test_tag(self):
         """
-        Labels not implemented
+        tags not implemented
         """

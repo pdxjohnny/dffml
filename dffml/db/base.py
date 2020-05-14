@@ -2,22 +2,14 @@ import abc
 import inspect
 import functools
 import collections
-from typing import (
-    Any,
-    List,
-    Optional,
-    Dict,
-    Tuple,
-    Union,
-    AsyncIterator,
-)
+from typing import Any, List, Optional, Dict, Tuple, Union, AsyncIterator
 
-from dffml.df.base import BaseDataFlowObject, BaseDataFlowObjectContext
-from dffml.util.entrypoint import base_entry_point
+from ..df.base import BaseDataFlowObject, BaseDataFlowObjectContext
+from ..util.entrypoint import base_entry_point
 
 
 Condition = collections.namedtuple(
-    "Condtion", ["column", "operation", "value"]
+    "Condition", ["column", "operation", "value"]
 )
 Conditions = Union[List[List[Condition]], List[List[Tuple[str]]]]
 
