@@ -176,8 +176,6 @@ def export_value(obj, key, value):
         obj[key] = STANDARD_TYPES.get(
             str(value).replace("typing.", ""), "generic"
         )
-    elif hasattr(value, "config") and hasattr(value, "ENTRY_POINT_ORIG_LABEL"):
-        obj[key] = export_base_configurable(value)
 
 
 def export_list(iterable):
@@ -190,13 +188,6 @@ def export_list(iterable):
         elif isinstance(value, list):
             iterable[i] = export_list(iterable[i])
     return iterable
-
-
-def export_base_configurable(obj):
-    return {
-        "arg": obj.ENTRY_POINT_ORIG_LABEL,
-        "config": export_dict(**obj.config._asdict()),
-    }
 
 
 def export_dict(**kwargs):

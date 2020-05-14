@@ -35,8 +35,6 @@ Output:
 
 The web UI (under heavy development) can be found `here <webui/>`_.
 
-The web UI can be found `here <webui/>`_.
-
 This is the documentation for the latest release, documentation for the master
 branch can be found `here <master/index.html>`_.
 
