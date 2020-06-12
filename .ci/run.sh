@@ -6,6 +6,7 @@ if [ -d "$HOME/.local/bin" ]; then
 fi
 
 SRC_ROOT=${SRC_ROOT:-"${PWD}"}
+TARGET=${TARGET:-"/opt/conda"}
 PYTHON=${PYTHON:-"python3"}
 if [ "x${VIRTUAL_ENV}" != "x" ]; then
   PYTHON="python"
@@ -14,6 +15,15 @@ fi
 TEMP_DIRS=()
 
 python_version="py$(${PYTHON} -c 'import sys; print(f"{sys.version_info.major}{sys.version_info.minor}")')"
+
+if ([[ "x${PLUGIN}" == "xall" ]] || \
+    [[ "x${PLUGIN}" == "xmodel/daal4py" ]] || \
+    [[ "x${PLUGIN}" == "xmodel/vowpalWabbit" ]] || \
+    [[ "x${PLUGIN}" == "x." ]] || \
+    [[ "x${PLUGIN}" == "xdocs" ]]) && \
+   [[ -f "${TARGET}/miniconda${python_version}/bin/activate" ]]; then
+  source "${TARGET}/miniconda${python_version}/bin/activate" base
+fi
 
 function run_plugin_examples() {
   if [ ! -d "${SRC_ROOT}/${PLUGIN}/examples" ]; then
@@ -30,7 +40,19 @@ function run_plugin_examples() {
 function run_plugin() {
   export PLUGIN="${1}"
 
+  # Install root package
+  "${PYTHON}" -m pip install -U -e "${SRC_ROOT}"
+
+  # If one plugin depends on another plugin this is where it should be installed
   if [ "x${PLUGIN}" = "xexamples/shouldi" ]; then
+    "${PYTHON}" -m pip install -U -e "${SRC_ROOT}/feature/git"
+  fi
+
+  if [ "x${PLUGIN}" == "xmodel/tensorflow_hub" ]; then
+    "${PYTHON}" -m pip install -U -e "${SRC_ROOT}/model/tensorflow"
+  fi
+
+  if [[ "x${PLUGIN}" == "xoperations/deploy" ]]; then
     "${PYTHON}" -m pip install -U -e "${SRC_ROOT}/feature/git"
   fi
 

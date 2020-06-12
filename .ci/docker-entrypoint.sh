@@ -11,12 +11,6 @@ if [ "x${USER}" == "x" ]; then
   export USER=user
 fi
 
-echo "#!/usr/bin/env bash" > /tmp/cmd.sh
-chmod 755 /tmp/cmd.sh
-runit () {
-  exec /tmp/cmd.sh
-}
-
 export VIRTUAL_ENV_DIR=$(mktemp -d)
 
 "${PYTHON}" -m venv "${VIRTUAL_ENV_DIR}"
@@ -25,7 +19,7 @@ export VIRTUAL_ENV_DIR=$(mktemp -d)
 export HOME=$(mktemp -d)
 
 if [ -d "/home/${USER}/.cache/pip" ]; then
-  export PIP_CACHE_DIR="/home/${USER}/.cache/pip"
+  export TARGET="/home/${USER}/.cache/pip"
 fi
 
 mkdir -p "${HOME}/.cache"
@@ -34,11 +28,7 @@ mkdir -p "${HOME}/.local/bin"
 export PATH="${HOME}/.local/bin:${PATH}"
 
 if [ "x${1}" == "x" ]; then
-  echo "exec bash" >> /tmp/cmd.sh
+  exec bash
 else
-  echo "./.ci/run.sh ${1}" >> /tmp/cmd.sh
+  exec ./.ci/run.sh ${1}
 fi
-
-source ./.ci/deps.sh "${1}"
-
-runit

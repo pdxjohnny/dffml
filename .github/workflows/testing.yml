@@ -20,38 +20,24 @@ jobs:
         git remote set-url origin https://github.com/intel/dffml
         git fetch --prune --unshallow
         git fetch --depth=1 origin +refs/tags/*:refs/tags/*
-    - name: Set up Python ${{ matrix.python-version }}
-      uses: actions/setup-python@v1
-      with:
-        python-version: ${{ matrix.python-version }}
-    - name: Use Node.js ${{ matrix.node-version }}
-      uses: actions/setup-node@v1
-      with:
-        node-version: ${{ matrix.node-version }}
-    - name: Get pip cache
-      id: pip-cache
-      run: |
-        python -c "from pip._internal.locations import USER_CACHE_DIR; print('::set-output name=dir::' + USER_CACHE_DIR)"
-    - name: pip cache
-      uses: actions/cache@v1
-      with:
-        path: ${{ steps.pip-cache.outputs.dir }}
-        key: ${{ runner.os }}-pip-${{ hashFiles('**/setup.py') }}
-        restore-keys: |
-          ${{ runner.os }}-pip-
-    - name: Setup conda
-      uses: s-weigand/setup-conda@v1
-      with:
-        update-conda: true
-        python-version: ${{ matrix.python-version }}
-        conda-channels: anaconda, conda-forge
     - name: Install dependencies
       run: |
         set -x
-        ./.ci/deps.sh ${{ matrix.check }}
+        docker build
+          -t dffmlci:${{ matrix.python-version }}
+          -f .ci/py${{ matrix.python-version }}.Dockerfile .
     - name: Run check
       run: |
-        GITHUB_PAGES_KEY=${{ secrets.GITHUB_PAGES_KEY }} ./.ci/run.sh ${{ matrix.check }}
+        docker run --rm -ti
+          -u $(id -u):$(id -g)
+          -e GITHUB_PAGES_KEY=${{ secrets.GITHUB_PAGES_KEY }}
+          -e LOGGING=debug
+          -e USER=$USER
+          -v $HOME/.cache/pip:/home/$USER/.cache/pip
+          -v $PWD:/usr/src/dffml
+          -w /usr/src/dffml
+          --entrypoint .ci/docker-entrypoint.sh
+          dffmlci:${{ matrix.python-version }} ${{ matrix.check }}
 
   test:
     runs-on: ubuntu-latest
@@ -73,17 +59,6 @@ jobs:
       uses: actions/setup-python@v1
       with:
         python-version: ${{ matrix.python-version }}
-    - name: Get pip cache
-      id: pip-cache
-      run: |
-        python -c "from pip._internal.locations import USER_CACHE_DIR; print('::set-output name=dir::' + USER_CACHE_DIR)"
-    - name: pip cache
-      uses: actions/cache@v1
-      with:
-        path: ${{ steps.pip-cache.outputs.dir }}
-        key: ${{ runner.os }}-pip-${{ hashFiles('**/setup.py') }}
-        restore-keys: |
-          ${{ runner.os }}-pip-
     - name: shouldi test binary cache
       uses: actions/cache@v1
       with:
@@ -91,23 +66,18 @@ jobs:
         key: ${{ hashFiles('examples/shouldi/tests/binaries.py') }}
         restore-keys: |
           ${{ runner.os }}-shouldi-test-binaries-
-    - name: Setup conda
-      uses: s-weigand/setup-conda@v1
-      with:
-        update-conda: true
-        python-version: ${{ matrix.python-version }}
-        conda-channels: anaconda, conda-forge
     - name: Install dependencies
       run: |
         set -x
-        ./.ci/deps.sh ${{ matrix.plugin }}
+        pip install -U codecov
+        docker build
+          -t dffmlci:${{ matrix.python-version }}
+          -f .ci/py${{ matrix.python-version }}.Dockerfile .
     - name: Test
       run: |
         set -x
         export PYTHON=python${{ matrix.python-version }}
         export PLUGIN=${{ matrix.plugin }}
-        export LOGGING=debug
-        export PATH="${HOME}/.local/bin:${PATH}"
         export PYPI_TOKENS=$(mktemp)
         cat > ${PYPI_TOKENS} <<EOF
         examples/shouldi=${{ secrets.PYPI_SHOULDI }}
@@ -127,14 +97,23 @@ jobs:
         configloader/yaml=${{ secrets.PYPI_CONFIG_YAML }}
         configloader/png=${{ secrets.PYPI_CONFIG_PNG }}
         EOF
-        export TWINE_USERNAME=__token__
         if [ "x${PLUGIN}" = "x." ]; then
           export TWINE_PASSWORD=${{ secrets.PYPI_DFFML }}
         else
           export TWINE_PASSWORD=$(grep "${PLUGIN}=" "${PYPI_TOKENS}" | sed 's/^[^=]*=//g')
         fi
         rm ${PYPI_TOKENS}
-        ./.ci/run.sh "${PLUGIN}"
+        docker run --rm -ti
+          -u $(id -u):$(id -g)
+          -e LOGGING=debug
+          -e TWINE_USERNAME=__token__
+          -e TWINE_PASSWORD="${TWINE_PASSWORD}"
+          -e USER=$USER
+          -v $HOME/.cache/pip:/home/$USER/.cache/pip
+          -v $PWD:/usr/src/dffml
+          -w /usr/src/dffml
+          --entrypoint .ci/docker-entrypoint.sh
+          dffmlci:${{ matrix.python-version }} "${PLUGIN}"
         if [ "x${PLUGIN}" = "x." ]; then
           CODECOV_TOKEN=${{ secrets.CODECOV_TOKEN }} codecov
         fi
