@@ -1,14 +1,16 @@
+from typing import List
+
 # Command line utility helpers and DataFlow specific classes
-from dffml import CMD, Arg, DataFlow, Input, GetSingle, run
+from dffml import CMD, Arg, DataFlow, Input, GetSingle, run, config, field
 
 # Import all the operations we wrote
-from shouldi.bandit import run_bandit
-from shouldi.pypi import pypi_latest_package_version
-from shouldi.pypi import pypi_package_json
-from shouldi.pypi import pypi_package_url
-from shouldi.pypi import pypi_package_contents
-from shouldi.pypi import cleanup_pypi_package
-from shouldi.safety import safety_check
+from .python.bandit import run_bandit
+from .python.pypi import pypi_latest_package_version
+from .python.pypi import pypi_package_json
+from .python.pypi import pypi_package_url
+from .python.pypi import pypi_package_contents
+from .python.pypi import cleanup_pypi_package
+from .python.safety import safety_check
 
 # Link inputs and outputs together according to their definitions
 DATAFLOW = DataFlow.auto(
@@ -36,11 +38,14 @@ DATAFLOW.seed.append(
 )
 
 
+@config
+class InstallConfig:
+    packages: List[str] = field("Package to check if we should install",)
+
+
 class Install(CMD):
 
-    arg_packages = Arg(
-        "packages", nargs="+", help="Package to check if we should install"
-    )
+    CONFIG = InstallConfig
 
     async def run(self):
         # Run all the operations, Each iteration of this loop happens
@@ -82,3 +87,12 @@ class Install(CMD):
 class ShouldI(CMD):
 
     install = Install
+
+
+# We're hiding this in the last lines for now so that we can perserve the
+# operations tutorial as is
+from .use import Use
+from .project.cli import ProjectCMD
+
+ShouldI.use = Use
+ShouldI.project = ProjectCMD

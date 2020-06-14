@@ -6,6 +6,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 ### Added
+- daal4py based linear regression model
+- DataFlowSource can take a config file as dataflow via the CLI.
+- Support for link on conditions in dataflow diagrams
+- `edit all` command to edit records in bulk
+- Support for Tensorflow 2.2
 - Vowpal Wabbit Models
 - Python 3.8 support
 - binsec branch to `operations/binsec`
@@ -26,7 +31,30 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - New use case `Redeploying dataflow on webhook` in docs.
 - Documentation for creating Source for new File types taking `.ini` as an example.
 - New input modes, output modes for HTTP API dataflow registration.
+- Usage example for tfhub text classifier.
+- `AssociateDefinition` output operation to map definition names to values
+  produced as a result of passing Inputs with those definitions to operations.
+- DataFlows now have a syntax for providing a set of definitions that will
+  override the operations default definition for a given input.
+- Source which modifies record features as they are read from another source.
+  Useful for modifying datasets as they are used with ML commands or editing
+  in bulk.
+- Auto create Definition for the `op` when they might have a spec, subspec.
+- `shouldi use` command which detects the language of the codebase given via
+  path to directory or Git repo URL and runs the appropriate static analyzers.
+- Support for entrypoint style loading of operations and seed inputs in `dataflow create`.
+- Definition for output of the function that `op` wraps.
+- Expose high level load, run and save functions to noasync.
+- Operation to verify secret for GitHub webhook.
+- Option to modify flow and add config in `dataflow create`.
+- Ability to use a function as a data source via the `op` source
 ### Changed
+- Update NER Model to use transformers 2.11.0
+- Update MNIST use case to normalize image arrays.
+- `arg_` notation replaced with `CONFIG = ExampleConfig` style syntax
+  for parsing all command line arguments.
+- Moved usage/io.rst to docs/tutorials/dataflows/io.rst
+- `edit` command substituted with `edit record`
 - `Edit on Github` button now hidden for plugins.
 - Doctests now run via unittests
 - Every class and function can now be imported from the top level module
@@ -34,13 +62,30 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   given.
 - Classes now use `CONFIG` if it has a default for every field and `config` is `None`
 - Models now dynamically import third party modules.
+- Memory dataflow classes now use auto args and config infrastructure
 - `dffml list records` command prints Records as JSON using `.export()`
+- Feature class in `dffml/feature/feature.py` initialize a feature object
+- All DefFeatures() functions are substituted with Features()
+- All feature.type() and feature.lenght() are substituted with
+  feature.type and feature.length
 - FileSource takes pathlib.Path as filename
+- Tensorflow tests re-run themselves up to 6 times to stop them from failing the
+  CI due to their randomly initialized weights making them fail ~2% of the time
+- Any plugin can now be loaded via it's entrypoint style path
+- `with_features` now raises a helpful error message if no records with matching
+  features were found
+- Split out model tutorial into writing the model, and another tutorial for
+  packaging the model.
 ### Fixed
 - Race condition in `MemoryRedundancyChecker` when more than 4 possible
   parameter sets for an operation.
+- Typing of config vlaues for numpy parsed docstrings where type should be tuple
+  or list
 ### Removed
 - Monitor class and associated tests (unused)
+- DefinedFeature class in `dffml/feature/feature.py`
+- DefFeature function in `dffml/feature/feature.py`
+- load_def function in Feature class in `dffml/feature/feature.py`
 
 ## [0.3.7] - 2020-04-14
 ### Added

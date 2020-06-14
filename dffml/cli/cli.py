@@ -3,16 +3,29 @@
 """
 Command line interface evaluates packages given their source URLs
 """
+import pathlib
 import pdb
 import pkg_resources
 
 from ..version import VERSION
 from ..record import Record
-from ..source.source import BaseSource
+from ..feature.feature import Features
+from ..df.types import DataFlow
+from ..source.df import DataFlowSource, DataFlowSourceConfig
+from ..source.source import Sources, BaseSource, SubsetSources
+from ..configloader.configloader import BaseConfigLoader
 from ..util.packaging import is_develop
-from ..util.cli.arg import Arg
 from ..util.cli.cmd import CMD
-from ..util.cli.cmds import SourcesCMD, PortCMD, KeysCMD
+from ..util.cli.cmds import (
+    SourcesCMD,
+    PortCMD,
+    KeysCMD,
+    KeysCMDConfig,
+    PortCMDConfig,
+    SourcesCMDConfig,
+)
+from ..util.config.fields import FIELD_SOURCES
+from ..base import field, config
 
 from .dataflow import Dataflow
 from .config import Config
@@ -31,18 +44,98 @@ class Version(CMD):
         print(f"dffml version {VERSION} (devmode: {str(devmode)})")
 
 
-class Edit(SourcesCMD, KeysCMD):
+@config
+class EditCMDConfig:
+    dataflow: str = field(
+        "File containing exported DataFlow", default=None,
+    )
+    config: BaseConfigLoader = field(
+        "ConfigLoader to use for importing DataFlow", default=None,
+    )
+    features: Features = field(
+        "Feature definitions of records to update",
+        required=False,
+        default_factory=lambda: [],
+    )
+    sources: Sources = FIELD_SOURCES
+
+
+class BaseEditCMD(SourcesCMD):
+
+    CONFIG = EditCMDConfig
+
+    async def __aenter__(self):
+        await super().__aenter__()
+        if self.dataflow:
+            dataflow_path = pathlib.Path(self.dataflow)
+            config_cls = self.config
+            if config_cls is None:
+                config_type = dataflow_path.suffix.replace(".", "")
+                config_cls = BaseConfigLoader.load(config_type)
+            async with config_cls.withconfig(
+                self.extra_config
+            ) as configloader:
+                async with configloader() as loader:
+                    exported = await loader.loadb(dataflow_path.read_bytes())
+                self.dataflow = DataFlow._fromdict(**exported)
+
+            self.sources = DataFlowSource(
+                DataFlowSourceConfig(
+                    source=self.sources,
+                    dataflow=self.dataflow,
+                    features=self.features,
+                )
+            )
+
+
+class EditAllRecords(BaseEditCMD, SourcesCMD):
+    """
+    Edit all records using operations
+    """
+
+    async def run(self):
+        async with self.sources as src:
+            async with src() as sctx:
+                async for record in sctx.records():
+                    if not self.dataflow:
+                        pdb.set_trace()
+                    await sctx.update(record)
+
+
+@config
+class EditRecordConfig(EditCMDConfig, KeysCMDConfig):
+    pass
+
+
+class EditRecord(EditAllRecords, KeysCMD):
     """
     Edit each specified record
     """
 
-    async def run(self):
-        async with self.sources as sources:
-            async with sources() as sctx:
-                for key in self.keys:
-                    record = await sctx.record(key)
-                    pdb.set_trace()
-                    await sctx.update(record)
+    CONFIG = EditRecordConfig
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.sources = SubsetSources(*self.sources, keys=self.keys)
+
+
+class Edit(CMD):
+    """
+    Edit records
+    """
+
+    _all = EditAllRecords
+    record = EditRecord
+
+
+@config
+class MergeConfig:
+    src: BaseSource = field(
+        "Source to pull records from", labeled=True,
+    )
+    dest: BaseSource = field(
+        "Source to merge records into", labeled=True,
+    )
 
 
 class Merge(CMD):
@@ -50,14 +143,7 @@ class Merge(CMD):
     Merge record data between sources
     """
 
-    arg_dest = Arg(
-        "dest", help="Sources merge records into", type=BaseSource.load_labeled
-    )
-    arg_src = Arg(
-        "src",
-        help="Sources to pull records from",
-        type=BaseSource.load_labeled,
-    )
+    CONFIG = MergeConfig
 
     async def run(self):
         async with self.src.withconfig(
@@ -71,10 +157,16 @@ class Merge(CMD):
                     await dctx.update(record)
 
 
+class ImportExportCMDConfig(PortCMDConfig, SourcesCMDConfig):
+    filename: str = field(
+        "Filename", default=None,
+    )
+
+
 class ImportExportCMD(PortCMD, SourcesCMD):
     """Shared import export arguments"""
 
-    arg_filename = Arg("filename", type=str)
+    CONFIG = ImportExportCMDConfig
 
 
 class Import(ImportExportCMD):

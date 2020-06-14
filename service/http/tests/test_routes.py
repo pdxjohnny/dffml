@@ -15,7 +15,7 @@ from dffml.operation.output import GetSingle
 from dffml.util.entrypoint import EntrypointNotFound
 from dffml.model.model import ModelContext, Model
 from dffml.model.accuracy import Accuracy
-from dffml.feature import DefFeature
+from dffml.feature import Feature
 from dffml.source.source import Sources
 from dffml.source.csv import CSVSourceConfig
 from dffml.util.cli.arg import parse_unknown
@@ -210,10 +210,10 @@ class TestRoutesConfigure(TestRoutesRunning, AsyncTestCase):
                     FakeModelConfig(
                         directory=pathlib.Path(tempdir),
                         features=Features(
-                            DefFeature("Years", int, 1),
-                            DefFeature("Experiance", int, 1),
+                            Feature("Years", int, 1),
+                            Feature("Experiance", int, 1),
                         ),
-                        predict=DefFeature("Salary", float, 1),
+                        predict=Feature("Salary", float, 1),
                     ),
                 )
                 with self.subTest(context="salaryctx"):
@@ -256,34 +256,6 @@ class TestRoutesConfigure(TestRoutesRunning, AsyncTestCase):
 
 
 class TestRoutesMultiComm(TestRoutesRunning, AsyncTestCase):
-    OPIMPS = {"formatter": formatter, "get_single": GetSingle, "remap": remap}
-
-    @classmethod
-    def patch_operation_implementation_load(cls, loading):
-        try:
-            return cls.OPIMPS[loading].imp
-        except KeyError as error:
-            raise EntrypointNotFound(
-                f"{loading} not found in {list(cls.OPIMPS.keys())}"
-            ) from error
-
-    @classmethod
-    def setUpClass(cls):
-        super().setUpClass()
-        cls._exit_stack = ExitStack()
-        cls.exit_stack = cls._exit_stack.__enter__()
-        cls.exit_stack.enter_context(
-            patch(
-                "dffml.df.base.OperationImplementation.load",
-                new=cls.patch_operation_implementation_load,
-            )
-        )
-
-    @classmethod
-    def tearDownClass(cls):
-        super().tearDownClass()
-        cls._exit_stack.__exit__(None, None, None)
-
     async def test_no_post(self):
         url: str = "/some/url"
         message: str = "Hello World"

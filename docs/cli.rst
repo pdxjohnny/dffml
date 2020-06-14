@@ -82,6 +82,143 @@ Output
         }
     ]
 
+Edit
+----
+
+Edit records present in a source
+
+Record
+~~~~~~
+
+The edit record command drops you into the Python debugger to edit a :py:class:`Record <dffml.record.Record>`
+in any source manually when a dataflow config file is not provided.
+
+.. note::
+
+    Be sure to check the :doc:`/plugins/dffml_source` plugin page to see if the
+    source your trying to edit is read only be default, and requires you to add
+    another flag such as ``readwrite`` to enable editing.
+
+.. code-block:: console
+
+    $ cat > image.csv << EOF
+    > key,image
+    > four,image1.mnistpng
+    > five,image2.mnistpng
+    > three,image3.mnistpng
+    > two,image4.mnistpng
+    > EOF
+    $ dffml edit record -sources f=csv -source-filename image.csv -source-readwrite -keys three
+    > /home/user/Documents/python/dffml/dffml/cli/cli.py(45)run()
+    -> await sctx.update(record)
+    (Pdb) record.data.features["image"] += "FEEDFACE"
+    (Pdb) c
+    $ dffml list records -sources f=csv -source-filename image.csv -source-readwrite
+    [
+        {
+            "extra": {},
+            "features": {
+                "image": "image1.mnistpng"
+            },
+            "key": "four"
+        },
+        {
+            "extra": {},
+            "features": {
+                "image": "image2.mnistpng"
+            },
+            "key": "five"
+        },
+        {
+            "extra": {},
+            "features": {
+                "image": "image3.mnistpngFEEDFACE"
+            },
+            "key": "three"
+        },
+        {
+            "extra": {},
+            "features": {
+                "image": "image4.mnistpng"
+            },
+            "key": "two"
+        }
+    ]
+
+All
+~~~
+
+Update all the records in any source using the :py:class:`DataFlowSource <dffml.source.df.DataFlowSource>`.
+
+For this example, we are using the `multiply` operation which multiplies every value in a record by a 
+factor which is 10 in this case. The example dataflow file looks like this:
+
+.. literalinclude:: /../examples/edit_records.yaml
+
+Create a source file: 
+
+.. code-block:: console
+
+    $ cat > data.csv << EOF
+    Expertise,Salary,Trust,Years
+    1,10,0.1,0
+    3,20,0.2,1
+    5,30,0.3,2
+    7,40,0.4,3
+    EOF
+
+Run the command:
+
+.. code-block:: console
+
+    $ dffml edit all \
+        -sources f=csv -source-filename data.csv -source-readwrite \
+        -features Years:int:1 Expertise:int:1 Trust:float:1 Salary:int:1 \
+        -dataflow edit_records.yaml
+    $ dffml list records -sources f=csv -source-filename data.csv                                                                                                           
+    [
+        {
+            "extra": {},
+            "features": {
+                "Expertise": 10,
+                "Salary": 100,
+                "Trust": 1.0,
+                "Years": 0
+            },
+            "key": "0"
+        },
+        {
+            "extra": {},
+            "features": {
+                "Expertise": 30,
+                "Salary": 200,
+                "Trust": 2.0,
+                "Years": 10
+            },
+            "key": "1"
+        },
+        {
+            "extra": {},
+            "features": {
+                "Expertise": 50,
+                "Salary": 300,
+                "Trust": 3.0,
+                "Years": 20
+            },
+            "key": "2"
+        },
+        {
+            "extra": {},
+            "features": {
+                "Expertise": 70,
+                "Salary": 400,
+                "Trust": 4.0,
+                "Years": 30
+            },
+            "key": "3"
+        }
+    ]
+
 DataFlow
 --------
 
@@ -99,7 +236,7 @@ format.
 
 .. code-block:: console
 
-    $ dffml dataflow create -config yaml get_single clone_git_repo > df.yaml
+    $ dffml dataflow create -configloader yaml get_single clone_git_repo > df.yaml
 
 Merge
 ~~~~~
@@ -135,7 +272,7 @@ command during generation.
 
 .. code-block:: console
 
-    $ dffml dataflow create dffml.mapping.create print_output -config yaml | \
+    $ dffml dataflow create dffml.mapping.create print_output -configloader yaml | \
         sed 'N;s/data:\n      - seed/data:\n      - dffml.mapping.create: mapping/g' | \
         tee df.yaml
     definitions:
@@ -275,7 +412,7 @@ All DFFML objects are exportable. Here's and example of exporting a DataFlow.
 
 .. code-block:: console
 
-    $ dffml service dev export -config json shouldi.cli:DATAFLOW
+    $ dffml service dev export -configloader json shouldi.cli:DATAFLOW
 
 This is an example of exporting a model. Be sure the files you're exporting from
 have a ``if __name__ == "__main__":`` block, or else loading the file will
@@ -284,7 +421,7 @@ which is what you want.
 
 .. code-block:: console
 
-    $ dffml service dev export -config yaml quickstart:model
+    $ dffml service dev export -configloader yaml quickstart:model
 
 Entrypoints
 +++++++++++

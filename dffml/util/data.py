@@ -6,6 +6,7 @@ Run doctests with
 python -m doctest -v dffml/util/data.py
 """
 import ast
+import uuid
 import types
 import pydoc
 import inspect
@@ -13,6 +14,16 @@ import dataclasses
 from functools import wraps
 import pathlib
 from typing import Callable
+
+try:
+    from typing import get_origin, get_args
+except ImportError:
+    # Added in Python 3.8
+    def get_origin(t):
+        return getattr(t, "__origin__", None)
+
+    def get_args(t):
+        return getattr(t, "__args__", None)
 
 
 def merge(one, two, list_append: bool = True):
@@ -88,6 +99,28 @@ def traverse_config_get(target, *args):
     return last["plugin"]
 
 
+def split_dot_seperated(val: str) -> "List[str]":
+    raw_split = val.split(".")
+    vals = []
+    i = 0
+    tl = []
+    trig = False
+    for x in raw_split:
+        if "'" in x or '"' in x:
+            trig = not trig
+            if not trig:
+                tl.append(x)
+                k = ".".join(tl).replace("'", "").replace('"', "")
+                vals.append(k)
+                tl = []
+                continue
+        if trig:
+            tl.append(x)
+            continue
+        vals.append(x)
+    return vals
+
+
 def traverse_get(target, *args):
     """
     Travel down through a dict
@@ -99,11 +132,45 @@ def traverse_get(target, *args):
     >>>
     >>> traverse_get({"one": {"two": 3}}, "one", "two")
     3
+    >>> traverse_get({"one": {"two": 3}}, "one.two")
+    3
+    >>> traverse_get({"one.two": {"three": 4}}, "'one.two'.three")
+    4
     """
+    if len(args) == 1:
+        args = split_dot_seperated(args[0])
     current = target
     for level in args:
         current = current[level]
     return current
+
+
+def traverse_set(target, *args, value):
+    """
+    Examples
+    --------
+
+    >>> from dffml import traverse_set
+    >>>
+    >>> d = {"one": {"two": 3}}
+    >>> traverse_set(d,"one.two", value = "Three")
+    >>> d["one"]["two"]
+    'Three'
+    """
+    if len(args) == 1:
+        args = split_dot_seperated(args[0])
+    if len(args) == 1:
+        target[args[0]] = value
+        return
+
+    current = target
+    for level in args[:-1]:
+        if level not in current:
+            current[level] = {}
+        current = current[level]
+
+    current[args[-1]] = value
+    return
 
 
 def ignore_args(func):
@@ -164,7 +231,7 @@ def export_value(obj, key, value):
         export_value(obj[key], "config", value.config)
     elif inspect.isclass(value):
         obj[key] = value.__qualname__
-    elif isinstance(value, pathlib.Path):
+    elif isinstance(value, (pathlib.Path, uuid.UUID)):
         obj[key] = str(value)
     elif hasattr(value, "export"):
         obj[key] = value.export()
@@ -301,10 +368,16 @@ def parser_helper(value):
     True
     >>> parser_helper("[1, 2, 3]")
     [1, 2, 3]
+    >>> parser_helper("1,2,3")
+    (1, 2, 3)
     >>> parser_helper("hello")
     'hello'
     >>> parser_helper("'on'")
     'on'
+    >>> parser_helper("on,off,feed,face,42")
+    [True, False, 'feed', 'face', 42]
+    >>> parser_helper("list,")
+    ['list']
     """
     if not isinstance(value, str):
         return value
@@ -317,4 +390,6 @@ def parser_helper(value):
     try:
         return ast.literal_eval(value)
     except:
+        if "," in value:
+            return list(map(parser_helper, filter(bool, value.split(","))))
         return value

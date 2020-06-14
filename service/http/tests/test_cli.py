@@ -10,7 +10,7 @@ import aiohttp
 
 from dffml.model.slr import SLRModel
 from dffml.source.json import JSONSource
-from dffml import Record, Features, DefFeature, save, train, accuracy
+from dffml import Record, Features, Feature, save, train, accuracy
 from dffml.util.asynctestcase import AsyncTestCase
 
 from dffml_service_http.cli import HTTPService
@@ -66,23 +66,6 @@ class TestCreateTLS(AsyncTestCase):
 
 
 class TestServer(AsyncTestCase):
-    @classmethod
-    def setUpClass(cls):
-        super().setUpClass()
-        cls._exit_stack = contextlib.ExitStack()
-        cls.exit_stack = cls._exit_stack.__enter__()
-        cls.exit_stack.enter_context(
-            patch(
-                "dffml.df.base.OperationImplementation.load",
-                new=TestRoutesMultiComm.patch_operation_implementation_load,
-            )
-        )
-
-    @classmethod
-    def tearDownClass(cls):
-        super().tearDownClass()
-        cls._exit_stack.__exit__(None, None, None)
-
     def url(self, cli):
         return f"http://{cli.addr}:{cli.port}"
 
@@ -229,8 +212,8 @@ class TestServer(AsyncTestCase):
         with tempfile.TemporaryDirectory() as tempdir:
             # Model the HTTP API will pre-load
             model = SLRModel(
-                features=Features(DefFeature("f1", float, 1)),
-                predict=DefFeature("ans", int, 1),
+                features=Features(Feature("f1", float, 1)),
+                predict=Feature("ans", int, 1),
                 directory=tempdir,
             )
 

@@ -6,9 +6,14 @@ if [ -d "$HOME/.local/bin" ]; then
 fi
 
 SRC_ROOT=${SRC_ROOT:-"${PWD}"}
-PYTHON=${PYTHON:-"python3.7"}
+PYTHON=${PYTHON:-"python3"}
+if [ "x${VIRTUAL_ENV}" != "x" ]; then
+  PYTHON="python"
+fi
 
 TEMP_DIRS=()
+
+python_version="py$(${PYTHON} -c 'import sys; print(f"{sys.version_info.major}{sys.version_info.minor}")')"
 
 function run_plugin_examples() {
   if [ ! -d "${SRC_ROOT}/${PLUGIN}/examples" ]; then
@@ -23,13 +28,14 @@ function run_plugin_examples() {
 }
 
 function run_plugin() {
-  "${PYTHON}" -m pip install -U pip twine
+  export PLUGIN="${1}"
 
-  # Install main package
-  "${PYTHON}" -m pip install -U -e "${SRC_ROOT}[dev]"
+  if [ "x${PLUGIN}" = "xexamples/shouldi" ]; then
+    "${PYTHON}" -m pip install -U -e "${SRC_ROOT}/feature/git"
+  fi
 
-  if [ "x${PLUGIN}" = "xmodel/tensorflow_hub" ]; then
-    "${PYTHON}" -m pip install -U -e "${SRC_ROOT}/model/tensorflow"
+  if [[ "${python_version}" == "py38" ]] && [[ "x${PLUGIN}" == "xmodel/daal4py" ]]; then
+    return
   fi
 
   cd "${SRC_ROOT}/${PLUGIN}"
@@ -80,7 +86,8 @@ function run_plugin() {
 
     # Fail if any tests were skipped or errored
     skipped=$(grep -E '(skipped=.*)' "${check_skips}" | wc -l)
-    if [ "$skipped" -ne 0 ]; then
+    # See issue https://github.com/intel/dffml/issues/706
+    if [ "$skipped" -ne 1 ]; then
       echo "Tests were skipped" >&2
       exit 1
     fi
@@ -240,16 +247,19 @@ function cleanup_temp_dirs() {
 # Clean up temporary directories on exit
 trap cleanup_temp_dirs EXIT
 
-if [ "x${PLUGIN}" != "x" ]; then
-  run_plugin
-elif [ "x${CHANGELOG}" != "x" ]; then
+if [ "x${1}" == "xchangelog" ]; then
   run_changelog
-elif [ "x${WHITESPACE}" != "x" ]; then
+elif [ "x${1}" == "xwhitespace" ]; then
   run_whitespace
-elif [ "x${STYLE}" != "x" ]; then
+elif [ "x${1}" == "xstyle" ]; then
   run_style
-elif [ "x${DOCS}" != "x" ]; then
+elif [ "x${1}" == "xdocs" ]; then
   run_docs
-elif [ "x${LINES}" != "x" ]; then
+elif [ "x${1}" == "xlines" ]; then
   run_lines
+elif [ -d "${1}" ]; then
+  run_plugin "${1}"
+else
+  echo "Not sure what to do" 2>&1
+  exit 1
 fi

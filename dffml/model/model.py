@@ -122,7 +122,8 @@ class SimpleModel(Model):
     def __init__(self, config: "BaseConfig") -> None:
         super().__init__(config)
         self.storage = {}
-        self.features = self.applicable_features(config.features)
+        if hasattr(self.config, "features"):
+            self.features = self.applicable_features(self.config.features)
         self._in_context = 0
 
     def __call__(self):
@@ -209,7 +210,7 @@ class SimpleModel(Model):
         # Check data type and length for each feature
         for feature in features:
             if self.check_applicable_feature(feature):
-                usable.append(feature.NAME)
+                usable.append(feature.name)
         # Return a sorted list of feature names for consistency. In case users
         # provide the same list of features to applicable_features in a
         # different order.
@@ -217,9 +218,9 @@ class SimpleModel(Model):
 
     def check_applicable_feature(self, feature):
         # Check the data datatype is in the list of supported data types
-        self.check_feature_dtype(feature.dtype())
+        self.check_feature_dtype(feature.dtype)
         # Check that length (dimensions) of feature is supported
-        self.check_feature_length(feature.length())
+        self.check_feature_length(feature.length)
         return True
 
     def check_feature_dtype(self, dtype):

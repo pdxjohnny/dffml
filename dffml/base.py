@@ -14,17 +14,7 @@ import dataclasses
 from argparse import ArgumentParser
 from typing import Dict, Any, Type, Optional
 
-try:
-    from typing import get_origin, get_args
-except ImportError:
-    # Added in Python 3.8
-    def get_origin(t):
-        return getattr(t, "__origin__", None)
-
-    def get_args(t):
-        return getattr(t, "__args__", None)
-
-
+from .util.data import get_args, get_origin
 from .util.cli.arg import Arg
 from .util.data import (
     traverse_config_set,
@@ -120,7 +110,11 @@ class BaseConfig(object):
 
 
 def mkarg(field):
-    arg = Arg(type=field.type)
+    if field.type != bool:
+        arg = Arg(type=field.type)
+    else:
+        arg = Arg()
+    arg.annotation = field.type
     # HACK For detecting dataclasses._MISSING_TYPE
     if "dataclasses._MISSING_TYPE" not in repr(field.default):
         arg["default"] = field.default
@@ -137,14 +131,22 @@ def mkarg(field):
                 )
             arg["action"] = list_action(field.type)
             arg["type"] = field.type.SINGLETON
+        if hasattr(arg["type"], "load_labeled") and field.metadata.get(
+            "labeled", False
+        ):
+            arg["type"] = arg["type"].load_labeled
         if hasattr(arg["type"], "load"):
             # TODO (python3.8) Use Protocol
             arg["type"] = arg["type"].load
-    elif get_origin(field.type) is list:
+    elif get_origin(field.type) in (list, tuple):
         arg["type"] = get_args(field.type)[0]
         arg["nargs"] = "+"
     if "description" in field.metadata:
         arg["help"] = field.metadata["description"]
+    if field.metadata.get("action"):
+        arg["action"] = field.metadata["action"]
+    if field.metadata.get("required"):
+        arg["required"] = field.metadata["required"]
     return arg
 
 
@@ -164,8 +166,13 @@ def convert_value(arg, value):
         # TODO This is a oversimplification of argparse's nargs
         if "nargs" in arg:
             value = list(map(type_cls, value))
+        elif getattr(type_cls, "CONFIGLOADABLE", False):
+            pass
         else:
             value = type_cls(value)
+        # list -> tuple
+        if arg.annotation is not None and get_origin(arg.annotation) is tuple:
+            value = get_origin(arg.annotation)(value)
     if "action" in arg:
         if isinstance(arg["action"], str):
             # HACK This accesses _pop_action_class from ArgumentParser
@@ -215,7 +222,15 @@ def _fromdict(cls, **kwargs):
     return cls(**kwargs)
 
 
-def field(description: str, *args, metadata: Optional[dict] = None, **kwargs):
+def field(
+    description: str,
+    *args,
+    action=None,
+    required: bool = False,
+    labeled: bool = False,
+    metadata: Optional[dict] = None,
+    **kwargs,
+):
     """
     Creates an instance of :py:func:`dataclasses.field`. The first argument,
     ``description`` is the description of the field, and will be set as the
@@ -224,6 +239,9 @@ def field(description: str, *args, metadata: Optional[dict] = None, **kwargs):
     if not metadata:
         metadata = {}
     metadata["description"] = description
+    metadata["required"] = required
+    metadata["labeled"] = labeled
+    metadata["action"] = action
     return dataclasses.field(*args, metadata=metadata, **kwargs)
 
 
@@ -324,11 +342,14 @@ class BaseConfigurableMetaClass(type, abc.ABC):
                 else:
                     use_CONFIG = True
                     for field in dataclasses.fields(self.CONFIG):
-                        if field.default is dataclasses.MISSING:
+                        if (
+                            field.default is dataclasses.MISSING
+                            and field.default_factory is dataclasses.MISSING
+                        ):
                             use_CONFIG = False
                             break
                     if use_CONFIG:
-                        config = self.CONFIG(**kwargs)
+                        config = self.CONFIG()
                     else:
                         raise TypeError(
                             "__init__() missing 1 required positional argument: 'config'"
@@ -362,6 +383,11 @@ class BaseConfigurable(metaclass=BaseConfigurableMetaClass):
         self.logger.debug(
             str_config if len(str_config) < 512 else (str_config[:512] + "...")
         )
+
+    def __eq__(self, other: "BaseConfigurable") -> bool:
+        if inspect.isclass(other) or not isinstance(other, self.__class__):
+            return
+        return self.config == other.config
 
     @classmethod
     def add_orig_label(cls, *above):

@@ -1,4 +1,5 @@
 import io
+import abc
 import copy
 import asyncio
 import secrets
@@ -61,6 +62,7 @@ from .base import (
     BaseOrchestrator,
 )
 
+from ..base import config, field
 from ..util.entrypoint import entrypoint
 from ..util.cli.arg import Arg
 from ..util.data import ignore_args
@@ -69,7 +71,8 @@ from ..util.asynchelper import aenter_stack, concurrently
 from .log import LOGGER
 
 
-class MemoryDataFlowObjectContextConfig(NamedTuple):
+@config
+class MemoryDataFlowObjectContextConfig:
     # Unique ID of the context, in other implementations this might be a JWT or
     # something
     uid: str
@@ -80,6 +83,11 @@ class BaseMemoryDataFlowObject(BaseDataFlowObject):
         return self.CONTEXT(
             MemoryDataFlowObjectContextConfig(uid=secrets.token_hex()), self
         )
+
+
+@config
+class MemoryKeyValueStoreConfig:
+    pass
 
 
 class MemoryKeyValueStoreContext(BaseKeyValueStoreContext):
@@ -120,9 +128,11 @@ class MemoryKeyValueStore(BaseKeyValueStore, BaseMemoryDataFlowObject):
     """
 
     CONTEXT = MemoryKeyValueStoreContext
+    CONFIG = MemoryKeyValueStoreConfig
 
 
-class MemoryInputSetConfig(NamedTuple):
+@config
+class MemoryInputSetConfig:
     ctx: BaseInputSetContext
     inputs: List[Input]
 
@@ -163,7 +173,8 @@ class MemoryInputSet(BaseInputSet):
         return unvalidated_input_set
 
 
-class MemoryParameterSetConfig(NamedTuple):
+@config
+class MemoryParameterSetConfig:
     ctx: BaseInputSetContext
     parameters: List[Parameter]
 
@@ -239,6 +250,11 @@ class NotificationSet(object):
 
     def __call__(self) -> NotificationSetContext:
         return NotificationSetContext(self)
+
+
+@config
+class MemoryInputNetworkConfig:
+    pass
 
 
 class MemoryInputNetworkContextEntry(NamedTuple):
@@ -345,7 +361,7 @@ class MemoryInputNetworkContext(BaseInputNetworkContext):
         >>> from dffml import *
         >>>
         >>> async def main():
-        ...     async with MemoryOrchestrator.withconfig({}) as orchestrator:
+        ...     async with MemoryOrchestrator() as orchestrator:
         ...         async with orchestrator(DataFlow.auto()) as octx:
         ...             await octx.ictx.sadd("Hi")
         >>>
@@ -365,7 +381,7 @@ class MemoryInputNetworkContext(BaseInputNetworkContext):
         >>> from dffml import *
         >>>
         >>> async def main():
-        ...     async with MemoryOrchestrator.withconfig({}) as orchestrator:
+        ...     async with MemoryOrchestrator() as orchestrator:
         ...         async with orchestrator(DataFlow.auto()) as octx:
         ...             await octx.ictx.sadd(StringInputSetContext("Hi"))
         >>>
@@ -465,6 +481,13 @@ class MemoryInputNetworkContext(BaseInputNetworkContext):
                         origins.append(condition_source)
                     # Ensure all conditions from all origins are True
                     for origin in origins:
+                        # See comment in input_flow.inputs section
+                        alternate_definitions = []
+                        if isinstance(origin, tuple) and isinstance(
+                            origin[1], (list, tuple)
+                        ):
+                            alternate_definitions = origin[1]
+                            origin = origin[0]
                         # Bail if the condition doesn't exist
                         if not origin in by_origin:
                             return
@@ -475,7 +498,13 @@ class MemoryInputNetworkContext(BaseInputNetworkContext):
                             # (and inputs for input_flow.inputs.items()) where
                             # the definition doesn't match, but it's within the
                             # correct origin.
-                            if isinstance(condition_source, str):
+                            if alternate_definitions:
+                                if (
+                                    item.definition.name
+                                    not in alternate_definitions
+                                ):
+                                    continue
+                            elif isinstance(condition_source, str):
                                 if (
                                     item.definition.name
                                     != operation.conditions[i].name
@@ -503,6 +532,19 @@ class MemoryInputNetworkContext(BaseInputNetworkContext):
                         else:
                             origins.append(input_source)
                         for origin in origins:
+                            # Check if the origin is a tuple where the first
+                            # value is the origin (such as "seed") and the
+                            # second value is an array of allowed alternate
+                            # Definition's (their names) within that origin.
+                            # These definitions will be used instead of the
+                            # default one the input specified for the
+                            # operation).
+                            alternate_definitions = []
+                            if isinstance(origin, tuple) and isinstance(
+                                origin[1], (list, tuple)
+                            ):
+                                alternate_definitions = origin[1]
+                                origin = origin[0]
                             # Don't try to grab inputs from an origin that
                             # doesn't have any to give us
                             if not origin in by_origin:
@@ -515,7 +557,13 @@ class MemoryInputNetworkContext(BaseInputNetworkContext):
                                 # types which will not equal each other. We
                                 # maybe want to consider switching to comparing
                                 # exported Defintions
-                                if isinstance(input_source, str):
+                                if alternate_definitions:
+                                    if (
+                                        item.definition.name
+                                        not in alternate_definitions
+                                    ):
+                                        continue
+                                elif isinstance(origin, str):
                                     if (
                                         item.definition.name
                                         != operation.inputs[input_name].name
@@ -567,11 +615,15 @@ class MemoryInputNetwork(BaseInputNetwork, BaseMemoryDataFlowObject):
     """
 
     CONTEXT = MemoryInputNetworkContext
+    CONFIG = MemoryInputNetworkConfig
 
 
-class MemoryOperationNetworkConfig(NamedTuple):
+@config
+class MemoryOperationNetworkConfig:
     # Starting set of operations
-    operations: List[Operation]
+    operations: List[Operation] = field(
+        "Starting set of operations", default_factory=lambda: []
+    )
 
 
 class MemoryOperationNetworkContext(BaseOperationNetworkContext):
@@ -620,19 +672,14 @@ class MemoryOperationNetwork(BaseOperationNetwork, BaseMemoryDataFlowObject):
     """
 
     CONTEXT = MemoryOperationNetworkContext
+    CONFIG = MemoryOperationNetworkConfig
 
-    @classmethod
-    def args(cls, args, *above) -> Dict[str, Arg]:
-        cls.config_set(
-            args, above, "ops", Arg(type=Operation.load, nargs="+", default=[])
-        )
-        return args
 
-    @classmethod
-    def config(cls, config, *above) -> MemoryOperationNetworkConfig:
-        return MemoryOperationNetworkConfig(
-            operations=cls.config_get(config, above, "ops")
-        )
+@config
+class MemoryRedundancyCheckerConfig:
+    kvstore: BaseKeyValueStore = field(
+        "Key value store to use", default_factory=lambda: MemoryKeyValueStore()
+    )
 
 
 class MemoryRedundancyCheckerContext(BaseRedundancyCheckerContext):
@@ -646,7 +693,7 @@ class MemoryRedundancyCheckerContext(BaseRedundancyCheckerContext):
         self.__stack = AsyncExitStack()
         await self.__stack.__aenter__()
         self.kvctx = await self.__stack.enter_async_context(
-            self.parent.key_value_store()
+            self.parent.kvstore()
         )
         return self
 
@@ -719,6 +766,7 @@ class MemoryRedundancyChecker(BaseRedundancyChecker, BaseMemoryDataFlowObject):
     """
 
     CONTEXT = MemoryRedundancyCheckerContext
+    CONFIG = MemoryRedundancyCheckerConfig
 
     def __init__(self, config):
         super().__init__(config)
@@ -731,8 +779,8 @@ class MemoryRedundancyChecker(BaseRedundancyChecker, BaseMemoryDataFlowObject):
         self.__exit_stack = ExitStack()
         self.__exit_stack.__enter__()
         await self.__stack.__aenter__()
-        self.key_value_store = await self.__stack.enter_async_context(
-            self.config.key_value_store
+        self.kvstore = await self.__stack.enter_async_context(
+            self.config.kvstore
         )
         self.loop = asyncio.get_event_loop()
         self.pool = self.__exit_stack.enter_context(
@@ -744,26 +792,10 @@ class MemoryRedundancyChecker(BaseRedundancyChecker, BaseMemoryDataFlowObject):
         self.__exit_stack.__exit__(exc_type, exc_value, traceback)
         await self.__stack.__aexit__(exc_type, exc_value, traceback)
 
-    @classmethod
-    def args(cls, args, *above) -> Dict[str, Arg]:
-        # Enable the user to specify a key value store
-        cls.config_set(
-            args,
-            above,
-            "kvstore",
-            Arg(type=BaseKeyValueStore.load, default=MemoryKeyValueStore),
-        )
-        # Load all the key value stores and add the arguments they might require
-        for loaded in BaseKeyValueStore.load():
-            loaded.args(args, *cls.add_orig_label(*above))
-        return args
 
-    @classmethod
-    def config(cls, config, *above):
-        kvstore = cls.config_get(config, above, "kvstore")
-        return BaseRedundancyCheckerConfig(
-            key_value_store=kvstore.withconfig(config, *cls.add_label(*above))
-        )
+@config
+class MemoryLockNetworkConfig:
+    pass
 
 
 class MemoryLockNetworkContext(BaseLockNetworkContext):
@@ -811,10 +843,15 @@ class MemoryLockNetworkContext(BaseLockNetworkContext):
 class MemoryLockNetwork(BaseLockNetwork, BaseMemoryDataFlowObject):
 
     CONTEXT = MemoryLockNetworkContext
+    CONFIG = MemoryLockNetworkConfig
 
 
-class MemoryOperationImplementationNetworkConfig(NamedTuple):
-    operations: Dict[str, OperationImplementation]
+@config
+class MemoryOperationImplementationNetworkConfig:
+    operations: Dict[str, OperationImplementation] = field(
+        "Operation implementations to load on initialization",
+        default_factory=lambda: {},
+    )
 
 
 class MemoryOperationImplementationNetworkContext(
@@ -1073,49 +1110,33 @@ class MemoryOperationImplementationNetwork(
 ):
 
     CONTEXT = MemoryOperationImplementationNetworkContext
-
-    @classmethod
-    def args(cls, args, *above) -> Dict[str, Arg]:
-        # Enable the user to specify operation implementations to be loaded via
-        # the entrypoint system (by ParseOperationImplementationAction)
-        # TODO opimps should be operations
-        cls.config_set(
-            args,
-            above,
-            "opimps",
-            Arg(type=OperationImplementation.load, nargs="+", default=[]),
-        )
-        # Add orig label to above since we are done loading
-        above = cls.add_orig_label(*above)
-        # Load all the opimps and add the arguments they might require
-        # TODO(p4) Should we do this? If someone messes up their entrypoints in
-        # one package it will mess up loading anytime this is called.
-        """
-        for loaded in OperationImplementation.load():
-            loaded.args(args, *above)
-        """
-        return args
-
-    @classmethod
-    def config(cls, config, *above) -> BaseConfig:
-        return MemoryOperationImplementationNetworkConfig(
-            operations={
-                imp.op.name: imp
-                for imp in [
-                    Imp.withconfig(config, "opimp")
-                    for Imp in cls.config_get(config, above, "opimps")
-                ]
-            }
-        )
+    CONFIG = MemoryOperationImplementationNetworkConfig
 
 
-class MemoryOrchestratorConfig(BaseOrchestratorConfig):
-    """
-    Same as base orchestrator config
-    """
+@config
+class MemoryOrchestratorConfig:
+    input_network: BaseInputNetwork = field(
+        "Input network to use", default_factory=lambda: MemoryInputNetwork()
+    )
+    operation_network: BaseOperationNetwork = field(
+        "Operation network to use",
+        default_factory=lambda: MemoryOperationNetwork(),
+    )
+    lock_network: BaseLockNetwork = field(
+        "Lock network to use", default_factory=lambda: MemoryLockNetwork()
+    )
+    opimp_network: BaseOperationImplementationNetwork = field(
+        "Operation implementation network to use",
+        default_factory=lambda: MemoryOperationImplementationNetwork(),
+    )
+    rchecker: BaseRedundancyChecker = field(
+        "Redundancy checker to use",
+        default_factory=lambda: MemoryRedundancyChecker(),
+    )
 
 
-class MemoryOrchestratorContextConfig(NamedTuple):
+@config
+class MemoryOrchestratorContextConfig:
     uid: str
     dataflow: DataFlow
     # Context objects to reuse. If not present in this dict a new context object
@@ -1608,6 +1629,7 @@ class MemoryOrchestratorContext(BaseOrchestratorContext):
 class MemoryOrchestrator(BaseOrchestrator, BaseMemoryDataFlowObject):
 
     CONTEXT = MemoryOrchestratorContext
+    CONFIG = MemoryOrchestratorConfig
 
     def __init__(self, config: "BaseConfig") -> None:
         super().__init__(config)
@@ -1638,114 +1660,4 @@ class MemoryOrchestrator(BaseOrchestrator, BaseMemoryDataFlowObject):
                 uid=secrets.token_hex(), dataflow=dataflow, reuse=kwargs
             ),
             self,
-        )
-
-    @classmethod
-    def args(cls, args, *above) -> Dict[str, Arg]:
-        # Extending above is done right before loading args of subclasses
-        cls.config_set(
-            args,
-            above,
-            "input",
-            "network",
-            Arg(type=BaseInputNetwork.load, default=MemoryInputNetwork),
-        )
-        cls.config_set(
-            args,
-            above,
-            "operation",
-            "network",
-            Arg(
-                type=BaseOperationNetwork.load, default=MemoryOperationNetwork
-            ),
-        )
-        cls.config_set(
-            args,
-            above,
-            "opimp",
-            "network",
-            Arg(
-                type=BaseOperationImplementationNetwork.load,
-                default=MemoryOperationImplementationNetwork,
-            ),
-        )
-        cls.config_set(
-            args,
-            above,
-            "lock",
-            "network",
-            Arg(type=BaseLockNetwork.load, default=MemoryLockNetwork),
-        )
-        cls.config_set(
-            args,
-            above,
-            "rchecker",
-            Arg(
-                type=BaseRedundancyChecker.load,
-                default=MemoryRedundancyChecker,
-            ),
-        )
-        above = cls.add_orig_label(*above)
-        for sub in [
-            BaseInputNetwork,
-            BaseOperationNetwork,
-            BaseOperationImplementationNetwork,
-            BaseLockNetwork,
-            BaseRedundancyChecker,
-        ]:
-            for loaded in sub.load():
-                loaded.args(args, *above)
-        return args
-
-    @classmethod
-    def config(cls, config, *above):
-        input_network = cls.config_get(config, above, "input", "network")
-        operation_network = cls.config_get(
-            config, above, "operation", "network"
-        )
-        opimp_network = cls.config_get(config, above, "opimp", "network")
-        lock_network = cls.config_get(config, above, "lock", "network")
-        rchecker = cls.config_get(config, above, "rchecker")
-        above = cls.add_label(*above)
-        return MemoryOrchestratorConfig(
-            input_network=input_network.withconfig(config, *above),
-            operation_network=operation_network.withconfig(config, *above),
-            lock_network=lock_network.withconfig(config, *above),
-            opimp_network=opimp_network.withconfig(config, *above),
-            rchecker=rchecker.withconfig(config, *above),
-        )
-
-    @classmethod
-    def basic_config(
-        cls, *args: OperationImplementation, config: Dict[str, Any] = None
-    ):
-        """
-        Creates a Memory Orchestrator which will be backed by other objects
-        within dffml.df.memory.
-        """
-        if config is None:
-            config = {}
-        return MemoryOrchestrator(
-            MemoryOrchestratorConfig(
-                input_network=MemoryInputNetwork(BaseConfig()),
-                operation_network=MemoryOperationNetwork(
-                    MemoryOperationNetworkConfig(
-                        operations=[Imp.op for Imp in args]
-                    )
-                ),
-                lock_network=MemoryLockNetwork(BaseConfig()),
-                rchecker=MemoryRedundancyChecker(
-                    BaseRedundancyCheckerConfig(
-                        key_value_store=MemoryKeyValueStore(BaseConfig())
-                    )
-                ),
-                opimp_network=MemoryOperationImplementationNetwork(
-                    MemoryOperationImplementationNetworkConfig(
-                        operations={
-                            imp.op.name: imp
-                            for imp in [Imp.withconfig(config) for Imp in args]
-                        }
-                    )
-                ),
-            )
         )

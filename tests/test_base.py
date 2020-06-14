@@ -1,5 +1,5 @@
 import unittest
-from typing import List
+from typing import List, Tuple
 import pathlib
 
 from dffml.base import (
@@ -9,7 +9,7 @@ from dffml.base import (
     list_action,
     BaseDataFlowFacilitatorObjectContext,
 )
-from dffml.feature.feature import DefFeature, Feature, Features
+from dffml.feature.feature import Feature, Features
 from dffml.source.source import BaseSource
 from dffml.source.csv import CSVSource
 from dffml.source.json import JSONSource
@@ -23,6 +23,7 @@ class FakeTestingConfig:
     num: float
     files: List[str]
     features: Features
+    nums: Tuple[int]
     name: str = field("Name of FakeTesting")
     label: str = "unlabeled"
     readonly: bool = False
@@ -62,10 +63,14 @@ class TestAutoArgsConfig(unittest.TestCase):
                                 },
                                 "features": {
                                     "plugin": Arg(
-                                        type=Feature.load,
+                                        type=Feature,
                                         nargs="+",
                                         action=list_action(Features),
                                     ),
+                                    "config": {},
+                                },
+                                "nums": {
+                                    "plugin": Arg(type=int, nargs="+"),
                                     "config": {},
                                 },
                                 "name": {
@@ -76,9 +81,7 @@ class TestAutoArgsConfig(unittest.TestCase):
                                 },
                                 "readonly": {
                                     "plugin": Arg(
-                                        type=bool,
-                                        action="store_true",
-                                        default=False,
+                                        action="store_true", default=False,
                                     ),
                                     "config": {},
                                 },
@@ -118,6 +121,8 @@ class TestAutoArgsConfig(unittest.TestCase):
                 "--test-features",
                 "Year:int:1",
                 "Commits:int:10",
+                "--test-fake-nums",
+                "100",
             )
         )
         self.assertEqual(config.num, -4.2)
@@ -131,10 +136,9 @@ class TestAutoArgsConfig(unittest.TestCase):
         )
         self.assertEqual(
             config.features,
-            Features(
-                DefFeature("Year", int, 1), DefFeature("Commits", int, 10)
-            ),
+            Features(Feature("Year", int, 1), Feature("Commits", int, 10)),
         )
+        self.assertEqual(config.nums, (100,))
 
     def test_config_set(self):
         config = FakeTesting.config(
@@ -157,6 +161,9 @@ class TestAutoArgsConfig(unittest.TestCase):
                 "--test-features",
                 "Year:int:1",
                 "Commits:int:10",
+                "--test-fake-nums",
+                "100",
+                "42",
             )
         )
         self.assertEqual(config.num, -4.2)
@@ -170,10 +177,9 @@ class TestAutoArgsConfig(unittest.TestCase):
         )
         self.assertEqual(
             config.features,
-            Features(
-                DefFeature("Year", int, 1), DefFeature("Commits", int, 10)
-            ),
+            Features(Feature("Year", int, 1), Feature("Commits", int, 10)),
         )
+        self.assertEqual(config.nums, (100, 42))
 
 
 class FakeTestingContext(BaseDataFlowFacilitatorObjectContext):
@@ -187,7 +193,7 @@ class FakeTestingConfig2:
     name: str = field("Name of FakeTesting2")
     num: float
     features: Features = Features(
-        DefFeature("default", int, 1), DefFeature("features", int, 10)
+        Feature("default", int, 1), Feature("features", int, 10)
     )
     label: str = "unlabeled"
 

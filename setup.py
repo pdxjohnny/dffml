@@ -1,8 +1,10 @@
 # SPDX-License-Identifier: MIT
 # Copyright (c) 2019 Intel Corporation
+import os
 import ast
 import pathlib
 from io import open
+import importlib.util
 from setuptools import find_packages, setup
 
 with open(pathlib.Path("dffml", "version.py"), "r") as f:
@@ -10,6 +12,31 @@ with open(pathlib.Path("dffml", "version.py"), "r") as f:
         if line.startswith("VERSION"):
             VERSION = ast.literal_eval(line.strip().split("=")[-1].strip())
             break
+
+# Load file by path
+spec = importlib.util.spec_from_file_location(
+    "plugins", os.path.join(os.path.dirname(__file__), "dffml", "plugins.py")
+)
+plugins = importlib.util.module_from_spec(spec)
+spec.loader.exec_module(plugins)
+
+# All packages under configloader/ are really named dffml-config-{name}
+ALTERNATIVES = {"configloader": "config"}
+ALTERNATIVES_FEATURE_TO_OP = ALTERNATIVES.copy()
+ALTERNATIVES_FEATURE_TO_OP.update({"feature": "operation"})
+EXTRAS_REQUIRES = {
+    (
+        ALTERNATIVES_FEATURE_TO_OP.get(plugin_type, plugin_type)
+        + ("s" if not plugin_type.endswith("s") else "")
+    ): [
+        "dffml-%s-%s"
+        % (ALTERNATIVES.get(plugin_type, plugin_type), name.replace("_", "-"),)
+        for sub_plugin_type, name in plugins.CORE_PLUGINS
+        if sub_plugin_type == plugin_type
+    ]
+    for plugin_type, _ in plugins.CORE_PLUGINS
+    if plugin_type != "examples"
+}
 
 with open("README.md", "r", encoding="utf-8") as f:
     README = f.read()
@@ -42,19 +69,13 @@ setup(
     include_package_data=True,
     zip_safe=False,
     extras_require={
-        "models": [
-            "dffml-model-tensorflow",
-            "dffml-model-scratch",
-            "dffml-model-scikit",
-        ],
-        "sources": ["dffml-source-mysql"],
         "all": [
-            "dffml-model-tensorflow",
-            "dffml-model-scratch",
-            "dffml-model-scikit",
-            "dffml-source-mysql",
-            "dffml-config-yaml",
-            "dffml-service-http",
+            "dffml-%s-%s"
+            % (
+                ALTERNATIVES.get(plugin_type, plugin_type),
+                name.replace("_", "-"),
+            )
+            for plugin_type, name in plugins.CORE_PLUGINS
         ],
         "dev": [
             "coverage",
@@ -66,6 +87,7 @@ setup(
             "jsbeautifier",
             "twine",
         ],
+        **EXTRAS_REQUIRES,
     },
     tests_require=["httptest>=0.0.15"],
     entry_points={
@@ -78,6 +100,8 @@ setup(
             "idx3 = dffml.source.idx3:IDX3Source",
             "db = dffml.source.db:DbSource",
             "ini = dffml.source.ini:INISource",
+            "df = dffml.source.df:DataFlowSource",
+            "op = dffml.source.op:OpSource",
         ],
         "dffml.port": ["json = dffml.port.json:JSON"],
         "dffml.service.cli": ["dev = dffml.service.dev:Develop"],
@@ -91,6 +115,7 @@ setup(
             "get_single = dffml.operation.output:GetSingle",
             "get_multi = dffml.operation.output:GetMulti",
             "associate = dffml.operation.output:Associate",
+            "associate_definition = dffml.operation.output:AssociateDefinition",
             # Mapping
             "dffml.mapping.extract = dffml.operation.mapping:mapping_extract_value",
             "dffml.mapping.create = dffml.operation.mapping:create_mapping",
@@ -106,6 +131,8 @@ setup(
             "print_output = dffml.operation.io:print_output",
             # preprocess
             "literal_eval = dffml.operation.preprocess:literal_eval",
+            # math
+            "multiply = dffml.operation.math:multiply",
             # Database
             "db_query_create_table = dffml.operation.db:db_query_create_table",
             "db_query_insert = dffml.operation.db:db_query_insert",
@@ -131,5 +158,7 @@ setup(
         "dffml.db": ["sqlite = dffml.db.sqlite:SqliteDatabase"],
         # Models
         "dffml.model": ["slr = dffml.model.slr:SLRModel"],
+        # Secrets
+        "dffml.secret": ["ini = dffml.secret.ini:INISecret"],
     },
 )

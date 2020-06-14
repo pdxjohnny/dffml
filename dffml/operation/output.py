@@ -102,15 +102,15 @@ class GroupBy(OperationImplementationContext):
             return want
 
 
-get_n_spec = Definition(name="get_n_spec", primitive="array")
+get_multi_spec = Definition(name="get_multi_spec", primitive="array")
 
-get_n_output = Definition(name="get_n_output", primitive="map")
+get_multi_output = Definition(name="get_multi_output", primitive="map")
 
 
 @op(
     name="get_multi",
-    inputs={"spec": get_n_spec},
-    outputs={"output": get_n_output},
+    inputs={"spec": get_multi_spec},
+    outputs={"output": get_multi_output},
     stage=Stage.OUTPUT,
 )
 class GetMulti(OperationImplementationContext):
@@ -293,6 +293,84 @@ class Associate(OperationImplementationContext):
                         want[parent.value] = item.value
                         break
             return {value.name: want}
+
+
+@op(
+    name="associate_definition",
+    inputs={"spec": associate_spec},
+    outputs={"output": associate_output},
+    stage=Stage.OUTPUT,
+)
+class AssociateDefinition(OperationImplementationContext):
+    """
+    Examples
+    ++++++++
+
+    >>> import asyncio
+    >>> from dffml import *
+    >>>
+    >>> feed_def = Definition(name="feed", primitive="string")
+    >>> dead_def = Definition(name="dead", primitive="string")
+    >>> output = Definition(name="output", primitive="string")
+    >>>
+    >>> feed_input = Input(value="my favorite value", definition=feed_def)
+    >>> face_input = Input(
+    ...     value="face", definition=output, parents=[feed_input]
+    ... )
+    >>>
+    >>> dead_input = Input(
+    ...     value="my second favorite value", definition=dead_def
+    ... )
+    >>> beef_input = Input(
+    ...     value="beef", definition=output, parents=[dead_input]
+    ... )
+    >>>
+    >>> async def main():
+    ...     for value in ["feed", "dead"]:
+    ...         async for ctx, results in MemoryOrchestrator.run(
+    ...             DataFlow.auto(AssociateDefinition),
+    ...             [
+    ...                 feed_input,
+    ...                 face_input,
+    ...                 dead_input,
+    ...                 beef_input,
+    ...                 Input(
+    ...                     value={value: "output"},
+    ...                     definition=AssociateDefinition.op.inputs["spec"],
+    ...                 ),
+    ...             ],
+    ...         ):
+    ...             print(results)
+    >>>
+    >>> asyncio.run(main())
+    {'feed': 'face'}
+    {'dead': 'beef'}
+    """
+
+    async def run(self, inputs: Dict[str, Any]) -> Dict[str, Any]:
+        # Look up the definiton for each definition name given
+        try:
+            spec = {
+                await self.octx.ictx.definition(
+                    self.ctx, key
+                ): await self.octx.ictx.definition(self.ctx, value)
+                for key, value in inputs["spec"].items()
+            }
+        except DefinitionNotInContext:
+            return {key: {} for key in inputs["spec"]}
+        # Output dict
+        want = {}
+        # Acquire all definitions within the context
+        async with self.octx.ictx.definitions(self.ctx) as od:
+            # Make exported into key, value which it will be in output
+            for key, value in spec.items():
+                async for item in od.inputs(value):
+                    parents = item.get_parents()
+                    for parent in parents:
+                        if key.name == parent.definition.name:
+                            want[key.name] = item.value
+                            break
+        return want
 
 
 class RemapConfig(NamedTuple):
