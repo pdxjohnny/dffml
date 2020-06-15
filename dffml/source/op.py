@@ -43,6 +43,38 @@ class OpSourceConfig:
 
 @entrypoint("op")
 class OpSource(MemorySource):
+    """
+    Use an abitrary function as a datasource. Backed by memory.
+
+    Write a function, have it return whatever data you want to have as records
+    via a ``dict``. Each key of the ``dict`` should be the record key. The value
+    should be a ``dict`` where one key should be ``"features"`` which should
+    have the feature data for the record. If you want to load any predictions
+    then set ``"predictions"`` to a ``dict`` where each key is the name of the
+    feature that was predicted. The value should be a ``dict`` with a
+    ``"value"`` key that contains the predicted value, and a ``"confidence"``
+    key with it's value being the 0.0 to 1.0 confidence level in that
+    prediction.
+
+    Examples
+    --------
+
+    If we had the following json file and wanted to use it as a data source
+
+    .. literalinclude:: /../tests/source/op/data.json
+
+    We could write the following function
+
+    .. literalinclude:: /../tests/source/op/parser.py
+
+    Then we can use the op source in the same way we'd use any other source
+
+    .. literalinclude:: /../tests/source/op/list.sh
+
+    You should see the following output
+
+    .. literalinclude:: /../tests/source/op/correct.json
+    """
 
     CONTEXT = MemorySourceContext
     CONFIG = OpSourceConfig
