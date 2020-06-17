@@ -122,6 +122,7 @@ setup(
             "dffml.mapping.merge = dffml.operation.mapping:mapping_merge",
             "dffml.mapping.expand.all.keys = dffml.operation.mapping:mapping_expand_all_keys",
             "dffml.mapping.expand.all.values = dffml.operation.mapping:mapping_expand_all_values",
+            "dffml.mapping.group_mappings = dffml.operation.mapping:group_mappings",
             # Dataflow
             "dffml.dataflow.run = dffml.operation.dataflow:run_dataflow",
             # Model
