@@ -360,7 +360,11 @@ class Input(object):
         return repr(self)
 
     def export(self):
-        return dict(value=self.value, definition=self.definition.export())
+        return dict(
+            value=self.value,
+            definition=self.definition.export(),
+            origin=self.origin,
+        )
 
     @classmethod
     def _fromdict(cls, **kwargs):
@@ -629,19 +633,6 @@ class DataFlow:
             )
             for instance_name, operation in kwargs["operations"].items()
         }
-
-        # Load operations whose names are in entrypoint format
-        _implementations = {}
-        for _, __op in kwargs["operations"].items():
-            _name = __op.name
-            if _name.count(":") > 0:
-                _implementations[_name] = next(load_entrypoint(__op.name)).imp
-
-        if "implementations" in kwargs:
-            kwargs["implementations"].update(_implementations)
-        else:
-            kwargs["implementations"] = _implementations
-
         # Import seed inputs
         if "seed" in kwargs:
             kwargs["seed"] = [
