@@ -204,6 +204,7 @@ def create_definition(name, param_annotation, default=NO_DEFAULT):
                 param_annotation, param_annotation.__name__
             ),
             default=default,
+            annotation=param_annotation,
         )
     elif get_origin(param_annotation) in [
         Union,
@@ -420,6 +421,8 @@ def op(*args, imp_enter=None, ctx_enter=None, config_cls=None, **kwargs):
         class Implementation(
             context_stacker(OperationImplementation, imp_enter)
         ):
+            CONFIG = config_cls
+
             def __init__(self, config):
                 if config_cls is not None and isinstance(config, dict):
                     if getattr(config_cls, "_fromdict", None) is not None:

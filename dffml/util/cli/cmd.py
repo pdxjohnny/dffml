@@ -11,6 +11,7 @@ import argparse
 from typing import Dict, Any
 import dataclasses
 
+from ...df.base import OperationImplementation
 from ...record import Record
 from ...feature import Feature
 
@@ -88,7 +89,12 @@ class Parser(argparse.ArgumentParser):
             (name.lower().replace("_", ""), method)
             for name, method in inspect.getmembers(add_from)
         ]:
-            if inspect.isclass(method) and issubclass(method, CMD):
+            if (inspect.isclass(method) and issubclass(method, CMD)) or (
+                inspect.isfunction(method)
+                and issubclass(
+                    getattr(method, "imp", CMD), OperationImplementation
+                )
+            ):
                 if subparsers is None:  # pragma: no cover
                     subparsers = self.add_subparsers()  # pragma: no cover
                 parser = subparsers.add_parser(
@@ -102,9 +108,16 @@ class Parser(argparse.ArgumentParser):
                         argparse.ArgumentDefaultsHelpFormatter,
                     ),
                 )
-                parser.set_defaults(cmd=method)
                 parser.set_defaults(parser=parser)
-                parser.add_subs(method)  # type: ignore
+                if inspect.isfunction(method) and issubclass(
+                    getattr(method, "imp", CMD), OperationImplementation
+                ):
+                    imp_cmd = op_cli(method.imp)
+                    parser.set_defaults(cmd=imp_cmd)
+                    parser.add_subs(imp_cmd)  # type: ignore
+                else:
+                    parser.set_defaults(cmd=method)
+                    parser.add_subs(method)  # type: ignore
 
         # Add arguments to the Parser
         position_list = {}
@@ -161,6 +174,8 @@ class CMD(object):
         if extra_config is None:
             extra_config = {}
         self.extra_config = extra_config
+
+        self._config = self.CONFIG(**kwargs)
 
         for field in dataclasses.fields(self.CONFIG):
             arg = mkarg(field)
@@ -286,3 +301,29 @@ class CMD(object):
         it doesn't work with other things that's why.
         """
         return args
+
+
+class OpCMD(CMD):
+    def op_args(self):
+        """
+        Return a dict only has keys that are also keys of the op set within the
+        IMP class property (the OperationImplementation)
+        """
+
+    async def do_run(self):
+        async with self.IMP as imp:
+            async with imp() as ctx:
+                if inspect.isasyncgenfunction(ctx.run):
+                    return [
+                        res async for res in ctx.run(**self._config._asdict())
+                    ]
+                else:
+                    return await ctx.run(**self._config._asdict())
+
+
+def op_cli(imp):
+    return type(
+        imp.op.name.replace("_", " ").title().replace(" ", "") + "CMD",
+        (OpCMD,),
+        {"IMP": imp, "CONFIG": imp.op.config},
+    )

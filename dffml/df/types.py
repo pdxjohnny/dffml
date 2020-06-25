@@ -3,7 +3,7 @@ import copy
 import itertools
 import pkg_resources
 from enum import Enum
-from dataclasses import dataclass, field, asdict
+from dataclasses import dataclass, asdict, MISSING
 from typing import (
     NamedTuple,
     Union,
@@ -16,7 +16,7 @@ from typing import (
     Tuple,
 )
 
-from ..base import BaseConfig
+from ..base import BaseConfig, make_config, field
 from ..util.data import export_dict, type_lookup
 from ..util.entrypoint import load as load_entrypoint
 from ..util.entrypoint import Entrypoint, base_entry_point
@@ -78,6 +78,10 @@ class Definition(NamedTuple):
     # validate property will be a callable (function or lambda) which returns
     # the sanitized version of the value
     validate: Callable[[Any], Any] = None
+    # TODO Proper serializing and deserializing of primitive to convert Python
+    # typing.* information into the annotation. Used for now as a shortcut for
+    # @op decorated opimps and auto definitions
+    annotation: Any = None
 
     def __repr__(self):
         return self.name
@@ -167,6 +171,17 @@ class FailedToLoadOperation(Exception):
     """
 
 
+def make_default_factory(value):
+    """
+    For closure
+    """
+
+    def func():
+        return value
+
+    return func
+
+
 @base_entry_point("dffml.operation", "operation")
 class Operation(NamedTuple, Entrypoint):
     name: str
@@ -177,6 +192,31 @@ class Operation(NamedTuple, Entrypoint):
     expand: Optional[List[str]] = []
     instance_name: Optional[str] = None
     validator: bool = False
+
+    @property
+    def config(self):
+        """
+        Returns a config class representing the operations inputs
+        """
+        name = self.name.replace("_", " ").title().replace(" ", "") + "Config"
+        return make_config(
+            name,
+            [
+                (
+                    name,
+                    definition.annotation,
+                    field(
+                        name,
+                        default_factory=(
+                            dataclasses.MISSING
+                            if definition.default is NO_DEFAULT
+                            else make_default_factory(definition.default)
+                        ),
+                    ),
+                )
+                for name, definition in self.inputs.items()
+            ],
+        )
 
     def export(self):
         exported = {
@@ -410,8 +450,8 @@ class InputFlow:
     network.
     """
 
-    inputs: Dict[str, List[Dict[str, Operation]]] = field(default=None)
-    conditions: List[Dict[str, Operation]] = field(default=None)
+    inputs: Dict[str, List[Dict[str, Operation]]] = None
+    conditions: List[Dict[str, Operation]] = None
 
     def __post_init__(self):
         if self.inputs is None:
