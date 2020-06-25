@@ -12,6 +12,7 @@ from typing import Dict, Any
 import dataclasses
 
 from ...base import BaseConfigurable
+from ...df.types import NO_DEFAULT
 from ...df.base import OperationImplementation
 from ...record import Record
 from ...feature import Feature
@@ -80,11 +81,15 @@ log_cmd = Arg(
 
 
 class Parser(argparse.ArgumentParser):
-    def recursive_add_argument(self, to_add, *args):
+    def recursive_add_argument(self, to_add, *args, top: bool = False):
         # Add arguments to the Parser
         position_list = {}
         for i, field in enumerate(dataclasses.fields(to_add.CONFIG)):
             arg = mkarg(field)
+            if not top and "required" in arg:
+                del arg["required"]
+            if not top and not "default" in arg:
+                arg["default"] = NO_DEFAULT
             if isinstance(arg, Arg):
                 position = None
                 if not "default" in arg and not arg.get("required", False):
@@ -109,9 +114,7 @@ class Parser(argparse.ArgumentParser):
                         arg["dest"] = ".".join(
                             map(lambda i: f"'{i}'", list(args) + [field.name],)
                         )
-                        if "type" in arg and hasattr(
-                            arg["type"], "ENTRY_POINT_ORIG_LABEL"
-                        ):
+                        if hasattr(field.type, "ENTRY_POINT_NAME"):
                             self.add_argument(
                                 name, **arg,
                             )
@@ -125,12 +128,6 @@ class Parser(argparse.ArgumentParser):
                                 arg["type"], *args, field.name,
                             )
                         else:
-                            name = (
-                                "-"
-                                + "-".join(args)
-                                + ("-" if args else "")
-                                + field.name.replace("_", "-")
-                            )
                             self.add_argument(
                                 name, **arg,
                             )
@@ -184,7 +181,7 @@ class Parser(argparse.ArgumentParser):
                     parser.add_subs(method)  # type: ignore
 
         # Add arguments to the Parser
-        self.recursive_add_argument(add_from)
+        self.recursive_add_argument(add_from, top=True)
         if issubclass(add_from, OpCMD):
             self.recursive_add_argument(add_from.IMP, "config")
 
