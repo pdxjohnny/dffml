@@ -11,6 +11,7 @@ import argparse
 from typing import Dict, Any
 import dataclasses
 
+from ...base import BaseConfigurable
 from ...df.base import OperationImplementation
 from ...record import Record
 from ...feature import Feature
@@ -79,6 +80,69 @@ log_cmd = Arg(
 
 
 class Parser(argparse.ArgumentParser):
+    def recursive_add_argument(self, to_add, *args):
+        # Add arguments to the Parser
+        position_list = {}
+        for i, field in enumerate(dataclasses.fields(to_add.CONFIG)):
+            arg = mkarg(field)
+            if isinstance(arg, Arg):
+                position = None
+                if not "default" in arg and not arg.get("required", False):
+                    position_list[i] = (field.name, arg)
+                else:
+                    try:
+                        name = (
+                            "-"
+                            + "-".join(args)
+                            + ("-" if args else "")
+                            + field.name.replace("_", "-")
+                        )
+                        # Set metavar so dest is not used
+                        if (
+                            not "action" in arg
+                            or arg["action"] != "store_true"
+                        ):
+                            arg["metavar"] = field.name.replace(
+                                "_", "-"
+                            ).upper()
+                        # Set dest as traverse_set . separated
+                        arg["dest"] = ".".join(
+                            map(lambda i: f"'{i}'", list(args) + [field.name],)
+                        )
+                        if "type" in arg and hasattr(
+                            arg["type"], "ENTRY_POINT_ORIG_LABEL"
+                        ):
+                            self.add_argument(
+                                name, **arg,
+                            )
+                        elif (
+                            "type" in arg
+                            and inspect.isclass(arg["type"])
+                            and issubclass(arg["type"], BaseConfigurable)
+                            and hasattr(arg["type"], "CONFIG")
+                        ):
+                            self.recursive_add_argument(
+                                arg["type"], *args, field.name,
+                            )
+                        else:
+                            name = (
+                                "-"
+                                + "-".join(args)
+                                + ("-" if args else "")
+                                + field.name.replace("_", "-")
+                            )
+                            self.add_argument(
+                                name, **arg,
+                            )
+                    except argparse.ArgumentError as error:
+                        raise Exception(repr(to_add)) from error
+
+        if position_list:
+            for position in sorted(position_list.keys()):
+                name, positional_arg = position_list[position]
+                self.add_argument(name.replace("_", "-"), **positional_arg)
+            position_list.clear()
+
     def add_subs(self, add_from: "CMD"):
         """
         Add sub commands and arguments recursively
@@ -120,26 +184,9 @@ class Parser(argparse.ArgumentParser):
                     parser.add_subs(method)  # type: ignore
 
         # Add arguments to the Parser
-        position_list = {}
-        for i, field in enumerate(dataclasses.fields(add_from.CONFIG)):
-            arg = mkarg(field)
-            if isinstance(arg, Arg):
-                position = None
-                if not "default" in arg and not arg.get("required", False):
-                    position_list[i] = (field.name, arg)
-                else:
-                    try:
-                        self.add_argument(
-                            "-" + field.name.replace("_", "-"), **arg
-                        )
-                    except argparse.ArgumentError as error:
-                        raise Exception(repr(add_from)) from error
-
-        if position_list:
-            for position in sorted(position_list.keys()):
-                name, positional_arg = position_list[position]
-                self.add_argument(name.replace("_", "-"), **positional_arg)
-            position_list.clear()
+        self.recursive_add_argument(add_from)
+        if issubclass(add_from, OpCMD):
+            self.recursive_add_argument(add_from.IMP, "config")
 
         # Add `-log` argument if it's not already added
         try:
