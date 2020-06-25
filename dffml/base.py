@@ -215,6 +215,7 @@ def field(
     action=None,
     required: bool = False,
     labeled: bool = False,
+    secret: bool = False,
     metadata: Optional[dict] = None,
     **kwargs,
 ):
@@ -228,12 +229,21 @@ def field(
     metadata["description"] = description
     metadata["required"] = required
     metadata["labeled"] = labeled
+    metadata["secret"] = secret
     metadata["action"] = action
     return dataclasses.field(*args, metadata=metadata, **kwargs)
 
 
 def config_asdict(self, *args, **kwargs):
     return export_dict(**dataclasses.asdict(self, *args, **kwargs))
+
+
+def config_repr(self):
+    data = self._asdict()
+    for field in dataclasses.fields(self):
+        if field.name in data and field.metadata.get("secret", False):
+            data[field.name] = "***HIDDEN***"
+    return f"{self.__class__.__qualname__}({data})"
 
 
 def config(cls):
@@ -246,6 +256,8 @@ def config(cls):
         self, *args, **kwargs
     )
     datacls._asdict = config_asdict
+    datacls.__repr__ = config_repr
+    datacls.__str__ = config_repr
     return datacls
 
 
@@ -263,6 +275,8 @@ def make_config(cls_name: str, fields, *args, namespace=None, **kwargs):
         ),
     )
     namespace.setdefault("_asdict", config_asdict)
+    namespace.setdefault("__repr__", config_repr)
+    namespace.setdefault("__str__", config_repr)
     kwargs["eq"] = True
     kwargs["init"] = True
     # Ensure non-default arguments always come before default arguments
@@ -389,6 +403,12 @@ class BaseConfigurable(metaclass=BaseConfigurableMetaClass):
         if inspect.isclass(other) or not isinstance(other, self.__class__):
             return
         return self.config == other.config
+
+    def __repr__(self) -> str:
+        return f"{self.__class__.__qualname__}({self.config})"
+
+    def __str__(self) -> str:
+        return repr(self)
 
     @classmethod
     def add_orig_label(cls, *above):
