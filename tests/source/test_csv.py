@@ -66,8 +66,8 @@ class TestCSVSource(FileSourceTest, AsyncTestCase):
         self.assertFalse(config.allowempty)
         self.assertIsNone(config.loadfiles)
 
-    async def test_config_set(self):
-        config = CSVSource.config(
+    def test_config_set(self):
+        config = CSVSource(
             await parse_unknown(
                 "--source-csv-filename",
                 "feedface",
@@ -81,8 +81,9 @@ class TestCSVSource(FileSourceTest, AsyncTestCase):
                 "--source-csv-allowempty",
                 "--source-csv-loadfiles",
             )
-        )
-        self.assertEqual(config.filename, "feedface")
+        ).config
+        self.assertEqual(config.filename, pathlib.Path("feedface"))
+        self.assertEqual(config.lockfile, pathlib.Path("feedface.lock"))
         self.assertEqual(config.tag, "default-tag")
         self.assertEqual(config.tagcol, "dffml_tag")
         self.assertEqual(config.key, "SourceURLColumn")

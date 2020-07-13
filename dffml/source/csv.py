@@ -16,41 +16,24 @@ from .memory import MemorySource
 from .file import FileSource, FileSourceConfig
 from ..base import config
 from ..util.entrypoint import entrypoint
+from ..util.filelock import FileLock, NullFileLock
 from ..configloader.configloader import ConfigLoaders
 
 csv.register_dialect("strip", skipinitialspace=True)
 
 
-@dataclass
-class OpenCSVFile:
-    write_out: Dict
-    active: int
-    lock: asyncio.Lock
-    write_back_key: bool = True
-    write_back_tag: bool = False
-
-    async def inc(self):
-        async with self.lock:
-            self.active += 1
-
-    async def dec(self):
-        async with self.lock:
-            self.active -= 1
-            return bool(self.active < 1)
-
-
 CSV_SOURCE_CONFIG_DEFAULT_KEY = "key"
-CSV_SOURCE_CONFIG_DEFAULT_tag = "untagged"
-CSV_SOURCE_CONFIG_DEFAULT_tag_COLUMN = "tag"
 CSV_SOURCE_CONFIG_DEFAULT_LOADFILES_NAME = None
 
 
 @config
 class CSVSourceConfig(FileSourceConfig):
     key: str = CSV_SOURCE_CONFIG_DEFAULT_KEY
-    tag: str = CSV_SOURCE_CONFIG_DEFAULT_tag
-    tagcol: str = CSV_SOURCE_CONFIG_DEFAULT_tag_COLUMN
     loadfiles: List[str] = CSV_SOURCE_CONFIG_DEFAULT_LOADFILES_NAME
+
+    def __post_init__(self):
+        if self.loadfiles is None:
+            self.loadfiles = []
 
 
 # CSVSource is a bit of a mess
@@ -61,65 +44,63 @@ class CSVSource(FileSource, MemorySource):
     """
 
     CONFIG = CSVSourceConfig
-
+    # We have to do a read, modify, write on the file to update it
+    WRITEMODE: str = "w+"
+    WRITEMODE_COMPRESSED: str = "wt"
     # Headers we've added to track data other than feature data for a record
     CSV_HEADERS = ["prediction", "confidence"]
 
-    OPEN_CSV_FILES: Dict[str, OpenCSVFile] = {}
-    OPEN_CSV_FILES_LOCK: asyncio.Lock = asyncio.Lock()
-    CONFIG_LOADER = ConfigLoaders()
+    def __init__(self, config):
+        super().__init__(config)
 
-    @asynccontextmanager
-    async def _open_csv(self, fd=None):
-        async with self.OPEN_CSV_FILES_LOCK:
-            if self.config.filename not in self.OPEN_CSV_FILES:
-                self.logger.debug(f"{self.config.filename} first open")
-                open_file = OpenCSVFile(
-                    active=1, lock=asyncio.Lock(), write_out={}
-                )
-                self.OPEN_CSV_FILES[self.config.filename] = open_file
-                if fd is not None:
-                    await self.read_csv(fd, open_file)
-            else:
-                self.logger.debug(f"{self.config.filename} already open")
-                await self.OPEN_CSV_FILES[self.config.filename].inc()
-            yield self.OPEN_CSV_FILES[self.config.filename]
+    async def __aenter__(self):
+        await super().__aenter__()
+        self._astack = await contextlib.AsyncExitStack().__aenter__()
+        self._stack = contextlib.ExitStack().__enter__()
+        # If we are in readwrite mode then we need to take a lock on the file
+        if self.config.readwrite:
+            self.filelock = self._stack.enter_context(
+                FileLock(str(self.config.lockfile))
+            )
+        else:
+            self.filelock = self._stack.enter_context(
+                NullFileLock(str(self.config.lockfile))
+            )
+        # For loading file data from column with filename in it
+        self.cfgl = await self._astack.enter_async_context(ConfigLoaders())
+        return self
+
+    async def __aexit__(self, exc_type, exc_value, traceback):
+        self._stack.__exit__(exc_type, exc_value, traceback)
+        await self._astack.__aexit__(exc_type, exc_value, traceback)
+        return await super().__aexit__(exc_type, exc_value, traceback)
 
     async def _empty_file_init(self):
-        async with self._open_csv():
-            return {}
+        return {}
 
-    async def read_csv(self, fd, open_file):
+    async def read_csv(self, fd):
+        open_file = self.open_file
         dict_reader = csv.DictReader(fd, dialect="strip")
         # Record what headers are present when the file was opened
         if not self.config.key in dict_reader.fieldnames:
             open_file.write_back_key = False
-        if self.config.tagcol in dict_reader.fieldnames:
-            open_file.write_back_tag = True
         # Store all the records by their tag in write_out
         open_file.write_out = {}
-        # If there is no key track row index to be used as key by tag
-        index = {}
+        # If there is no key track row index to be used as key
+        index = 0
         for row in dict_reader:
-            # Grab tag from row
-            tag = row.get(self.config.tagcol, self.config.tag)
             # Load via ConfigLoaders if loadfiles parameter is given
             cfgl_data = {}
-            if self.config.loadfiles:
-                for loadfile in self.config.loadfiles:
-                    async with self.CONFIG_LOADER as cfgl:
-                        _, cfgl_data[loadfile] = await cfgl.load_file(
-                            row[loadfile]
-                        )
-            if self.config.tagcol in row:
-                del row[self.config.tagcol]
-            index.setdefault(tag, 0)
+            for loadfile in self.config.loadfiles:
+                _, cfgl_data[loadfile] = await self.cfgl.load_file(
+                    row[loadfile]
+                )
             # Grab key from row
-            key = row.get(self.config.key, str(index[tag]))
+            key = row.get(self.config.key, str(index))
             if self.config.key in row:
                 del row[self.config.key]
             else:
-                index[tag] += 1
+                index += 1
             # Record data we are going to parse from this row (must include
             # features).
             record_data = {}
@@ -173,26 +154,28 @@ class CSVSource(FileSource, MemorySource):
             }
             record_data.update({"prediction": predictions})
             # If there was no data in the row, skip it
-            if not record_data and key == str(index[tag] - 1):
+            if not record_data and key == str(index - 1):
                 continue
             # Add the record to our internal memory representation
-            open_file.write_out.setdefault(tag, {})
-            open_file.write_out[tag][key] = Record(key, data=record_data)
+            open_file.write_out[key] = Record(key, data=record_data)
 
     async def load_fd(self, fd):
         """
         Parses a CSV stream into Record instances
         """
-        async with self._open_csv(fd) as open_file:
-            self.mem = open_file.write_out.get(self.config.tag, {})
+        with self.open_file.lock.acquire():
+            # TODO Make locking async
+            await self.read_csv(fd)
+        self.mem = self.open_file.write_out.get(self.config.tag, {})
         self.logger.debug("%r loaded %d records", self, len(self.mem))
 
     async def dump_fd(self, fd):
         """
         Dumps data into a CSV stream
         """
-        async with self.OPEN_CSV_FILES_LOCK:
-            open_file = self.OPEN_CSV_FILES[self.config.filename]
+        with self.open_file.lock.acquire():
+            await self.load_fd(fd)
+            open_file = self.open_file
             open_file.write_out.setdefault(self.config.tag, {})
             open_file.write_out[self.config.tag].update(self.mem)
             # Bail if not last open source for this file

@@ -47,7 +47,9 @@ class AsyncTestCase(unittest.TestCase):
     """
 
     # The event loop to run test_ functions in
-    loop = asyncio.get_event_loop()
+    @property
+    def loop(self):
+        return asyncio.get_event_loop()
 
     def async_wrapper(self, coro):
         """
