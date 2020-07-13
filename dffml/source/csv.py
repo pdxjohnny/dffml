@@ -21,24 +21,6 @@ from ..configloader.configloader import ConfigLoaders
 csv.register_dialect("strip", skipinitialspace=True)
 
 
-@dataclass
-class OpenCSVFile:
-    write_out: Dict
-    active: int
-    lock: asyncio.Lock
-    write_back_key: bool = True
-    write_back_tag: bool = False
-
-    async def inc(self):
-        async with self.lock:
-            self.active += 1
-
-    async def dec(self):
-        async with self.lock:
-            self.active -= 1
-            return bool(self.active < 1)
-
-
 CSV_SOURCE_CONFIG_DEFAULT_KEY = "key"
 CSV_SOURCE_CONFIG_DEFAULT_tag = "untagged"
 CSV_SOURCE_CONFIG_DEFAULT_tag_COLUMN = "tag"
@@ -64,30 +46,10 @@ class CSVSource(FileSource, MemorySource):
 
     # Headers we've added to track data other than feature data for a record
     CSV_HEADERS = ["prediction", "confidence"]
-
-    OPEN_CSV_FILES: Dict[str, OpenCSVFile] = {}
-    OPEN_CSV_FILES_LOCK: asyncio.Lock = asyncio.Lock()
     CONFIG_LOADER = ConfigLoaders()
 
-    @asynccontextmanager
-    async def _open_csv(self, fd=None):
-        async with self.OPEN_CSV_FILES_LOCK:
-            if self.config.filename not in self.OPEN_CSV_FILES:
-                self.logger.debug(f"{self.config.filename} first open")
-                open_file = OpenCSVFile(
-                    active=1, lock=asyncio.Lock(), write_out={}
-                )
-                self.OPEN_CSV_FILES[self.config.filename] = open_file
-                if fd is not None:
-                    await self.read_csv(fd, open_file)
-            else:
-                self.logger.debug(f"{self.config.filename} already open")
-                await self.OPEN_CSV_FILES[self.config.filename].inc()
-            yield self.OPEN_CSV_FILES[self.config.filename]
-
     async def _empty_file_init(self):
-        async with self._open_csv():
-            return {}
+        return {}
 
     async def read_csv(self, fd, open_file):
         dict_reader = csv.DictReader(fd, dialect="strip")
@@ -183,8 +145,7 @@ class CSVSource(FileSource, MemorySource):
         """
         Parses a CSV stream into Record instances
         """
-        async with self._open_csv(fd) as open_file:
-            self.mem = open_file.write_out.get(self.config.tag, {})
+        self.mem = await self.read_csv(fd, open_file)
         self.logger.debug("%r loaded %d records", self, len(self.mem))
 
     async def dump_fd(self, fd):
