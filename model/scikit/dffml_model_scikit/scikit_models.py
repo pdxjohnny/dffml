@@ -39,6 +39,7 @@ from sklearn.linear_model import (
     OrthogonalMatchingPursuit,
     Lars,
     Ridge,
+    TheilSenRegressor,
 )
 from sklearn.cluster import (
     KMeans,
@@ -98,6 +99,7 @@ for entry_point_name, name, cls in [
     ("scikitgpr", "GaussianProcessRegressor", GaussianProcessRegressor),
     ("scikitomp", "OrthogonalMatchingPursuit", OrthogonalMatchingPursuit),
     ("scikitridge", "Ridge", Ridge),
+    ("scikittheil", "TheilSenRegressor", TheilSenRegressor),
     ("scikitlars", "Lars", Lars),
     ("scikitkmeans", "KMeans", KMeans),
     ("scikitbirch", "Birch", Birch),
