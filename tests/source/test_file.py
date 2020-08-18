@@ -51,7 +51,13 @@ class TestFileSource(AsyncTestCase):
                             "plugin": None,
                             "config": {
                                 "filename": {
-                                    "plugin": Arg(type=str),
+                                    "plugin": Arg(type=pathlib.Path),
+                                    "config": {},
+                                },
+                                "lockfile": {
+                                    "plugin": Arg(
+                                        type=pathlib.Path, default=None
+                                    ),
                                     "config": {},
                                 },
                                 "readwrite": {
@@ -83,7 +89,8 @@ class TestFileSource(AsyncTestCase):
         config = FileSource.config(
             parse_unknown("--source-file-filename", "feedface")
         )
-        self.assertEqual(config.filename, "feedface")
+        self.assertEqual(config.filename, pathlib.Path("feedface"))
+        self.assertEqual(config.lockfile, None)
         self.assertEqual(config.tag, "untagged")
         self.assertFalse(config.readwrite)
         self.assertFalse(config.allowempty)
@@ -93,13 +100,16 @@ class TestFileSource(AsyncTestCase):
             parse_unknown(
                 "--source-file-filename",
                 "feedface",
+                "--source-file-lockfile",
+                "somefile",
                 "--source-file-tag",
                 "default-tag",
                 "--source-file-readwrite",
                 "--source-file-allowempty",
             )
         )
-        self.assertEqual(config.filename, "feedface")
+        self.assertEqual(config.filename, pathlib.Path("feedface"))
+        self.assertEqual(config.lockfile, pathlib.Path("somefile"))
         self.assertEqual(config.tag, "default-tag")
         self.assertTrue(config.readwrite)
         self.assertTrue(config.allowempty)

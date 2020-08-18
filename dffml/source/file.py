@@ -18,7 +18,8 @@ from ..util.entrypoint import entrypoint
 
 @config
 class FileSourceConfig:
-    filename: str
+    filename: pathlib.Path
+    lockfile: pathlib.Path = None
     tag: str = "untagged"
     readwrite: bool = False
     allowempty: bool = False
@@ -34,13 +35,21 @@ class FileSource(BaseSource):
     READMODE: str = "r"
     WRITEMODE: str = "w"
     READMODE_COMPRESSED: str = "rt"
-    WRITEMODE_COMPRESSED: str = "wt"
+    WRITEMODE_COMPRESSED: str = "a"
 
     def __init__(self, config):
         super().__init__(config)
 
         if isinstance(getattr(self.config, "filename", None), str):
             self.config.filename = pathlib.Path(self.config.filename)
+
+        if getattr(self.config, "lockfile", None) is None:
+            self.config.lockfile = self.config.filename.with_name(
+                self.config.filename.name + ".lock"
+            )
+
+        if isinstance(getattr(self.config, "lockfile", None), str):
+            self.config.lockfile = pathlib.Path(self.config.lockfile)
 
     async def __aenter__(self) -> "BaseSourceContext":
         await self._open()

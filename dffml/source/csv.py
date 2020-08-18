@@ -16,9 +16,27 @@ from .memory import MemorySource
 from .file import FileSource, FileSourceConfig
 from ..base import config
 from ..util.entrypoint import entrypoint
+from ..util.filelock import FileLock
 from ..configloader.configloader import ConfigLoaders
 
 csv.register_dialect("strip", skipinitialspace=True)
+
+
+@dataclass
+class OpenCSVFile:
+    lock: FileLock
+    write_out: Dict
+    write_back_key: bool = True
+    write_back_tag: bool = False
+
+    async def inc(self):
+        async with self.lock:
+            self.active += 1
+
+    async def dec(self):
+        async with self.lock:
+            self.active -= 1
+            return bool(self.active < 1)
 
 
 CSV_SOURCE_CONFIG_DEFAULT_KEY = "key"
@@ -43,15 +61,26 @@ class CSVSource(FileSource, MemorySource):
     """
 
     CONFIG = CSVSourceConfig
-
+    # We have to do a read, modify, write on the file to update it
+    WRITEMODE: str = "w+"
+    WRITEMODE_COMPRESSED: str = "wt"
     # Headers we've added to track data other than feature data for a record
     CSV_HEADERS = ["prediction", "confidence"]
+    # For loading file data from column with filename in it
     CONFIG_LOADER = ConfigLoaders()
 
-    async def _empty_file_init(self):
-        return {}
+    def __init__(self, config):
+        super().__init__(config)
+        self.open_file = OpenCSVFile(
+            lock=FileLock(self.config.lockfile), write_out={}
+        )
 
-    async def read_csv(self, fd, open_file):
+    async def _empty_file_init(self):
+        with self.open_file.lock.acquire():
+            return {}
+
+    async def read_csv(self, fd):
+        open_file = self.open_file
         dict_reader = csv.DictReader(fd, dialect="strip")
         # Record what headers are present when the file was opened
         if not self.config.key in dict_reader.fieldnames:
@@ -145,15 +174,19 @@ class CSVSource(FileSource, MemorySource):
         """
         Parses a CSV stream into Record instances
         """
-        self.mem = await self.read_csv(fd, open_file)
+        with self.open_file.lock.acquire():
+            # TODO Make locking async
+            await self.read_csv(fd)
+        self.mem = self.open_file.write_out.get(self.config.tag, {})
         self.logger.debug("%r loaded %d records", self, len(self.mem))
 
     async def dump_fd(self, fd):
         """
         Dumps data into a CSV stream
         """
-        async with self.OPEN_CSV_FILES_LOCK:
-            open_file = self.OPEN_CSV_FILES[self.config.filename]
+        with self.open_file.lock.acquire():
+            await self.load_fd(fd)
+            open_file = self.open_file
             open_file.write_out.setdefault(self.config.tag, {})
             open_file.write_out[self.config.tag].update(self.mem)
             # Bail if not last open source for this file

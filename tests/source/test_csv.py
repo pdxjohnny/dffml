@@ -55,10 +55,13 @@ class TestCSVSource(FileSourceTest, AsyncTestCase):
                 self.assertEqual("2", rows["sometag"]["0"]["face"])
 
     def test_config_default(self):
-        config = CSVSource.config(
-            parse_unknown("--source-csv-filename", "feedface")
-        )
-        self.assertEqual(config.filename, "feedface")
+        config = CSVSource(
+            CSVSource.config(
+                parse_unknown("--source-csv-filename", "feedface")
+            )
+        ).config
+        self.assertEqual(config.filename, pathlib.Path("feedface"))
+        self.assertEqual(config.lockfile, pathlib.Path("feedface.lock"))
         self.assertEqual(config.tag, "untagged")
         self.assertEqual(config.tagcol, "tag")
         self.assertEqual(config.key, "key")
@@ -67,22 +70,25 @@ class TestCSVSource(FileSourceTest, AsyncTestCase):
         self.assertIsNone(config.loadfiles)
 
     def test_config_set(self):
-        config = CSVSource.config(
-            parse_unknown(
-                "--source-csv-filename",
-                "feedface",
-                "--source-csv-tag",
-                "default-tag",
-                "--source-csv-tagcol",
-                "dffml_tag",
-                "--source-csv-key",
-                "SourceURLColumn",
-                "--source-csv-readwrite",
-                "--source-csv-allowempty",
-                "--source-csv-loadfiles",
+        config = CSVSource(
+            CSVSource.config(
+                parse_unknown(
+                    "--source-csv-filename",
+                    "feedface",
+                    "--source-csv-tag",
+                    "default-tag",
+                    "--source-csv-tagcol",
+                    "dffml_tag",
+                    "--source-csv-key",
+                    "SourceURLColumn",
+                    "--source-csv-readwrite",
+                    "--source-csv-allowempty",
+                    "--source-csv-loadfiles",
+                )
             )
-        )
-        self.assertEqual(config.filename, "feedface")
+        ).config
+        self.assertEqual(config.filename, pathlib.Path("feedface"))
+        self.assertEqual(config.lockfile, pathlib.Path("feedface.lock"))
         self.assertEqual(config.tag, "default-tag")
         self.assertEqual(config.tagcol, "dffml_tag")
         self.assertEqual(config.key, "SourceURLColumn")
