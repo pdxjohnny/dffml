@@ -104,6 +104,7 @@ jobs:
     - name: Test
       run: |
         set -x
+        export GITHUB_TOKEN=${{ secrets.GITHUB_TOKEN }}
         export PYTHON=python${{ matrix.python-version }}
         export PLUGIN=${{ matrix.plugin }}
         export LOGGING=debug
