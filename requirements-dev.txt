@@ -1,0 +1,8 @@
+coverage
+codecov
+sphinx
+sphinx_rtd_theme
+recommonmark
+black==19.10b0
+jsbeautifier
+twine

@@ -51,16 +51,7 @@ setup(
     include_package_data=True,
     zip_safe=False,
     extras_require={
-        "dev": [
-            "coverage",
-            "codecov",
-            "sphinx",
-            "sphinx_rtd_theme",
-            "recommonmark",
-            "black==19.10b0",
-            "jsbeautifier",
-            "twine",
-        ],
+        "dev": pathlib.Path("requirements-dev.txt").read_text().split("\n"),
         **plugins.PACKAGE_NAMES_BY_PLUGIN_INSTALLABLE,
     },
     tests_require=[

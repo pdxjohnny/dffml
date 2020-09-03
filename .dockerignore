@@ -4,3 +4,6 @@
 */*.venv/
 */*.eggs/
 */*.mypy_cache/
+examples/shouldi/tests/downloads/
+.ci/Dockerfile
+.ci/*.Dockerfile

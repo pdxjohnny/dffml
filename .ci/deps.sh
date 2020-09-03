@@ -9,6 +9,10 @@ set -ex
 
 export PLUGIN="${1}"
 
+if [ "x$(id -u)" != "x0" ]; then
+  SUDO="sudo"
+fi
+
 if [ "x${PIP_CACHE_DIR}" != "x" ]; then
   mkdir -p "${PIP_CACHE_DIR}"
 fi
@@ -90,13 +94,13 @@ python -m pip install -U -e .[dev]
 if [[ "x${PLUGIN}" == "xfeature/git" ]] || \
    [[ "x${PLUGIN}" == "xoperations/deploy" ]]; then
   curl -sSL https://github.com/XAMPPRocky/tokei/releases/download/v9.1.1/tokei-v9.1.1-x86_64-unknown-linux-gnu.tar.gz | tar xvz -C "$HOME/.local/bin/"
-  sudo apt-get update && sudo apt-get install -y git subversion cloc openssl
+  ${SUDO} apt-get update && ${SUDO} apt-get install -y git subversion cloc openssl
 fi
 
 if [ "${PLUGIN}" == "source/mysql" ]; then
-  curl -fsSL https://download.docker.com/linux/ubuntu/gpg | sudo apt-key add -
-  sudo add-apt-repository "deb [arch=amd64] https://download.docker.com/linux/ubuntu $(lsb_release -cs) stable"
-  sudo apt-get update && sudo apt-get install -y docker-ce docker-ce-cli containerd.io
+  curl -fsSL https://download.docker.com/linux/ubuntu/gpg | ${SUDO} apt-key add -
+  ${SUDO} add-apt-repository "deb [arch=amd64] https://download.docker.com/linux/ubuntu $(lsb_release -cs) stable"
+  ${SUDO} apt-get update && ${SUDO} apt-get install -y docker-ce docker-ce-cli containerd.io
   docker pull mariadb:10
 fi
 
@@ -158,7 +162,7 @@ fi
 if [[ "x${PLUGIN}" == "xmodel/autosklearn" ]] || \
    [[ "x${PLUGIN}" == "x." ]] || \
    [[ "x${PLUGIN}" == "xdocs" ]]; then
-  sudo apt-get install -y build-essential swig
+  ${SUDO} apt-get install -y build-essential swig
   curl https://raw.githubusercontent.com/automl/auto-sklearn/master/requirements.txt |
     xargs -n 1 -L 1 pip install
 fi
