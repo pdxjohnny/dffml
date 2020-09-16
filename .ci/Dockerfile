@@ -79,8 +79,8 @@ RUN . /etc/os-release && \
   apt-get clean && \
   rm -rf /var/lib/apt/lists/* && \
   mkdir -p /etc/containers && \
-  echo -e '[registries.search]\nregistries = ["docker.io", "quay.io"]' | \
-    tee /etc/containers/registries.conf && \
+  echo '[registries.search]' | tee /etc/containers/registries.conf && \
+  echo 'registries = ["docker.io", "quay.io"]' | tee -a /etc/containers/registries.conf && \
   podman pull mariadb:10.5.5
 
 # ===========================  END  TEST DEPENDENCIES ==========================
