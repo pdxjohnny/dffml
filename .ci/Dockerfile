@@ -6,9 +6,11 @@ FROM python:3.7-buster
 
 # The version of python we're using in pyXY format (changes with base image)
 ARG PYTHON_SHORT_VERSION=py37
+ENV PYTHON_SHORT_VERSION ${PYTHON_SHORT_VERSION}
 
 # The location we should install conda to
 ARG CONDA_INSTALL_LOCATION=/opt/conda
+ENV CONDA_INSTALL_LOCATION ${CONDA_INSTALL_LOCATION}
 
 # Set current working directory
 WORKDIR /usr/src/dffml
@@ -65,6 +67,7 @@ RUN curl -sSL https://github.com/XAMPPRocky/tokei/releases/download/v9.1.1/tokei
   rm -rf /var/lib/apt/lists/*
 
 # source/mysql
+# Use 10.5.5 to reduce version movement
 RUN . /etc/os-release && \
   export NAME=$(echo $NAME | sed -e 's/ .*//g') && \
   echo "deb http://download.opensuse.org/repositories/devel:/kubic:/libcontainers:/stable/${NAME}_${VERSION_ID}/ /" | tee /etc/apt/sources.list.d/devel:kubic:libcontainers:stable.list && \
@@ -76,8 +79,9 @@ RUN . /etc/os-release && \
   apt-get clean && \
   rm -rf /var/lib/apt/lists/* && \
   mkdir -p /etc/containers && \
-  echo -e "[registries.search]\nregistries = ['docker.io', 'quay.io']" | tee /etc/containers/registries.conf
-# podman pull mariadb:10
+  echo -e '[registries.search]\nregistries = ["docker.io", "quay.io"]' | \
+    tee /etc/containers/registries.conf && \
+  podman pull mariadb:10.5.5
 
 # ===========================  END  TEST DEPENDENCIES ==========================
 
@@ -103,18 +107,9 @@ RUN . "${CONDA_INSTALL_LOCATION}/miniconda${PYTHON_SHORT_VERSION}/bin/activate" 
 RUN . "${CONDA_INSTALL_LOCATION}/miniconda${PYTHON_SHORT_VERSION}/bin/activate" base && \
   if [ "${PYTHON_SHORT_VERSION}" != "py38" ]; then conda install -y -c intel daal4py==2020.1 daal==2020.1; fi
 
-#####################3
-#####################3
-#       TODO
-# move get-pip to conda
-#####################3
-#####################3
-
 # operations/nlp
 RUN . "${CONDA_INSTALL_LOCATION}/miniconda${PYTHON_SHORT_VERSION}/bin/activate" base && \
   conda install -y -c conda-forge spacy && \
-  curl https://bootstrap.pypa.io/get-pip.py -o get-pip.py && \
-  python get-pip.py && \
   python -m spacy download en_core_web_sm
 
 # model/autosklearn
