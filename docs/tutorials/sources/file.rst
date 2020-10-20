@@ -206,7 +206,17 @@ To install your new source run
 .. code-block:: console
     :test:
 
+    $ dffml service dev entrypoints list dffml.source
+
+.. code-block:: console
+    :test:
+
     $ python -m pip install -e .
+
+.. code-block:: console
+    :test:
+
+    $ dffml service dev entrypoints list dffml.source
 
 CLI Usage
 ---------
