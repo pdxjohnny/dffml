@@ -3,80 +3,14 @@ name: Tests
 on: [push, pull_request]
 
 jobs:
-  lint:
-    runs-on: ubuntu-latest
-    strategy:
-      fail-fast: false
-      max-parallel: 40
-      matrix:
-        check: [changelog, whitespace, style, docs, lines]
-        python-version: [3.7]
-        node-version: [12.x]
-
-    steps:
-    - uses: actions/checkout@v2
-    - name: Checkout full upstream repo
-      run: |
-        git remote set-url origin https://github.com/intel/dffml
-        git fetch --prune --unshallow
-        git fetch --depth=1 origin +refs/tags/*:refs/tags/*
-    - name: Set up Python ${{ matrix.python-version }}
-      uses: actions/setup-python@v1
-      with:
-        python-version: ${{ matrix.python-version }}
-    - name: Use Node.js ${{ matrix.node-version }}
-      uses: actions/setup-node@v1
-      with:
-        node-version: ${{ matrix.node-version }}
-    - name: Get pip cache
-      id: pip-cache
-      run: |
-        python -c "from pip._internal.locations import USER_CACHE_DIR; print('::set-output name=dir::' + USER_CACHE_DIR)"
-    - name: pip cache
-      uses: actions/cache@v1
-      with:
-        path: ${{ steps.pip-cache.outputs.dir }}
-        key: ${{ runner.os }}-pip-${{ hashFiles('**/setup.py') }}
-        restore-keys: |
-          ${{ runner.os }}-pip-
-    - name: Setup conda
-      uses: s-weigand/setup-conda@v1
-      with:
-        update-conda: true
-        python-version: ${{ matrix.python-version }}
-        conda-channels: anaconda, conda-forge
-    - name: Install dependencies
-      run: |
-        set -x
-        ./.ci/deps.sh ${{ matrix.check }}
-    - name: Run check
-      run: |
-        export GITHUB_TOKEN=${{ secrets.GITHUB_TOKEN }}
-        GITHUB_PAGES_KEY=${{ secrets.GITHUB_PAGES_KEY }} ./.ci/run.sh ${{ matrix.check }}
-
-  container:
-    runs-on: ubuntu-latest
-
-    steps:
-    - uses: actions/checkout@v2
-    - name: Install dependencies
-      run: |
-        set -x
-        curl -fsSL https://download.docker.com/linux/ubuntu/gpg | sudo apt-key add -
-        sudo add-apt-repository "deb [arch=amd64] https://download.docker.com/linux/ubuntu $(lsb_release -cs) stable"
-        sudo apt-get update && sudo apt-get install -y docker-ce docker-ce-cli containerd.io
-    - name: Run check
-      run: |
-        ./.ci/run.sh container
-
   test:
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
       max-parallel: 40
       matrix:
-        plugin: [., examples/shouldi, model/daal4py, model/tensorflow, model/tensorflow_hub, model/transformers, model/scratch, model/scikit, model/vowpalWabbit, model/autosklearn, model/spacy, model/pytorch, model/xgboost, operations/binsec, operations/deploy, operations/image, operations/nlp, source/mysql, feature/git, feature/auth, service/http, configloader/yaml, configloader/image]
-        python-version: [3.7, 3.8]
+        plugin: [.]
+        python-version: [3.7]
 
     steps:
     - uses: actions/checkout@v2
