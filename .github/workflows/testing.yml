@@ -68,6 +68,10 @@ jobs:
     - name: Run check
       run: |
         ./.ci/run.sh container
+    - name: Scan image
+      uses: anchore/scan-action@v2
+      with:
+        image: "intelotc/dffml:latest"
 
   test:
     runs-on: ubuntu-latest
