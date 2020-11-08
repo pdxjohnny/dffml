@@ -9,7 +9,15 @@ set -ex
 
 export PLUGIN="${1}"
 
-if [ "x${PIP_CACHE_DIR}" != "x" ]; then
+if [[ "x${PLUGIN}" == "xconsoletest" ]]; then
+  export PLUGIN="."
+fi
+
+if [[ "x${PIP_CACHE_DIR}" == "x" ]]; then
+  PIP_CACHE_DIR=$(python -c "from pip._internal.locations import USER_CACHE_DIR; print(USER_CACHE_DIR)")
+fi
+
+if [[ ! -d "${PIP_CACHE_DIR}" ]]; then
   mkdir -p "${PIP_CACHE_DIR}"
 fi
 
@@ -38,39 +46,7 @@ if [[ "x${PLUGIN}" == "xmodel/daal4py" ]] || \
    [[ "x${PLUGIN}" == "xmodel/vowpalWabbit" ]] || \
    [[ "x${PLUGIN}" == "x." ]] || \
    [[ "x${PLUGIN}" == "xdocs" ]]; then
-  if [[ "${has_conda}" != "True" ]]; then
-    # URL of conda
-    conda_url="https://repo.anaconda.com/miniconda/Miniconda3-${python_version}_4.8.2-Linux-x86_64.sh"
-    # Location to download conda to
-    conda_download="${PIP_CACHE_DIR}/conda${python_version}.sh"
-    # Hash of conda download
-    if [ "${python_version}" == "py37" ]; then
-      conda_hash=957d2f0f0701c3d1335e3b39f235d197837ad69a944fa6f5d8ad2c686b69df3b
-    elif [ "${python_version}" == "py38" ]; then
-      conda_hash=5bbb193fd201ebe25f4aeb3c58ba83feced6a25982ef4afa86d5506c3656c142
-    fi
-    # Download it
-    if [ ! -f "${conda_download}" ]; then
-      curl -L "${conda_url}" -o "${conda_download}"
-    fi
-    # Verify the hash
-    sha256sum "${conda_download}" | grep "^${conda_hash}"
-    # Run it
-    bash "${conda_download}" -b -p "${PIP_CACHE_DIR}/miniconda${python_version}"
-    # Update
-    conda update -y -n base -c defaults conda
-    # Add channels
-    conda config --add channels anaconda
-    conda config --add channels conda-forge
-    # Remove numpy 1.19.1 see https://github.com/intel/dffml/issues/816
-    conda uninstall numpy
-    conda install numpy==1.18.5
-  fi
-  where_conda=$(conda info -s | grep CONDA_ROOT | awk '{print $NF}')
-  if [ -f "${where_conda}/etc/profile.d/conda.sh" ]; then
-    source "${where_conda}/etc/profile.d/conda.sh"
-  fi
-  conda activate base
+  source .ci/conda.sh "${PIP_CACHE_DIR}"
 fi
 
 # Install and upgrade

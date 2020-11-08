@@ -61,19 +61,20 @@ if [[ "${has_conda}" != "True" ]]; then
   # Add channels
   conda config --add channels anaconda
   conda config --add channels conda-forge
-  # Remove numpy 1.19.1 see https://github.com/intel/dffml/issues/816
-  # conda uninstall numpy
-  # conda install numpy==1.18.5
-  # For some reason conda doesn't come with pip?
-  # Commit message: Update to 20.2.3
-  GET_PIP_URL="https://github.com/pypa/get-pip/raw/fa7dc83944936bf09a0e4cb5d5ec852c0d256599/get-pip.py"
-  PIP_HASH='b8bbf0ef2f8728c1337818cba5d48e8f2a7d18fbbe2ce253299306b5f79011b0365c3cf8852cdef0935e203d8aba6fba'
-  GET_PIP_FILE="${CONDA_INSTALL_LOCATION}/get-pip.py"
-  curl -L "${GET_PIP_URL}" -o "${GET_PIP_FILE}"
-  sha384sum "${GET_PIP_FILE}" | grep "^${PIP_HASH}"
-  python "${GET_PIP_FILE}"
-  python -m pip install -U pip
 fi
-if [ -f "${CONDA_INSTALL_LOCATION}/miniconda${python_version}/bin/activate" ]; then
-  source "${CONDA_INSTALL_LOCATION}/miniconda${python_version}/bin/activate" base
+
+where_conda=$(conda info -s | grep CONDA_ROOT | awk '{print $NF}')
+if [ -f "${where_conda}/etc/profile.d/conda.sh" ]; then
+  source "${where_conda}/etc/profile.d/conda.sh"
 fi
+conda activate base
+
+# For some reason conda doesn't come with pip?
+# Commit message: Update to 20.2.3
+GET_PIP_URL="https://github.com/pypa/get-pip/raw/fa7dc83944936bf09a0e4cb5d5ec852c0d256599/get-pip.py"
+PIP_HASH='b8bbf0ef2f8728c1337818cba5d48e8f2a7d18fbbe2ce253299306b5f79011b0365c3cf8852cdef0935e203d8aba6fba'
+GET_PIP_FILE="${CONDA_INSTALL_LOCATION}/get-pip.py"
+curl -L "${GET_PIP_URL}" -o "${GET_PIP_FILE}"
+sha384sum "${GET_PIP_FILE}" | grep "^${PIP_HASH}"
+python "${GET_PIP_FILE}"
+python -m pip install -U pip
