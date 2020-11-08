@@ -475,12 +475,13 @@ those shortly.
     :diff-files: setup.py
     :filepath: setup.py
 
-Re-install the package via pip
+When we change the ``entry_points`` we need to run the following command for
+changes to take effect.
 
 .. code-block:: console
     :test:
 
-    $ python -m pip install --use-feature=2020-resolver -e .
+    $ python setup.py egg_info
 
 Now we should be able to run our new tool via the CLI! (Provided your ``$PATH``
 is set up correctly).
