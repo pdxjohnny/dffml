@@ -202,10 +202,145 @@ class TestArg(IntegrationCLITestCase):
         self.assertEqual(second.name, "-test")
         self.assertEqual(second["key"], "new_value")
 
+"""
+model:
+  plugin: tfdnnc
+  config:
+    epochs: 400
+    steps: 4000
+    classifications:
+    - '0'
+    - '1'
+    predict:
+      dtype: int
+      length: 1
+      name: maintained
+    features:
+    - dtype: int
+      length: 10
+      name: authors
+    - dtype: int
+      length: 10
+      name: commits
+    - dtype: int
+      length: 10
+      name: work
+
+OLD:
+
+-sources one=csv two=json
+-source-one-filename first.csv
+-source-two-filename second.json
+
+sources:
+- one=csv
+- two=json
+source:
+  config:
+    one:
+      config:
+        filename: first.csv
+    two:
+      config:
+        filename: second.json
+
+NEW:
+
+@config
+class SourcesConfig:
+    no_merge: bool = False
+    data: Dict[str, BaseSource] = field("", fill=True)
+
+-sources-no_merge
+-sources-one csv
+-sources-one-filename first.csv
+-sources-two json
+-sources-two-filename second.json
+
+With fill=True we treat the above as if it is:
+
+-sources-data-one csv
+-sources-data-one-filename first.csv
+-sources-data-two json
+-sources-data-two-filename second.json
+
+self.config.data["one"]
+
+sources:
+  config:
+    one:
+      plugin: csv
+      config:
+        filename: first.csv
+    two:
+      plugin: json
+      config:
+        filename: second.json
+
+
+
+---- We talked about features a bit, however, we decided not to change them to
+be dict based. -----
+
+OLD FEATURES:
+
+    -model-features
+      authors:int:10
+      commits:int:10
+      work:int:10
+
+model:
+  config:
+    ...
+    features:
+    - authors:int:10
+    - commits:int:10
+    - work:int:10
+
+NEW FEATURES:
+
+    -model-features-authors
+    -model-features-commits
+    -model-features-work
+    -model-features-authors-dtype int
+    -model-features-commits-dtype int
+    -model-features-work-dtype int
+    -model-features-authors-length 10
+    -model-features-commits-length 10
+    -model-features-work-length 10
+
+model:
+  config:
+    ...
+    features:
+      config:
+        authors:
+          dtype: int
+          length: 10
+        commits:
+          dtype: int
+          length: 10
+        work:
+          dtype: int
+          length: 10
+
+
+
+Unrelated, kvstore stuff below:
+
+@config
+class WithArgsKVStoreConfig:
+    filename: str
+
+class WithArgsKVStore:
+    CONFIG = WithArgsKVStoreConfig
+
+"""
     async def test_parse_unknown(self):
         self.required_plugins("dffml-config-yaml")
         async with ConfigLoaders() as configloaders:
             parsed = await parse_unknown(
+                "@" + str(pathlib.Path(__file__).parent / "args-from-file.yaml"),
                 "-rchecker-memory-kvstore",
                 "withargs",
                 "-rchecker-memory-kvstore-withargs-filename",

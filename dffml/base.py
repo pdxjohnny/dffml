@@ -219,6 +219,11 @@ def is_config_dict(value):
 
 
 def _fromdict(cls, **kwargs):
+    # TODO for dict support, if you see field.fill == True, ensure that you only
+    # see it once, raise if you see it multiple times. Record all of the kwarg
+    # keys which were used (field.name was in kwargs, and field.fill == False)
+    # Loop through kwargs again after this loop. Teart any keys as if they were
+    # under the field where fill was set to True.
     for field in dataclasses.fields(cls):
         if field.name in kwargs:
             value = kwargs[field.name]
@@ -252,6 +257,7 @@ def field(
     action=None,
     required: bool = False,
     labeled: bool = False,
+    fill: bool = False,
     metadata: Optional[dict] = None,
     **kwargs,
 ):
@@ -259,6 +265,10 @@ def field(
     Creates an instance of :py:func:`dataclasses.field`. The first argument,
     ``description`` is the description of the field, and will be set as the
     ``"description"`` key in the metadata ``dict``.
+
+    If ``fill`` is ``True``, then when parsing arguments for a class / config
+    struture, any arguments which don't match the fields in that config should
+    be treated as if they were prefixed with this fields name.
     """
     if not metadata:
         metadata = {}
