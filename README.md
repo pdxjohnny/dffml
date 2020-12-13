@@ -6,6 +6,7 @@
 [![CII](https://bestpractices.coreinfrastructure.org/projects/2594/badge)](https://bestpractices.coreinfrastructure.org/projects/2594)
 [![Gitter chat](https://badges.gitter.im/gitterHQ/gitter.svg)](https://gitter.im/dffml/community)
 [![PyPI version](https://img.shields.io/pypi/v/dffml.svg)](https://pypi.org/project/dffml)
+[![FOSSA Status](https://app.fossa.io/api/projects/git%2Bgithub.com%2Fpdxjohnny%2Fdffml.svg?type=shield)](https://app.fossa.io/projects/git%2Bgithub.com%2Fpdxjohnny%2Fdffml?ref=badge_shield)
 
 ## Mission Statement
 
@@ -53,6 +54,9 @@ will guide you through getting setup and contributing to DFFML.
 ## License
 
 DFFML is distributed under the [MIT License](LICENSE).
+
+
+[![FOSSA Status](https://app.fossa.io/api/projects/git%2Bgithub.com%2Fpdxjohnny%2Fdffml.svg?type=large)](https://app.fossa.io/projects/git%2Bgithub.com%2Fpdxjohnny%2Fdffml?ref=badge_large)
 
 ## Legal
 
