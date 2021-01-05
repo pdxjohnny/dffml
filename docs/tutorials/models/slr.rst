@@ -84,6 +84,10 @@ Class
 The naming conventions for classes in DFFML is ``TheName`` + ``PluginType``.
 We're making a ``Model`` plugin. So the name is ``MySLRModel``.
 
+.. literalinclude:: /../dffml/skel/model/REPLACE_IMPORT_PACKAGE_NAME/myslr.py
+    :test:
+    :lines: 60-61
+
 The plugin system needs us to do two things to ensure we can access our new
 model from the DFFML command line and other interfaces.
 
@@ -96,7 +100,7 @@ model from the DFFML command line and other interfaces.
 
 .. literalinclude:: /../dffml/skel/model/REPLACE_IMPORT_PACKAGE_NAME/myslr.py
     :test:
-    :lines: 60-63
+    :lines: 60-61
 
 Train
 -----
