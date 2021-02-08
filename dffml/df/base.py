@@ -387,6 +387,7 @@ def op(*args, imp_enter=None, ctx_enter=None, config_cls=None, **kwargs):
                 )
 
         auto_def_outputs = False
+        dict_return_type = False
         # Definition for return type of a function
         if not "outputs" in kwargs:
             return_type = inspect.signature(func).return_annotation
@@ -399,6 +400,8 @@ def op(*args, imp_enter=None, ctx_enter=None, config_cls=None, **kwargs):
                     )
                 }
                 auto_def_outputs = True
+            if return_type is dict or get_origin(return_type) is dict:
+                dict_return_type = True
 
         func.op = Operation(**kwargs)
         func.ENTRY_POINT_NAME = ["operation"]
@@ -468,7 +471,9 @@ def op(*args, imp_enter=None, ctx_enter=None, config_cls=None, **kwargs):
                     else:
                         # TODO Add auto thread pooling of non-async functions
                         result = func(**inputs)
-                    if auto_def_outputs and len(self.parent.op.outputs) == 1:
+                    if (auto_def_outputs or not dict_return_type) and len(
+                        self.parent.op.outputs
+                    ) == 1:
                         if inspect.isasyncgen(result):
 
                             async def convert_asyncgen(outputs):
