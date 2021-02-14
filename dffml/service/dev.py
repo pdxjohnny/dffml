@@ -720,7 +720,7 @@ class BumpPackages(CMD):
 
 @configdataclass
 class PinDepsConfig:
-    logs: pathlib.Path = field("Path to log file for main plugin")
+    logs: pathlib.Path = field("Path to CI log zip file")
     update: bool = field(
         "Update all requirements.txt files with pinned dependneices",
         default=False,
@@ -775,8 +775,8 @@ class PinDeps(CMD):
     @classmethod
     def remove_ansi_escape(cls, contents):
         """
-        Found on Stack Overflow from Martijn Pieters, only modified input variable
-        name.
+        Found on Stack Overflow from Martijn Pieters, only modified input
+        variable name.
         - https://stackoverflow.com/a/14693789
         - https://creativecommons.org/licenses/by-sa/4.0/
         """
@@ -832,13 +832,55 @@ class PinDeps(CMD):
 
         return ci_installed
 
-    async def pin_deps(self, contents: bytes):
-        if not b"PLUGIN=" in contents:
-            return
+    FIND_CI_INSTALLED_LINUX_PLUGIN_VERSION_REGEX = re.compile(
+        r"\(([a-z./]+), ([0-9.]+)\)"
+    )
+    FIND_CI_INSTALLED_NON_LINUX_VERSION_REGEX = re.compile(r"\(([0-9.]+)\)")
 
+    @classmethod
+    def find_ci_installed(cls, logs_dir: pathlib.Path):
+        ci_installed = {}
+
+        for log_file_path in logs_dir.rglob("*.txt"):
+            if "windows" in log_file_path.stem:
+                platform_system = "Windows"
+            elif "macos" in log_file_path.stem:
+                platform_system = "MacOS"
+            else:
+                platform_system = "Linux"
+
+                match = cls.FIND_CI_INSTALLED_LINUX_PLUGIN_VERSION_REGEX.search(
+                    log_file_path.stem
+                )
+                if not match:
+                    continue
+
+                plugin, python_version = match.groups()
+                # Only look for the pip freeze on the main plugin
+                if plugin != ".":
+                    continue
+
+            contents = log_file_path.read_bytes()
+            if not b"pip freeze" in contents:
+                continue
+
+            if platform_system in ("Windows", "MacOS"):
+                python_version = cls.FIND_CI_INSTALLED_NON_LINUX_VERSION_REGEX.search(
+                    log_file_path.stem
+                ).groups()[
+                    0
+                ]
+
+            ci_installed[
+                (platform_system, python_version)
+            ] = cls.parse_github_actions_log_file(contents)
+
+        return ci_installed
+
+    async def pin_deps(self, logs_dir: pathlib.Path):
         root = pathlib.Path(__file__).parents[2]
 
-        ci_installed = self.parse_github_actions_log_file(contents)
+        ci_installed = self.find_ci_installed(logs_dir)
 
         for requirements_txt_path in root.rglob("requirements.txt"):
             self.logger.debug(requirements_txt_path)
@@ -854,14 +896,38 @@ class PinDeps(CMD):
                 if not package_name:
                     continue
                 # Ensure package was installed in CI
-                if not package_name in ci_installed:
-                    raise ValueError(
-                        f"Plugin {requirements_txt_path.parent}: {package_name!r} not in {ci_installed}"
-                    )
+                for supported_os, supported_python in []:
+                    if (supported_os, supported_python) not in ci_installed:
+                        raise ValueError(
+                            f"Supported OS/Python version {supported_os} {supported_python}: not in {ci_installed.keys()}"
+                        )
+                    if (
+                        not package_name
+                        in ci_installed[(supported_os, supported_python)]
+                    ):
+                        raise ValueError(
+                            f"Plugin {requirements_txt_path.parent}: {package_name!r} not in {ci_installed[(supported_os, supported_python)]}"
+                        )
                 # Modify the line to be a pinned package
-                modify_contents[i] = (
-                    package_name + "==" + ci_installed[package_name]
-                )
+                for (
+                    (platform_system, python_version),
+                    packages_installed,
+                ) in ci_installed.items():
+                    line_contents = []
+                    for (
+                        package_name,
+                        package_version_installed,
+                    ) in packages_installed.items():
+                        line_contents.append(
+                            "; ".join(
+                                [
+                                    f"{package_name}=={package_version_installed}",
+                                    f'platfrom_system == "{platform_system}"',
+                                    f'python_version == "{python_version}"',
+                                ]
+                            )
+                        )
+                    modify_contents[i] += "\t".join(line_contents)
 
                 self.logger.debug(f"{line:<40} | {modify_contents[i]}")
 
@@ -869,13 +935,14 @@ class PinDeps(CMD):
                 path=str(requirements_txt_path.relative_to(root)),
                 requirements_txt_path=requirements_txt_path,
                 requirements_txt_contents=requirements_txt_contents,
-                requirements_txt_pinned="\n".join(modify_contents),
+                requirements_txt_pinned="\n".join(modify_contents).replace(
+                    "\t", "\n"
+                ),
             )
 
     async def run(self):
-        async for plugin in self.pin_deps(
-            pathlib.Path(self.logs).read_bytes()
-        ):
+        async for plugin in self.pin_deps(pathlib.Path(self.logs)):
+            yield plugin
             if self.update:
                 plugin.requirements_txt_path.write_text(
                     plugin.requirements_txt_pinned
