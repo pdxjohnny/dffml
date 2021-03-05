@@ -8,6 +8,6 @@ black==19.10b0
 jsbeautifier
 twine
 # Test requirements
-httptest>=0.0.15
+httptest>=0.0.17
 Pillow>=7.1.2
 pre-commit
