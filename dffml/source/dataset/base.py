@@ -42,7 +42,7 @@ def dataset_source(entrypoint_name) -> ContextManagedWrapperSource:
     >>> from dffml.noasync import load
     >>> from dffml.source.csv import CSVSource
     >>> from dffml.source.dataset import dataset_source
-    >>> from dffml.util.net import validate_file_hash
+    >>> from dffml.util.file import validate_file_hash
     >>>
     >>> @dataset_source("my.training")
     ... def my_training_dataset(
