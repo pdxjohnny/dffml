@@ -308,7 +308,3 @@ cli_cli_Version_Version_git_hash.test_docstring = unittest.skipIf(
     platform.system() == "Windows",
     "Test cleanup doesn't seem to work on Windows",
 )(cli_cli_Version_Version_git_hash.test_docstring)
-
-source_dataset_base_dataset_source.test_docstring = unittest.skipIf(
-    platform.system() != "Linux", "httptest only works on Linux",
-)(source_dataset_base_dataset_source.test_docstring)
