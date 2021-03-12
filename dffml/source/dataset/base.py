@@ -17,9 +17,15 @@ def dataset_source(entrypoint_name) -> ContextManagedWrapperSource:
     --------
 
     Say we have the following dataset hosted at
-    http://download.example.com/data/my_training.csv
+    http://example.com/my_training.csv
+
+    Let's test this locally by creating a file and serving it from our local
+    machine. Write the following file.
+
+    **my_training.csv**
 
     .. code-block::
+        :test:
         :filepath: my_training.csv
 
         feed,face,dead,beef
@@ -29,6 +35,14 @@ def dataset_source(entrypoint_name) -> ContextManagedWrapperSource:
         0.3,3,30,300
         0.4,4,40,400
 
+    We can start an HTTP server using Python
+
+    .. code-block:: console
+        :test:
+        :daemon: 8080
+
+        $ python3 -m http.server 8080
+
     We could write a dataset source to download and cache the contents locally
     as follows. We want to make sure that we validate the contents of datasets
     using SHA 384 hashes (see
@@ -36,53 +50,36 @@ def dataset_source(entrypoint_name) -> ContextManagedWrapperSource:
     details). Without hash validation we risk downloading the wrong file or
     potentially malicious files.
 
-    >>> import pathlib
-    >>> import urllib.request
-    >>>
-    >>> from dffml.noasync import load
-    >>> from dffml.source.csv import CSVSource
-    >>> from dffml.source.dataset import dataset_source
-    >>> from dffml.util.file import validate_file_hash
-    >>>
-    >>> @dataset_source("my.training")
-    ... def my_training_dataset(
-    ...     url: str = "http://download.example.com/data/my_training.csv",
-    ...     expected_sha384_hash: str = "2e7f15ea48da79e35d7ea4aa7c37b2359cda06c38f9d0e3b08c5f0a2db0289158a4d17d06f5a0a538e1a449ece0c6cfc",
-    ... ):
-    ...
-    ...     # Create a pathlib.Path object for where the contents will be stored
-    ...     filepath = (
-    ...         pathlib.Path(
-    ...             "~", ".cache", "dffml", "datasets", "my_training.csv"
-    ...         )
-    ...         .expanduser()
-    ...         .resolve()
-    ...     )
-    ...     # Create parent directories if they don't exist
-    ...     if not filepath.parent.is_dir():
-    ...         filepath.parent.mkdir(parents=True)
-    ...
-    ...     # Download the file if it doesn't exist
-    ...     if not filepath.is_file():
-    ...         urllib.request.urlretrieve(url, filename=str(filepath))
-    ...     # Validate the contents
-    ...     validate_file_hash(filepath, expected_sha384_hash=expected_sha384_hash)
-    ...
-    ...     # Create a source using downloaded file
-    ...     yield CSVSource(filename=str(filepath))
-    >>>
-    >>> records = list(load(my_training_dataset.source()))
-    >>> print(len(records))
-    5
-    >>> print(records[0].export())
-    {'key': '0', 'features': {'feed': 0.0, 'face': 0, 'dead': 0, 'beef': 0}, 'extra': {}}
-    >>>
-    >>> with my_training_dataset() as source:
-    ...     records = list(load(source))
-    ...     print(len(records))
-    ...     print(records[2].export())
-    5
-    {'key': '2', 'features': {'feed': 0.2, 'face': 2, 'dead': 20, 'beef': 200}, 'extra': {}}
+    **my_training.py**
+
+    .. literalinclude:: /../examples/source/dataset/base/dataset_source/my_training.py
+        :test:
+
+    We can use it from Python in two different ways as follows
+
+    **run.py**
+
+    .. literalinclude:: /../examples/source/dataset/base/dataset_source/my_training_run.py
+        :test:
+        :filepath: run.py
+
+    .. code-block:: console
+        :test:
+        :replace: cmds[0][-1] = cmds[0][-2].replace("8080", str(ctx["HTTP_SERVER"]["8080"]))
+
+        $ python3 run.py http://localhost:8080/my_training.csv cache_dir
+
+    Or we can use it from the command line
+
+    .. code-block:: console
+        :test:
+        :replace: cmds[0][-1] = cmds[0][-1].replace("8080", str(ctx["HTTP_SERVER"]["8080"]))
+
+        $ dffml list records \
+            -sources training=my_training:my_training_dataset.source \
+            -source-training-cache_dir cache_dir \
+            -source-training-url http://localhost:8080/my_training.csv
+
     """
     return context_managed_wrapper_source(
         entrypoint_name, qualname_suffix="DatasetSource"
