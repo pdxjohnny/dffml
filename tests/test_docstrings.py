@@ -127,43 +127,6 @@ def wrap_noasync_accuracy(state):
 wrap_noasync_predict = wrap_noasync_accuracy
 
 
-def wrap_source_dataset_base_dataset_source(state):
-    # Read the data from the csv file from the functions docstring
-    node = [
-        node
-        for node in parse_nodes(inspect.getdoc(state["obj"]))
-        if node.options.get("filepath", "") == "my_training.csv"
-    ][0]
-    # Contents of the file to send to HTTP client
-    contents = "\n".join(node.content).encode()
-
-    # Create a test server which will provide the given file
-    class DownloadExampleComHTTPServer(httptest.Handler):
-        def do_GET(self):
-            self.send_response(200)
-            self.send_header("Content-type", "text/plain")
-            self.send_header("Content-length", len(contents))
-            self.end_headers()
-            self.wfile.write(contents)
-
-    # Start the test server
-    with httptest.Server(DownloadExampleComHTTPServer) as ts:
-        # Save the original inspect_params() function
-        original_inspect_params = inspect_params
-        # A new inspect_params() that will use the test servers URL for the
-        # value of the url property in the config class for the
-        def new_inspect_params(cls):
-            args = original_inspect_params(cls)
-            args.update({"url": (str, field("url", default=ts.url()))})
-            return args
-
-        # Patch inspect_params() to be the new_inspect_params(0
-        with unittest.mock.patch(
-            "dffml.util.config.inspect.inspect_params", new=new_inspect_params,
-        ):
-            yield
-
-
 async def operation_db():
     """
     Create the database and table (myTable) for the db operations
