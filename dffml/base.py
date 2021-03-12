@@ -370,7 +370,7 @@ class BaseConfigurableMetaClass(type, abc.ABC):
             elif config is None and hasattr(self, "CONFIG"):
                 if kwargs:
                     try:
-                        config = self.CONFIG(**kwargs)
+                        config = self.CONFIG._fromdict(**kwargs)
                     except TypeError as error:
                         error.args = (
                             error.args[0].replace(
