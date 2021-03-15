@@ -24,14 +24,17 @@ Project Ideas
 
 We currently have the following project ideas:
 
-.. toctree::
-    :titlesonly:
+:doc:`automl`
 
-    Add set of premade DataFlows users can use out of the box for data cleanup <https://github.com/intel/dffml/issues/969>
-    Refactor DataFlows to add event types <https://github.com/intel/dffml/issues/919>
-    Implement Auto ML <automl>
-    Support archive storage (such as zip and tar) of models and DataFlows (1) <https://github.com/intel/dffml/issues/967>
-    Support archive storage (such as zip and tar) of models and DataFlows (2) <https://github.com/intel/dffml/issues/662>
+- `Add set of premade DataFlows users can use out of the box for data cleanup <https://github.com/intel/dffml/issues/969>`_
+
+- `Refactor DataFlows to add event types <https://github.com/intel/dffml/issues/919>`_
+
+- :doc:`Implement Auto ML </contributing/gsoc/2021/automl.md>`
+
+- `Support archive storage (such as zip and tar) of models and DataFlows (Part 1) <https://github.com/intel/dffml/issues/967>`_
+
+- `Support archive storage (such as zip and tar) of models and DataFlows (Part 2) <https://github.com/intel/dffml/issues/662>`_
 
 If you've got a idea you'd like to propose, please make a new issue with the
 `gsoc: project:` prefix to discuss it! We're open to all sorts of ideas.
