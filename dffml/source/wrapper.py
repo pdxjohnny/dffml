@@ -1,6 +1,7 @@
 import inspect
 import functools
 import contextlib
+import dataclasses
 from typing import Dict, List, AsyncIterator
 
 from ..record import Record
@@ -91,11 +92,15 @@ class FunctionMustBeGenerator(Exception):
 class ContextManagedWrapperSource(WrapperSource):
     async def __aenter__(self) -> "ContextManagedWrapperSource":
         # Handle async vs. non-async
+        # TODO @config._asdict should NOT export, we should add a new .export()
+        # method to @config which converts to primitive types. ._asdict() should
+        # preseve typing information
+        kwargs = dataclasses.asdict(self.config)
         if self.IS_ASYNC:
-            async with self.WRAPPED(**self.config._asdict()) as source:
+            async with self.WRAPPED(**kwargs) as source:
                 pass
         else:
-            with self.WRAPPED(**self.config._asdict()) as source:
+            with self.WRAPPED(**kwargs) as source:
                 pass
         # Ensure the object returned really is a source
         if not isinstance(source, BaseSource):
