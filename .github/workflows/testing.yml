@@ -96,7 +96,7 @@ jobs:
         - service/http
         - configloader/yaml
         - configloader/image
-        python-version: [3.7, 3.8]
+        python-version: [3.7, 3.8, 3.9]
 
     steps:
     - uses: actions/checkout@v2
