@@ -167,14 +167,15 @@ class FailedToLoadOperation(Exception):
     """
 
 
+@dataclass(frozen=True)
 @base_entry_point("dffml.operation", "operation")
-class Operation(NamedTuple, Entrypoint):
+class Operation(Entrypoint):
     name: str
-    inputs: Dict[str, Definition] = {}
-    outputs: Dict[str, Definition] = {}
+    inputs: Dict[str, Definition] = field(default_factory=lambda: {})
+    outputs: Dict[str, Definition] = field(default_factory=lambda: {})
     stage: Stage = Stage.PROCESSING
-    conditions: Optional[List[Definition]] = []
-    expand: Optional[List[str]] = []
+    conditions: Optional[List[Definition]] = field(default_factory=lambda: [])
+    expand: Optional[List[str]] = field(default_factory=lambda: [])
     instance_name: Optional[str] = None
     validator: bool = False
     retry: int = 0
