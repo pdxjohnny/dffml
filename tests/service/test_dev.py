@@ -461,14 +461,8 @@ class TestLintCommits(AsyncTestCase):
     ]
 
     async def test_should_validate(self):
-        self.assertTrue(
-            all(
-                [
-                    await self.LintCommitsObj.validate_commit_msg(msg)
-                    for msg in self.valid_commits
-                ]
-            )
-        )
+        for msg in self.valid_commits:
+            self.assertTrue(await self.LintCommitsObj.validate_commit_msg(msg))
 
     async def test_shouldnot_validate(self):
         self.assertTrue(
