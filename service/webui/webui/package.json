@@ -4,12 +4,14 @@
     "@material-ui/icons": "^4.5.1",
     "material-table": "^1.56.1",
     "material-ui-dropzone": "^2.4.7",
+    "mermaid": "^8.11.0",
+    "miragejs": "^0.1.33",
     "react": "^16.12.0",
     "react-dom": "^16.12.0",
+    "react-flow-renderer": "^9.6.2",
     "react-router-dom": "^5.1.2",
     "react-scripts": "^3.3.0",
-    "swr": "^0.1.16",
-    "miragejs": "^0.1.33"
+    "swr": "^0.1.16"
   },
   "scripts": {
     "start": "react-scripts start",
@@ -29,5 +31,5 @@
       "last 1 safari version"
     ]
   },
-  "homepage" : "https://intel.github.io/dffml/master/webui"
+  "homepage": "https://intel.github.io/dffml/master/webui"
 }

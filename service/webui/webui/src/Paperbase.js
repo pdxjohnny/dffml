@@ -14,6 +14,7 @@ import {
 
 import SetBackendPopup from './SetBackendPopup';
 import SourcesUpload from './SourcesUpload';
+import DataFlowCreate from './DataFlowCreate';
 import SettingsBackend from './SettingsBackend';
 import NotFound from './NotFound';
 
@@ -193,16 +194,8 @@ function Paperbase(props) {
     setMobileOpen(!mobileOpen);
   };
 
-  return (
-    <ThemeProvider theme={theme}>
-      <Router>
-        <div className={classes.root}>
-          <CssBaseline />
-          <SetBackendPopup
-            open={localStorage.getItem('backend.url') === null}
-            backend={backend}
-            saveBackend={saveBackend}
-          />
+          /*
+           * TODO Put this back
           <nav className={classes.drawer}>
             <Hidden smUp implementation="js">
               <Navigator
@@ -216,6 +209,18 @@ function Paperbase(props) {
               <Navigator PaperProps={{ style: { width: drawerWidth } }} />
             </Hidden>
           </nav>
+          */
+
+  return (
+    <ThemeProvider theme={theme}>
+      <Router>
+        <div className={classes.root}>
+          <CssBaseline />
+          <SetBackendPopup
+            open={localStorage.getItem('backend.url') === null}
+            backend={backend}
+            saveBackend={saveBackend}
+          />
           <div className={classes.app}>
             <Switch>
               {/* Begin the views */}
@@ -223,6 +228,12 @@ function Paperbase(props) {
                 <Header onDrawerToggle={handleDrawerToggle} />
                 <main className={classes.main}>
                   <SourcesUpload backend={backend} />
+                </main>
+              </Route>
+              <Route path="/dataflows/create">
+                <Header onDrawerToggle={handleDrawerToggle} />
+                <main className={classes.main}>
+                  <DataFlowCreate backend={backend} />
                 </main>
               </Route>
               <Route path="/settings/backend">
