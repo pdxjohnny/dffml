@@ -154,49 +154,63 @@ async function dataflowToElements(dataflow) {
     //   data: { label: 'Node C' },
     //   position: { x: 400, y: 200 },
     // },
-    elements.push({
+    elements[operation_instance_name] = {
       id: operation_instance_name,
       data: { label: operation_instance_name },
       position: {
-        x: Number(transform.substring(transform.indexOf("(") + 1, transform.indexOf(","))),
-        y: Number(transform.substring(transform.indexOf(",") + 1, transform.indexOf(")"))),
+        x: 2 * Number(transform.substring(transform.indexOf("(") + 1, transform.indexOf(","))),
+        y: 2 * Number(transform.substring(transform.indexOf(",") + 1, transform.indexOf(")"))),
       },
-    });
+    };
 
     // The inputs
     // Example:
     // { id: 'e1-2', source: '1', target: '2', label: 'updatable edge' },
     Object.keys(flow.inputs).forEach(function(input_name) {
-
-    // {
-    //     "conditions": [
-    //         "seed"
-    //     ],
-    //     "inputs": {
-    //         "repo": [
-    //             {
-    //                 "clone_git_repo": "repo"
-    //             }
-    //         ]
-    //     }
-    // }
+      // {
+      //     "conditions": [
+      //         "seed"
+      //     ],
+      //     "inputs": {
+      //         "repo": [
+      //             {
+      //                 "clone_git_repo": "repo"
+      //             }
+      //         ]
+      //     }
+      // }
       flow.inputs[input_name].forEach(function(origin) {
+        let source = undefined;
 
-        flow.inputs[input_name].forEach(function(origin) {
-        elements.push({
+        // Three types of origins to support
+        if (typeof origin === "string") {
+          // Single string origin ("seed")
+          source = origin;
+          // Add an element for the origin if it doesn't exist
+          if (!elements.hasOwnProperty(source)) {
+            // TODO How to calculate x, y?
+          }
+        } else if (typeof origin === "object") {
+          // Output of another operation
+          // source = Object.keys(origin)[0] + ".outputs." + origin[Object.keys(origin)[0]];
+          source = Object.keys(origin)[0];
+        } else if (false) {
+          // TODO Accept alternate definitions from list
+        }
+
+        elements[operation_instance_name + ".inputs." + input_name] = {
           id: operation_instance_name + ".inputs." + input_name,
-          source: "",
+          source: source,
           target: operation_instance_name,
-          label: operation_instance_name + ".inputs." + input_name,
-        });
+          label: input_name,
+        };
       });
     });
   });
 
   console.log(elements)
 
-
-  return elements;
+  return Object.values(elements);
 }
 
 async function elementsToDataFlow(elements, dataflow) {
