@@ -5,6 +5,7 @@ import React, { useState } from 'react';
 import ReactFlow, { Controls, updateEdge, addEdge } from 'react-flow-renderer';
 
 import mermaid from 'mermaid';
+import MD5 from "crypto-js/md5";
 
 import TestDataFlow from './DataFlowCreateTestDataFlowAutomatingClassification';
 
@@ -94,11 +95,9 @@ end`;
 // SVG of the diagram.
 function diagramToSVG(diagram) {
   return new Promise((resolve, reject) => {
-    var insertSvg = function(svgCode, bindFunctions){
-      resolve(svgCode);
-    };
-
-    var graph = mermaid.mermaidAPI.render('graphDiv', diagram, insertSvg);
+    mermaid.mermaidAPI.render('graphDiv', diagram, function(svgCode, bindFunctions) {
+      resolve((new DOMParser()).parseFromString(svgCode, "image/svg+xml"));
+    });
   });
 }
 
@@ -118,32 +117,81 @@ async function dataflowToElements(dataflow) {
       data: { label: 'Node B' },
       position: { x: 100, y: 200 },
     },
-    {
-      id: '3',
-      data: { label: 'Node C' },
-      position: { x: 400, y: 200 },
-    },
     { id: 'e1-2', source: '1', target: '2', label: 'updatable edge' },
   ];
 
+  // TODO Make some more generic interface so we aren't tied to mermaid.
+  // Main concern here is how to map nodes to elements and back across
+  // diagramming libraries will probably result in different CSS selectors
+  // needed.
+  // We don't have to worry about this if
+  // https://github.com/wbkd/react-flow/issues/1194 is fixed. We're only using
+  // mermaid to get the correct X, Y, for each element.
   const diagram = await dataflowToDiagram(dataflow);
-  // const svg = await diagramToSVG(diagram);
+  const svg = await diagramToSVG(diagram);
+  const svg_nodes = svg.querySelectorAll(".node,.default");
 
-  let id = 1;
-
-  let keys = Object.keys(dataflow.flow);
-  for (let i = 0; i < keys.length; i++, id++) {
-    let operation_instance_name = keys[i]
-    let input_flow = dataflow.flow[operation_instance_name];
-
-    let element = {
-      id: String(id),
-      data: { label: operation_instance_name },
-      position: { x: 100, y: 0 + (100 * i) },
-    };
-
-    elements.push(element);
+  let operation_instance_name_md5_to_svg_node = {};
+  for (let i = 0; i < svg_nodes.length; i++) {
+    let node = svg_nodes[i];
+    let node_md5 = node.id.split("-")[1];
+    operation_instance_name_md5_to_svg_node[node_md5] = node;
   }
+
+  Object.keys(dataflow.flow).forEach(function(operation_instance_name, id) {
+    let flow = dataflow.flow[operation_instance_name];
+
+    let node_md5 = MD5(operation_instance_name).toString();
+    let svg_node = operation_instance_name_md5_to_svg_node[node_md5];
+
+    // transform="translate(599.1979103088379,219.66666984558105)"
+    let transform = svg_node.attributes.transform.nodeValue;
+
+    // The node
+    // Example:
+    // {
+    //   id: '3',
+    //   data: { label: 'Node C' },
+    //   position: { x: 400, y: 200 },
+    // },
+    elements.push({
+      id: operation_instance_name,
+      data: { label: operation_instance_name },
+      position: {
+        x: Number(transform.substring(transform.indexOf("(") + 1, transform.indexOf(","))),
+        y: Number(transform.substring(transform.indexOf(",") + 1, transform.indexOf(")"))),
+      },
+    });
+
+    // The inputs
+    // Example:
+    // { id: 'e1-2', source: '1', target: '2', label: 'updatable edge' },
+    Object.keys(flow.inputs).forEach(function(input_name) {
+
+    // {
+    //     "conditions": [
+    //         "seed"
+    //     ],
+    //     "inputs": {
+    //         "repo": [
+    //             {
+    //                 "clone_git_repo": "repo"
+    //             }
+    //         ]
+    //     }
+    // }
+      flow.inputs[input_name].forEach(function(origin) {
+
+        flow.inputs[input_name].forEach(function(origin) {
+        elements.push({
+          id: operation_instance_name + ".inputs." + input_name,
+          source: "",
+          target: operation_instance_name,
+          label: operation_instance_name + ".inputs." + input_name,
+        });
+      });
+    });
+  });
 
   console.log(elements)
 
