@@ -3,8 +3,6 @@ name: Tests
 on:
   push: {}
   pull_request: {}
-  schedule:
-  - cron:  '0 3 * * *'
 
 jobs:
   lint:
@@ -49,5 +47,6 @@ jobs:
         ./.ci/deps.sh ${{ matrix.check }}
     - name: Run check
       run: |
-        export GITHUB_TOKEN=${{ secrets.GITHUB_TOKEN }}
-        SSH_DFFML_GH_PAGES=${{ secrets.SSH_DFFML_GH_PAGES }} ./.ci/run.sh ${{ matrix.check }}
+        cd service/webui/webui
+        yarn install
+        yarn build
