@@ -1,8 +1,8 @@
 import PropTypes from 'prop-types';
 import { withStyles } from '@material-ui/core/styles';
 
-import React, { useState } from 'react';
-import ReactFlow, { Controls, updateEdge, addEdge } from 'react-flow-renderer';
+import React, { useState, memo } from 'react';
+import ReactFlow, { Handle, Controls, updateEdge, addEdge } from 'react-flow-renderer';
 
 import mermaid from 'mermaid';
 import MD5 from "crypto-js/md5";
@@ -99,6 +99,49 @@ function diagramToSVG(diagram) {
       resolve((new DOMParser()).parseFromString(svgCode, "image/svg+xml"));
     });
   });
+}
+
+async function dataflowToNodeTypes(dataflow) {
+  let nodeTypes = {};
+
+  Object.keys(dataflow.operations).forEach(function(operation_instance_name) {
+    nodeTypes[operation_instance_name] = memo(({ data }) => {
+      return (
+        <>
+          <>
+            {Object.keys(dataflow.operations[operation_instance_name].inputs).forEach(function(input_name) {
+              return (
+                <Handle
+                  key={input_name}
+                  type="target"
+                  position="left"
+                  style={{ background: '#555' }}
+                  onConnect={(params) => console.log('handle onConnect', operation_instance_name, input_name, params)}
+                />
+              );
+            })}
+          </>
+          <div>
+            Custom Color Picker Node: <strong>{data.color}</strong>
+          </div>
+          <>
+            {Object.keys(dataflow.operations[operation_instance_name].outputs).forEach(function(output_name) {
+              return (
+                <Handle
+                  key={output_name}
+                  type="source"
+                  position="right"
+                  style={{ background: '#555' }}
+                />
+              );
+            })}
+          </>
+        </>
+      );
+    });
+  });
+
+  return nodeTypes;
 }
 
 async function dataflowToElements(dataflow) {
@@ -220,7 +263,7 @@ async function elementsToDataFlow(elements, dataflow) {
 }
 
 function DataFlow(props) {
-  const { elements, modifyElements } = props;
+  const { elements, nodeTypes, modifyElements } = props;
 
   // Called after end of edge gets dragged to another source or target
   const onEdgeUpdate = (oldEdge, newConnection) =>
@@ -234,6 +277,7 @@ function DataFlow(props) {
       elements={elements}
       onLoad={onLoad}
       snapToGrid
+      nodeTypes={nodeTypes}
       onEdgeUpdate={onEdgeUpdate}
       onConnect={onConnect}
     >
@@ -245,6 +289,7 @@ function DataFlow(props) {
 DataFlow.propTypes = {
   classes: PropTypes.object.isRequired,
   elements: PropTypes.array.isRequired,
+  nodeTypes: PropTypes.object.isRequired,
   modifyElements: PropTypes.func.isRequired,
 };
 
@@ -265,17 +310,21 @@ function Content(props) {
   const { classes, backend } = props;
   const [ dataflow, setDataFlow ] = useState({});
   const [ elements, setElements ] = useState([]);
+  const [ nodeTypes, setNodeTypes ] = useState({});
 
   async function modifyDataFlow(dataflow) {
     console.log("modifyDataFlow", dataflow);
     setDataFlow(dataflow);
+    setNodeTypes(await dataflowToNodeTypes(dataflow));
     setElements(await dataflowToElements(dataflow));
   }
 
   async function modifyElements(event, data, elements) {
     console.log("modifyElements", event, data, elements);
     setElements(elements);
-    setDataFlow(await elementsToDataFlow(elements, dataflow));
+    let new_dataflow = await elementsToDataFlow(elements, dataflow);
+    setNodeTypes(await dataflowToNodeTypes(new_dataflow));
+    setDataFlow(new_dataflow);
   }
 
   // TODO Replace this with upload or create mechanism
@@ -292,6 +341,7 @@ function Content(props) {
       <DataFlow
         classes={classes}
         elements={elements}
+        nodeTypes={nodeTypes}
         modifyElements={modifyElements}
       />
     </React.Fragment>
