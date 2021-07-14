@@ -185,7 +185,46 @@ def run(*args, **kwargs):
     """
     async_gen = high_level.run(*args, **kwargs).__aiter__()
 
+    # We are running into a common issue.
+    # In Linux, a process has signal handlers. The signal handler
+    # in question right now is SIGCHLD. This signal is sent to a
+    # process when a child of that process exits. subprocess starts
+    # child processes. The process.wait() call has some internal
+    # locking under the hood.
+
+    # Child processes are started by a
+    # fork() and exec() pattern (google that read more).
+    # Essentially what happens is we make a copy (fork()) of the
+    # running process, and replace it with a new process (exec()).
+
+    # When we call asyncio.subprocess.Process.wait(), the internal
+    # lock is taken, and somewhere, SIGCHID is being waited for.
+    # I'm pretty sure this is all done through some sort of queue
+    # system or list or something. Because if we don't have the
+    # a ChildWatcher attached to our loop (which as you'll recall we
+    # create here in dffml.noasync)
     loop = asyncio.new_event_loop()
+
+    # We have two options right now
+    # 1. Use the main event loop viaasyncio.get_event_loop()
+    # 2. Grab the existing asyncio hildwatcher and attach our loop to it
+
+    # I haven't been successful in doing either of these over the years,
+    # 1. Sometimes there is no event loop, and get_event_loop() raises.
+    #   - We could I suppose just create one, although I seem to remember
+    #     there being an issue with that too.
+    # 2. Not sure how to do this, let's try this first, since this re-uses an
+    #    existing, probably correcly setup, ChildWatcher.
+
+    # Oh, oops, looks like this worked, I didn't mean to do this. lol. Wow, so
+    # many years of confusion... I have a feeling this approach will fall
+    # apart when the main test suite it run though, but let's give it a shot.
+    watcher = asyncio.FastChildWatcher()
+    # We probably need to check if there is an existing one and try to attach
+    # that though, or at a minimum grab one if it exists and then set it back
+    # when we're done.
+    asyncio.set_child_watcher(watcher)
+    watcher.attach_loop(loop)
 
     def cleanup():
         loop.run_until_complete(loop.shutdown_asyncgens())
