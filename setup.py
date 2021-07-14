@@ -151,6 +151,7 @@ setup(
         "dffml.lock.network": ["memory = dffml.df.memory:MemoryLockNetwork"],
         "dffml.operation.implementation.network": [
             "memory = dffml.df.memory:MemoryOperationImplementationNetwork"
+            "subprocess = dffml.df.subprocess:SubprocessOperationImplementationNetwork"
         ],
         "dffml.orchestrator": ["memory = dffml.df.memory:MemoryOrchestrator"],
         # Databases
