@@ -7,27 +7,7 @@ import importlib
 from typing import Optional, Callable
 
 
-def modules(
-    root: pathlib.Path,
-    package_name: str,
-    *,
-    skip: Optional[Callable[[str, pathlib.Path], bool]] = None,
-):
-    for path in root.rglob("*.py"):
-        # Figure out name
-        import_name = pathlib.Path(str(path)[len(str(root)) :]).parts[1:]
-        import_name = (
-            package_name
-            + "."
-            + ".".join(
-                list(import_name[:-1]) + [import_name[-1].replace(".py", "")]
-            )
-        )
-        # Check if we should skip importing this file
-        if skip and skip(import_name, path):
-            continue
-        # Import module
-        yield import_name, importlib.import_module(import_name)
+from .util.python import modules
 
 
 root = pathlib.Path(__file__).parent
