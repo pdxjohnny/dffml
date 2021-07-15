@@ -6,20 +6,35 @@ import pathlib
 import importlib
 from typing import Optional, Callable
 
-
 from .util.python import modules
 
 
+# Package name "dffml"
+package_name = __package__
+# Root of dffml Python package
 root = pathlib.Path(__file__).parent
+
+# Directories to skip
 skel = root / "skel"
 cli = root / "cli"
-package_name = __package__
-# Skip any files in skel and __main__.py and __init__.py
-skip = (
-    lambda _import_name, path: skel in path.parents
-    or cli in path.parents
-    or path.name.startswith("__")
-)
+# List of modules not to expose
+SKIP = ["cli", "util.cli.cmds", "util.testing.consoletest"]
+# Function to provide to modules to skip import
+def skip(import_name, path):
+    # Check if we should skip this module
+    import_name_no_package = import_name[len(package_name) + 1 :]
+    # Skip any files in skel and __main__.py and __init__.py
+    return (
+        skel in path.parents
+        or cli in path.parents
+        or path.name.startswith("__")
+        or any(
+            filter(
+                lambda check: import_name_no_package.startswith(check), SKIP
+            )
+        )
+    )
+
 
 # All classes and functions
 cls_func_all = {}
@@ -42,17 +57,10 @@ DUPLICATE_PREFER = {
     "run": "high_level",
     "list_action": "base",
 }
-# List of modules not to expose
-SKIP = ["cli", "util.cli.cmds", "util.testing.consoletest"]
 
 
 for import_name, module in modules(root, package_name, skip=skip):
     import_name_no_package = import_name[len(package_name) + 1 :]
-    # Check if we should skip this module
-    if any(
-        filter(lambda check: import_name_no_package.startswith(check), SKIP)
-    ):
-        continue
     # Iterate over all of the objects in the module
     for name, obj in inspect.getmembers(module):
         # Skip if not a class or function
