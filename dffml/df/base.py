@@ -329,6 +329,18 @@ def op(
     ...     definition=canVote.op.outputs["result"],
     ... )
     Input(value={'Bob': Person(name='Bob', age=19), 'Alice': Person(name='Alice', age=21), 'Mark': Person(name='Mark', age=90)}, definition=canVote.outputs.result)
+
+    Operations can be used from the command line
+
+    >>> import asyncio
+    >>> from dffml import op
+    >>>
+    >>> @op
+    ... def say_hello(word: str):
+    ...     print(f"Hello {word}")
+    ...
+    >>> asyncio.run(say_hello.cli("--word", "World"))
+    Hello World
     """
 
     def wrap(func):
@@ -423,6 +435,42 @@ def op(
                     return await ctx.run(kwargs)
 
         func.test = test
+
+        # Create a CLI wrapper
+        def make_op_cli(func):
+            from ..util.config.inspect import make_config_inspect
+            from ..util.cli.cmd import CMD, CMDOutputOverride
+
+
+            class FuncCMD(CMD):
+
+                CONFIG = make_config_inspect(func.__name__ + "CMDConfig", func)
+
+                async def run(self):
+                    print(self)
+                    return
+                    # The merged dataflow
+                    merged: Dict[str, Any] = {}
+                    # For entering ConfigLoader contexts
+                    async with contextlib.AsyncExitStack() as exit_stack:
+                        # Load config loaders we'll need as we see their file types
+                        parsers: Dict[str, BaseConfigLoader] = {}
+                        for path in self.dataflows:
+                            _, exported = await BaseConfigLoader.load_file(
+                                parsers, exit_stack, path
+                            )
+                            merge(merged, exported, list_append=True)
+                    # Export the dataflow
+                    dataflow = DataFlow._fromdict(**merged)
+                    async with self.configloader(BaseConfig()) as configloader:
+                        async with configloader() as loader:
+                            exported = dataflow.export(linked=not self.not_linked)
+                            print((await loader.dumpb(exported)).decode())
+
+            func.cmd = type(func.__name__ + "CMD", (FuncCMD,), {})
+            func.cli = func.cmd._main
+
+        make_op_cli(func)
 
         class Implementation(
             context_stacker(OperationImplementation, imp_enter)
