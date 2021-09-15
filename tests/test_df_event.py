@@ -71,8 +71,7 @@ DATAFLOW.update()
 
 class TestDataFlowEventTypes(AsyncTestCase):
     async def test_event_types(self):
-        # async for ctx, event, data in run(
-        async for ctx, data in run(
+        async for ctx, event, data in run(
             DATAFLOW,
             {
                 "context_A": [

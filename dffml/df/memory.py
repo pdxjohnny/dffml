@@ -1592,7 +1592,7 @@ class MemoryOrchestratorContext(BaseOrchestratorContext):
                         # Yield the context that completed and the results of its
                         # output operations
                         ctx, results = task.result()
-                        yield ctx, results
+                        yield ctx, "test", results
                     # Create more tasks to wait on the results of each of the
                     # contexts submitted if we are caping the number of them
                     while (

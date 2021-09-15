@@ -145,6 +145,11 @@ setup(
             "convert_list_to_records = dffml.operation.source:convert_list_to_records",
             "convert_records_to_list = dffml.operation.source:convert_records_to_list",
         ],
+        # DataFlow event types
+        "dffml.df.event": [
+            "input = dffml.df.event.input:InputEvent",
+            "output = dffml.df.event.output:OutputEvent",
+        ],
         "dffml.kvstore": ["memory = dffml.df.memory:MemoryKeyValueStore"],
         "dffml.input.network": ["memory = dffml.df.memory:MemoryInputNetwork"],
         "dffml.operation.network": [
