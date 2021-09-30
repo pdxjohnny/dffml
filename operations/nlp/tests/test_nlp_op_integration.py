@@ -1,4 +1,5 @@
 import os
+import json
 import shlex
 import pathlib
 import tempfile
@@ -62,15 +63,11 @@ class TestNLPOps(AsyncTestCase):
                     .replace("\\", "")
                     .split("|")[0]
                 )
-                with contextlib.redirect_stdout(self.stdout):
-                    await CLI._main(*cmnd[1:])
-                    std_output = self.stdout.getvalue()
-                    self.stdout.truncate(0)
-                    self.stdout.seek(0)
+                std_output = await CLI._main(*cmnd[1:])
                 with open(
                     os.path.join(tempdir, "nlp_ops_dataflow.json"), "w"
                 ) as fd:
-                    fd.write(std_output)
+                    json.dump(std_output, fd)
 
             with open(
                 os.path.join(ROOT, "examples", "nlp", "train.sh"), "r"
