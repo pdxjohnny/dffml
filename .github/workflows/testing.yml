@@ -18,7 +18,7 @@ jobs:
       max-parallel: 100
       matrix:
         plugin:
-        - configloader/yaml
+        - source/mongodb
         python-version:
         - 3.7
 
@@ -82,6 +82,7 @@ jobs:
         model/pytorch=${{ secrets.PYPI_MODEL_PYTORCH }}
         model/xgboost=${{ secrets.PYPI_MODEL_XGBOOST }}
         source/mysql=${{ secrets.PYPI_SOURCE_MYSQL }}
+        source/mongodb=${{ secrets.PYPI_SOURCE_MONGODB }}
         feature/git=${{ secrets.PYPI_FEATURE_GIT }}
         feature/auth=${{ secrets.PYPI_FEATURE_AUTH }}
         operations/binsec=${{ secrets.PYPI_OPERATIONS_BINSEC }}
