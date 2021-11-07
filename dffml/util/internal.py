@@ -3,8 +3,11 @@ Helper functions for dealing with internal data types
 """
 import pathlib
 import contextlib
+from typing import Optional
 
+from ..df.types import DataFlow
 from ..record import Record
+from ..configloader.configloader import BaseConfigLoader
 from ..source.source import (
     Sources,
     SourcesContext,
@@ -55,3 +58,28 @@ async def records_to_sources(*args):
             for already_open_sctx in sctxs:
                 sctx.append(already_open_sctx)
             yield sctx
+
+
+async def load_dataflow_from_configloader(
+    dataflow, configloader_cls: Optional[BaseConfigLoader] = None
+):
+    """
+    Load a dataflow from a configloader if it is not an instance of a dataflow
+    already. Optionally takes an explicitly given subclass of
+    :py:class:`BaseConfigLoader`. Otherwise currently attempts to guess based on
+    dataflow being a filepath, loads configloader registered to entrypoint of
+    the file extension.
+
+    **TODO** This just guesses based on filetype, we should also support
+    protocol's from URLs for example: ``protocol://``
+    """
+    if isinstance(dataflow, DataFlow):
+        return dataflow
+    dataflow_path = pathlib.Path(dataflow)
+    if configloader_cls is None:
+        config_type = dataflow_path.suffix.replace(".", "")
+        configloader_cls = BaseConfigLoader.load(config_type)
+    async with configloader_cls() as configloader:
+        async with configloader() as loader:
+            exported = await loader.loadb(dataflow_path.read_bytes())
+            return DataFlow._fromdict(**exported)
