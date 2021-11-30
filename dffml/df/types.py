@@ -1,7 +1,5 @@
-import sys
 import uuid
 import copy
-import types
 import itertools
 import pkg_resources
 from enum import Enum
@@ -136,12 +134,9 @@ class Definition(NamedTuple):
             # in dict
             for key, dtype in annotations_with_defaults.items():
                 annotations[key] = dtype
-            def_tuple["__module__"] = sys.modules[__name__]
             def_tuple["__annotations__"] = annotations
             kwargs["spec"] = type(
-                kwargs["spec"]["name"],
-                types.resolve_bases((NamedTuple,)),
-                def_tuple,
+                kwargs["spec"]["name"], (NamedTuple,), def_tuple
             )
         return cls(**kwargs)
 
