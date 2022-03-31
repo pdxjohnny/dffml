@@ -209,7 +209,7 @@ async def update_dataflow_config(
     # and modifes each dataflow in a RunDataFlowCustomSpec (which should
     # eventually just be our new CLI + OperationImplementation verison of
     # RunDataFlowConfig)
-    spec.dataflow.configs.update(updates)
+    # spec.dataflow.configs.update(updates)
     return {"result": spec}
 
 
@@ -226,10 +226,9 @@ async def run_dataflow_to_generate_config_updates(
     self, spec: RunDataFlowCustomSpec,
 ) -> AsyncIterator[RunDataFlowCustomOutputSpec]:
     async for outputs in run_dataflow_custom(self, spec):
+        breakpoint()
         results = outputs["result"].results
-        if results["returncode"] != 0:
-            raise RuntimeError(results["stderr"])
-        yield {"result": results["stdout"]}
+        yield {"result": results.stdout}
 
 
 @op(
@@ -299,7 +298,7 @@ bom_orchestrator = SSHOrchestrator(
         ],
     ),
 )
-# bom_orchestrator = MemoryOrchestrator()
+bom_orchestrator = MemoryOrchestrator()
 
 
 # Create orchestrators to talk to both clusters with varrying configs.
@@ -329,28 +328,7 @@ clusters = {
     ),
 }
 
-downloads = pathlib.Path("~/Downloads/").expanduser()
-if downloads.joinpath("getArtifactoryBinaries-stdout.log").is_file():
-    cached_succesful_output = [
-        Input(
-            value=downloads.joinpath(
-                "getArtifactoryBinaries-stdout.log"
-            ).read_text(),
-            definition=subprocess_line_by_line.op.outputs["stdout"],
-        ),
-        Input(
-            value=downloads.joinpath(
-                "getArtifactoryBinaries-stderr.log"
-            ).read_text(),
-            definition=subprocess_line_by_line.op.outputs["stderr"],
-        ),
-        Input(
-            value=0,
-            definition=subprocess_line_by_line.op.outputs["returncode"],
-        ),
-    ]
-
-no_cache_run_subprocess = [
+get_cmd_and_bom_inputs = [
     Input(
         value=[
             "python",
@@ -370,6 +348,24 @@ no_cache_run_subprocess = [
     ),
 ]
 
+# TODO DEBUG read from local FS for cached results
+downloads = pathlib.Path("~/Downloads/").expanduser()
+if downloads.joinpath("getArtifactoryBinaries-stdout.log").is_file():
+    get_cmd_and_bom_inputs = [
+        Input(
+            value=subprocess_line_by_line.op.outputs["result"].spec(
+                stdout=downloads.joinpath(
+                    "getArtifactoryBinaries-stdout.log"
+                ).read_text(),
+                stderr=downloads.joinpath(
+                    "getArtifactoryBinaries-stderr.log"
+                ).read_text()[-1000:],
+                returncode=1,
+            ),
+            definition=subprocess_line_by_line.op.outputs["result"],
+        ),
+    ]
+
 DATAFLOW = DataFlow(
     update_dataflow_config,
     run_dataflow_custom,
@@ -385,7 +381,10 @@ DATAFLOW = DataFlow(
         ),
         Input(
             value=RunDataFlowCustomSpec(
-                DataFlow(subprocess_line_by_line, GetSingle),
+                DataFlow(
+                    subprocess_line_by_line,
+                    subprocess_ensure_return_code_exit_success,
+                ),
                 {
                     "get_cmd_and_bom": [
                         Input(
@@ -395,9 +394,7 @@ DATAFLOW = DataFlow(
                             ],
                             definition=GetSingle.op.inputs["spec"],
                         ),
-                        # TODO DEBUG read from local FS for cached results
-                        # *cached_succesful_output,
-                        *no_cache_run_subprocess,
+                        *get_cmd_and_bom_inputs,
                     ]
                 },
                 "bom_orchestrator",
