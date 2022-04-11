@@ -37,6 +37,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Helper for creating a blank generic Python package
   `$ dffml service dev create blank mypackage`
 - Added `is_trained` flag to all models
+- Pandas dataframe source can read from Excel files
 ### Changed
 - Calls to hashlib now go through helper functions
 - Build docs using `dffml service dev docs`
