@@ -822,6 +822,518 @@ class BaseInputNetwork(BaseDataFlowObject):
     """
 
 
+@config
+class LoadSourceInputNetworkConfig:
+    pass
+
+
+class LoadSourceInputNetworkContextEntry(NamedTuple):
+    ctx: BaseInputSetContext
+    definitions: Dict[Definition, List[Input]]
+    by_origin: Dict[Union[str, Tuple[str, str]], List[Input]]
+
+
+class MemoryDefinitionSetContext(BaseDefinitionSetContext):
+    async def inputs(self, definition: Definition) -> AsyncIterator[Input]:
+        # Grab the input set context handle
+        handle = await self.ctx.handle()
+        handle_string = handle.as_string()
+        # Associate inputs with their context handle grouped by definition
+        async with self.parent.ctxhd_lock:
+            # Yield all items under the context for the given definition
+            entry = self.parent.ctxhd[handle_string]
+            for item in entry.definitions[definition]:
+                yield item
+
+
+class LoadSourceInputNetworkContext(BaseInputNetworkContext):
+    def __init__(
+        self, config: BaseConfig, parent: "LoadSourceInputNetwork"
+    ) -> None:
+        super().__init__(config, parent)
+        self.ctx_notification_set = NotificationSet()
+        self.input_notification_set = {}
+        # Organize by context handle string then by definition within that
+        self.ctxhd: Dict[str, Dict[Definition, Any]] = {}
+        # TODO Create ctxhd_locks dict to manage a per context lock
+        self.ctxhd_lock = asyncio.Lock()
+
+    async def receive_from_parent_flow(self, inputs: List[Input]):
+        """
+        Takes input from parent dataflow and adds it to every active context
+        """
+        if not inputs:
+            return
+        async with self.ctxhd_lock:
+            ctx_keys = list(self.ctxhd.keys())
+        self.logger.debug(f"Receiving {inputs} from parent flow")
+        self.logger.debug(f"Forwarding inputs to contexts {ctx_keys}")
+        for ctx in ctx_keys:
+            await self.sadd(ctx, *inputs)
+
+    async def add(self, input_set: BaseInputSet):
+        # Grab the input set context handle
+        handle = await input_set.ctx.handle()
+        handle_string = handle.as_string()
+        # TODO These ctx.add calls should probably happen after inputs are in
+        # self.ctxhd
+
+        # remove unvalidated inputs
+        unvalidated_input_set = await input_set.remove_unvalidated_inputs()
+
+        # If the context for this input set does not exist create a
+        # NotificationSet for it to notify the orchestrator
+        if not handle_string in self.input_notification_set:
+            self.input_notification_set[handle_string] = NotificationSet()
+            async with self.ctx_notification_set() as ctx:
+                await ctx.add((None, input_set.ctx))
+        # Add the input set to the incoming inputs
+        async with self.input_notification_set[handle_string]() as ctx:
+            await ctx.add((unvalidated_input_set, input_set))
+        # Associate inputs with their context handle grouped by definition
+        async with self.ctxhd_lock:
+            # Create dict for handle_string if not present
+            if not handle_string in self.ctxhd:
+                self.ctxhd[handle_string] = LoadSourceInputNetworkContextEntry(
+                    ctx=input_set.ctx, definitions={}, by_origin={}
+                )
+            # Go through each item in the input set
+            async for item in input_set.inputs():
+                # Create set for item definition if not present
+                if (
+                    not item.definition
+                    in self.ctxhd[handle_string].definitions
+                ):
+                    self.ctxhd[handle_string].definitions[item.definition] = []
+                # Add input to by definition set
+                self.ctxhd[handle_string].definitions[item.definition].append(
+                    item
+                )
+                # Create set for item origin if not present
+                if not item.origin in self.ctxhd[handle_string].by_origin:
+                    self.ctxhd[handle_string].by_origin[item.origin] = []
+                # Add input to by origin set
+                self.ctxhd[handle_string].by_origin[item.origin].append(item)
+
+    async def uadd(self, *args: Input):
+        """
+        Shorthand for creating a MemoryInputSet with a StringInputSetContext
+        containing a random value for the string.
+        """
+        # TODO(security) Allow for tuning nbytes
+        return await self.sadd(secrets.token_hex(), *args)
+
+    async def sadd(self, context_handle_string, *args: Input):
+        """
+        Shorthand for creating a MemoryInputSet with a StringInputSetContext.
+
+        >>> import asyncio
+        >>> from dffml import *
+        >>>
+        >>> async def main():
+        ...     async with MemoryOrchestrator() as orchestrator:
+        ...         async with orchestrator(DataFlow.auto()) as octx:
+        ...             await octx.ictx.sadd("Hi")
+        >>>
+        >>> asyncio.run(main())
+        """
+        ctx = StringInputSetContext(context_handle_string)
+        await self.add(
+            MemoryInputSet(MemoryInputSetConfig(ctx=ctx, inputs=list(args)))
+        )
+        return ctx
+
+    async def cadd(self, ctx, *args: Input):
+        """
+        Shorthand for creating a MemoryInputSet with an existing context.
+
+        >>> import asyncio
+        >>> from dffml import *
+        >>>
+        >>> async def main():
+        ...     async with MemoryOrchestrator() as orchestrator:
+        ...         async with orchestrator(DataFlow.auto()) as octx:
+        ...             await octx.ictx.sadd(StringInputSetContext("Hi"))
+        >>>
+        >>> asyncio.run(main())
+        """
+        await self.add(
+            MemoryInputSet(MemoryInputSetConfig(ctx=ctx, inputs=list(args)))
+        )
+        return ctx
+
+    async def ctx(self) -> Tuple[bool, BaseInputSetContext]:
+        async with self.ctx_notification_set() as ctx:
+            return await ctx.added()
+
+    async def added(
+        self, watch_ctx: BaseInputSetContext
+    ) -> Tuple[bool, BaseInputSet]:
+        # Grab the input set context handle
+        handle_string = (await watch_ctx.handle()).as_string()
+        # Notify whatever is listening for new inputs in this context
+        async with self.input_notification_set[handle_string]() as ctx:
+            """
+            return await ctx.added()
+            """
+            async with ctx.parent.event_added_lock:
+                await ctx.parent.event_added.wait()
+                ctx.parent.event_added.clear()
+                async with ctx.parent.lock:
+                    notification_items = ctx.parent.notification_items
+                    ctx.parent.notification_items = []
+                    return False, notification_items
+
+    async def definition(
+        self, ctx: BaseInputSetContext, definition: str
+    ) -> Definition:
+        async with self.ctxhd_lock:
+            # Grab the input set context handle
+            handle_string = (await ctx.handle()).as_string()
+            # Ensure that the handle_string is present in ctxhd
+            if not handle_string in self.ctxhd:
+                raise ContextNotPresent(handle_string)
+            # Search through the definitions to find one with a matching name
+            found = list(
+                filter(
+                    lambda check: check.name == definition,
+                    self.ctxhd[handle_string].definitions,
+                )
+            )
+            # Raise an error if the definition was not found in given context
+            if not found:
+                raise DefinitionNotInContext(
+                    "%s: %s" % (handle_string, definition)
+                )
+            # If found then return the definition
+            return found[0]
+
+    def definitions(
+        self, ctx: BaseInputSetContext
+    ) -> BaseDefinitionSetContext:
+        return MemoryDefinitionSetContext(self.config, self, ctx)
+
+    async def check_conditions(
+        self,
+        operation: Operation,
+        dataflow: DataFlow,
+        ctx: BaseInputSetContext,
+    ) -> bool:
+        async with self.ctxhd_lock:
+            # Grab the input set context handle
+            handle_string = (await ctx.handle()).as_string()
+            # Ensure that the handle_string is present in ctxhd
+            if not handle_string in self.ctxhd:
+                return
+            # Limit search to given context via context handle
+            return await self._check_conditions(
+                operation, dataflow, self.ctxhd[handle_string].by_origin
+            )
+
+    async def _check_conditions(
+        self,
+        operation: Operation,
+        dataflow: DataFlow,
+        by_origin: Dict[Union[str, Tuple[str, str]], List[Input]],
+    ) -> bool:
+        # Grab the input flow to check for definition overrides
+        input_flow = dataflow.flow[operation.instance_name]
+        # Return that all conditions are satisfied if there are none to satisfy
+        if not input_flow.conditions:
+            return True
+        # Check that all conditions are present and logicly True
+        for i, condition_source in enumerate(input_flow.conditions):
+            # We must check if we found an Input where the definition
+            # matches the definition of the condition in addition to
+            # checking that the Input's value is True. If we were not
+            # to check that we found a definition we would be effectively
+            # saying that the lack of presence equates with the
+            # condition being True.
+            condition_found_and_true = False
+            # Create a list of places this input originates from
+            origins = []
+            if isinstance(condition_source, dict):
+                for origin in condition_source.items():
+                    origins.append(origin)
+            else:
+                origins.append(condition_source)
+            # Ensure all conditions from all origins are True
+            for origin in origins:
+                # See comment in input_flow.inputs section
+                (
+                    alternate_definitions,
+                    origin,
+                ) = input_flow.get_alternate_definitions(origin)
+                # Bail if the condition doesn't exist
+                if not origin in by_origin:
+                    return
+                # Bail if the condition is not True
+                for item in by_origin[origin]:
+                    # TODO(p2) Alright, this shits fucked, way not clean
+                    # / clear. We're just trying to skip any conditions
+                    # (and inputs for input_flow.inputs.items()) where
+                    # the definition doesn't match, but it's within the
+                    # correct origin.
+                    if alternate_definitions:
+                        if item.definition.name not in alternate_definitions:
+                            continue
+                    elif isinstance(condition_source, str):
+                        if (
+                            item.definition.name
+                            != operation.conditions[i].name
+                        ):
+                            continue
+                    elif (
+                        item.definition.name
+                        != dataflow.operations[origin[0]]
+                        .outputs[origin[1]]
+                        .name
+                    ):
+                        continue
+                    condition_found_and_true = bool(item.value)
+            # Ensure we were able to find a condition within the input
+            # network, and that when we found it it's value was True.
+            if condition_found_and_true:
+                return True
+        return False
+
+    async def gather_inputs(
+        self,
+        rctx: "BaseRedundancyCheckerContext",
+        operation: Operation,
+        dataflow: DataFlow,
+        ctx: Optional[BaseInputSetContext] = None,
+    ) -> AsyncIterator[BaseParameterSet]:
+        # Create a mapping of definitions to inputs for that definition
+        gather: Dict[str, List[Parameter]] = {}
+        async with self.ctxhd_lock:
+            # If no context is given we will generate input pairs for all
+            # contexts
+            contexts = self.ctxhd.values()
+            # If a context is given only search definitions within that context
+            if not ctx is None:
+                # Grab the input set context handle
+                handle_string = (await ctx.handle()).as_string()
+                # Ensure that the handle_string is present in ctxhd
+                if not handle_string in self.ctxhd:
+                    return
+                # Limit search to given context via context handle
+                contexts = [self.ctxhd[handle_string]]
+            for ctx, _, by_origin in contexts:
+                # Ensure we were able to find a condition within the input
+                # network, and that when we found it it's value was True.
+                if not await self._check_conditions(
+                    operation, dataflow, by_origin
+                ):
+                    return
+                # Grab the input flow to check for definition overrides
+                input_flow = dataflow.flow[operation.instance_name]
+                # Gather all inputs with matching definitions and contexts
+                for input_name, input_sources in input_flow.inputs.items():
+                    # Create parameters for all the inputs
+                    gather[input_name] = []
+                    for input_source in input_sources:
+                        # Create a list of places this input originates from
+                        origins = []
+                        # Handle the case where we look at the first instance in
+                        # the list for the immediate alternate definition then
+                        # trace back through input origins to make sure they all
+                        # match
+                        if isinstance(input_source, list):
+                            # TODO Refactor this since we have duplicate code
+                            if isinstance(input_source[0], dict):
+                                for origin in input_source[0].items():
+                                    origins.append(origin)
+                            else:
+                                origins.append(input_source[0])
+                        elif isinstance(input_source, dict):
+                            for origin in input_source.items():
+                                origins.append(origin)
+                        else:
+                            origins.append(input_source)
+                        for origin in origins:
+                            # Check if the origin is a tuple where the first
+                            # value is the origin (such as "seed") and the
+                            # second value is an array of allowed alternate
+                            # Definition's (their names) within that origin.
+                            # These definitions will be used instead of the
+                            # default one the input specified for the
+                            # operation).
+                            (
+                                alternate_definitions,
+                                origin,
+                            ) = input_flow.get_alternate_definitions(origin)
+                            # Don't try to grab inputs from an origin that
+                            # doesn't have any to give us
+                            if not origin in by_origin:
+                                continue
+                            # Generate parameters from inputs
+                            for item in by_origin[origin]:
+                                # TODO(p2) We favored comparing names to
+                                # definitions because sometimes we create
+                                # definitions which have specs which create new
+                                # types which will not equal each other. We
+                                # maybe want to consider switching to comparing
+                                # exported Definitions
+                                if alternate_definitions:
+                                    if (
+                                        item.definition.name
+                                        not in alternate_definitions
+                                    ):
+                                        continue
+                                elif isinstance(origin, str):
+                                    if (
+                                        item.definition.name
+                                        != operation.inputs[input_name].name
+                                    ):
+                                        continue
+                                elif (
+                                    item.definition.name
+                                    != dataflow.operations[origin[0]]
+                                    .outputs[origin[1]]
+                                    .name
+                                ):
+                                    continue
+                                # When the input_source is a list of alternate
+                                # definitions we need to check each parent to
+                                # verity that it's origin matches with the list
+                                # given by input_source
+                                if isinstance(input_source, list):
+                                    all_parent_origins_match = True
+                                    # Make a list of all the origins
+                                    ancestor_origins = []
+                                    for ancestor_origin in input_source:
+                                        if isinstance(ancestor_origin, dict):
+                                            for (
+                                                ancestor_origin
+                                            ) in ancestor_origin.items():
+                                                ancestor_origins.append(
+                                                    ancestor_origin
+                                                )
+                                        else:
+                                            ancestor_origins.append(
+                                                ancestor_origin
+                                            )
+                                    i = 1
+                                    current_parent = item
+                                    while i < len(ancestor_origins):
+                                        ancestor_origin = ancestor_origins[i]
+                                        # Go through all the parents. Create a
+                                        # list of possible parents based on if
+                                        # their origin matches the alternate
+                                        # definition
+                                        possible_parents = [
+                                            parent
+                                            for parent in current_parent.parents
+                                            # If the input source is a dict then
+                                            # we need to convert it to a tuple
+                                            # for comparison to the origin
+                                            if parent.origin == ancestor_origin
+                                        ]
+                                        if not possible_parents:
+                                            all_parent_origins_match = False
+                                            break
+                                        elif len(possible_parents) > 1:
+                                            # TODO Go through each option and
+                                            # check if either is a viable
+                                            # option. Our current implementation
+                                            # only allows for valeting one path,
+                                            # due to a single current_parent
+                                            # If there is more than one option
+                                            # raise an error since we don't know
+                                            # who to choose
+                                            raise MultipleAncestorsFoundError(
+                                                (
+                                                    operation.instance_name,
+                                                    input_name,
+                                                    ancestor_origin,
+                                                    [
+                                                        parent.__dict__
+                                                        for parent in possible_parents
+                                                    ],
+                                                )
+                                            )
+                                        # Move on to the next origin to validate
+                                        i += 1
+                                        # The current_parent becomes the only
+                                        # possible parent
+                                        current_parent = possible_parents[0]
+                                    # If we didn't find any ancestor paths that
+                                    # matched then we don't use this Input
+                                    if not all_parent_origins_match:
+                                        continue
+                                gather[input_name].append(
+                                    Parameter(
+                                        key=input_name,
+                                        value=item.value,
+                                        origin=item,
+                                        definition=operation.inputs[
+                                            input_name
+                                        ],
+                                    )
+                                )
+                    # There is no data in the network for an input
+                    if not gather[input_name]:
+                        # Check if there is a default value for the parameter,
+                        # if so use it. That default will either come from the
+                        # definition attached to input_name, or it will come
+                        # from one of the alternate definition given within the
+                        # input flow for the input_name.
+                        check_for_default_value = [
+                            operation.inputs[input_name]
+                        ] + alternate_definitions
+                        for definition in check_for_default_value:
+                            # Check if the definition has a default value that is not _NO_DEFAULT
+                            if "dffml.df.types._NO_DEFAULT" not in repr(
+                                definition.default
+                            ):
+                                gather[input_name].append(
+                                    Parameter(
+                                        key=input_name,
+                                        value=definition.default,
+                                        origin=item,
+                                        definition=operation.inputs[
+                                            input_name
+                                        ],
+                                    )
+                                )
+                                break
+                        # If there is no default value, we don't have a complete
+                        # parameter set, so we bail out
+                        else:
+                            return
+        # Generate all possible permutations of applicable inputs
+        # Create the parameter set for each
+        products = list(
+            map(
+                lambda permutation: MemoryParameterSet(
+                    MemoryParameterSetConfig(ctx=ctx, parameters=permutation)
+                ),
+                product(*list(gather.values())),
+            )
+        )
+        # Check if each permutation has been executed before
+        async for parameter_set, taken in rctx.take_if_non_existant(
+            operation, *products
+        ):
+            # If taken then yield the permutation
+            if taken:
+                yield parameter_set
+
+
+@entrypoint("source.load")
+class LoadSourceInputNetwork(BaseInputNetwork, BaseMemoryDataFlowObject):
+    """
+    Load an input network with data from from underlying source on initial load.
+
+    .. code-block:: console
+        :test:
+    """
+
+    CONTEXT = LoadSourceInputNetworkContext
+    CONFIG = LoadSourceInputNetworkConfig
+
+
 class OperationImplementationNotInstantiable(Exception):
     """
     OperationImplementation cannot be instantiated and is required to continue.
