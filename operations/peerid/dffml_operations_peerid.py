@@ -73,13 +73,19 @@ from peerdid.types import (
 )
 
 
+import os
 import pathlib
 import contextlib
+
+import dffml
+
+from typing import Dict, Any
+
 
 CACHED_DOWNLOADS = pathlib.Path(__file__).parent.joinpath(".tools", "downloads")
 
 
-# FireFly Linux download
+# SSIService Linux download
 # TODO Expand to use generic download from github repo flow (see recording for
 # details)
 # - Check content length
@@ -87,138 +93,143 @@ CACHED_DOWNLOADS = pathlib.Path(__file__).parent.joinpath(".tools", "downloads")
 # - Receive content body once content length confirmed available within quota /
 #   system local resource management, i.e. traverse `Input` parents and
 #   interact with backing scarce resource.
-CACHED_FIREFLY_CLI = (
-    "https://github.com/hyperledger/firefly-cli/releases/download/v1.0.1/firefly-cli_1.0.1_Linux_x86_64.tar.gz",
-    "38b060a751ac96384cd9327eb1b1e36a21fdb71114be07434c0cc7bf63f6e1da274edebfe76f65fbd51ad2f14898b95b",
+CACHED_SSI_SERVICE_CLI = (
+    "https://github.com/TBD54566975/ssi-service/archive/bb54e46c306ba7fc20e5a1af85f2ea9454f78a86.tar.gz",
+    "324442ba5d854ae7668a211795e90f5eb216420777d51965fb9773929b602660953169c80f0ac161b714420d594f3513",
 )
 
 
 @dffml.config
-class FireFlyConfig:
-    download_url: str dffml.field("URL to FireFly CLI", default=CACHED_FIREFLY_CLI[0])
-    download_hash: str dffml.field("SHA384 hash for FireFly CLI", default=CACHED_FIREFLY_CLI[1])
-    cache_dir: str dffml.field("Directory to stored cached download of FireFly CLI", default=CACHED_DOWNLOADS)
+class SSIServiceConfig:
+    download_url: str = dffml.field("URL to SSIService CLI", default=CACHED_SSI_SERVICE_CLI[0])
+    download_hash: str = dffml.field("SHA384 hash for SSIService CLI", default=CACHED_SSI_SERVICE_CLI[1])
+    cache_dir: str = dffml.field("Directory to stored cached download of SSIService CLI", default=CACHED_DOWNLOADS)
 
 
-# Imp enter could be run dataflow which either connects to remote firefly or
+# Imp enter could be run dataflow which either connects to remote ssi_service or
 # downloads and runs (ssh tunnels, proxies, etc.)
 # TODO Remove context manager when we fix op imp_enter and ctx_enter to not
 # attempt context entry before setting return value on parent key given if
 # return value is not a context manager. We want to call coroutines instead of
 # entering their context.
 @contextlib.asynccontextmanager
-async def download_firefly_cli(self, url, hash_value, cache_dir):
+async def download_ssi_service(self, url, hash_value, cache_dir):
+    # TODO Implement load from file(s) on start if given (another pathlib.Path
+    # argument after cache_dir)
     # TODO For generic case we should remove any query string found after last
     # suffix (?..., #...)
-    firefly_cli = await cached_download_unpack_archive(
+
+    # Golang for mage
+    golang_url = "https://go.dev/dl/go1.18.1.linux-amd64.tar.gz"
+    golang_sha = ""
+    golang = await dffml.cached_download_unpack_archive(
+        golang_url,
+        cache_dir.joinpath("golang." + ''.join(pathlib.Path(golang_url).suffixes)),
+        cache_dir.joinpath("golang-download"),
+        golang_sha,
+    )
+
+    # Mage requires go
+    mage_url = "https://github.com/magefile/mage/releases/download/v1.13.0/mage_1.13.0_Linux-64bit.tar.gz"
+    mage_sha = "b4adb5b8e2239fbcd04367df5c6f4a3fa4b6a8bc7ffb2c79b300850a669dcd786606ea3af2b6014beffd257d9cbbc218"
+    mage = await dffml.cached_download_unpack_archive(
+        mage_url,
+        cache_dir.joinpath("mage." + ''.join(pathlib.Path(mage_url).suffixes)),
+        cache_dir.joinpath("mage-download"),
+        mage_sha,
+    )
+    # SSI Service is packaged as docker but we must build the container with
+    # mage
+    ssi_service = await dffml.cached_download_unpack_archive(
         url,
-        cache_dir.joinpath("firefly-cli." + '.'.join(pathlib.Path(url).suffixes)),
-        cache_dir.joinpath("firefly-cli-download"),
+        cache_dir.joinpath("ssi-service." + ''.join(pathlib.Path(url).suffixes)),
+        cache_dir.joinpath("ssi-service-download"),
         hash_value,
     )
-    return firefly_cli
+    try:
+        # Directory which ssi-service source was download to
+        kwargs = {
+            "cwd": list(cache_dir.joinpath("ssi-service-download", "").glob("*"))[0],
+        }
+
+        from pprint import pprint
+        pprint(list(golang.rglob("*")))
+
+        os.environ["GOROOT"] = str(golang / "go")
+        os.environ["GOPATH"] = str(ssi_service / ".gopath")
+        os.environ["GOBIN"] = str(ssi_service / ".gopath" / "bin")
+
+        with dffml.prepend_to_path(
+            mage,
+            golang / "go" / "bin",
+        ):
+
+            os.system("bash")
+
+            await dffml.run_command([
+                "mage",
+                "cbt",
+            ], logger=self.logger, **kwargs)
+
+        print(kwargs)
+        yield None
+        return
+
+        # Body of run_command
+
+        # Combination of stdout and stderr
+        cmd = [
+            "init",
+        ]
+        logger = self.logger
+
+        output = []
+        if logger is not None:
+            logger.debug(f"Running {cmd}, {kwargs}")
+        async for event, result in dffml.exec_subprocess(cmd, **kwargs):
+            if event == dffml.Subprocess.CREATED:
+                # Set proc when created
+                proc = result
+            elif event in [dffml.Subprocess.STDOUT_READLINE, dffml.Subprocess.STDERR_READLINE]:
+                # Log line read
+                if logger is not None:
+                    logger.debug(f"{cmd}: {event}: {result.decode().rstrip()}")
+                # Append to output in case of error
+                output.append(result)
+            # Raise if anything goes wrong
+            elif event == dffml.Subprocess.COMPLETED and result != 0:
+                raise RuntimeError(repr(cmd) + ": " + b"\n".join(output).decode())
+            print(event, result)
+            breakpoint()
+
+        yield ssi_service
+    finally:
+        # TODO Stop ssi_service
+        pass
+    # TODO Output chain to file(s)
+
 
 @dffml.op(
+    name="ssi_service.import.gateway",
+    inputs={},
+    outputs={},
+    config_cls=SSIServiceConfig,
     imp_enter={
-        "firefly": lambda self: download_firefly_cli(self, self.config),
+        "ssi_service": lambda self: download_ssi_service(
+            self,
+            self.config.download_url,
+            self.config.download_hash,
+            self.config.cache_dir,
+        ),
     }
 )
-async def firefly_import(self):
+class ssi_service_import_gateway(dffml.OperationImplementationContext):
     """
-    Takes inputs
-    """
+    Takes inputs and puts them in firely
 
-    return
-    encryption_keys = [
-        VerificationMaterialAgreement(
-            type=VerificationMethodTypeAgreement.X25519_KEY_AGREEMENT_KEY_2019,
-            format=VerificationMaterialFormatPeerDID.BASE58,
-            value="DmgBSHMqaZiYqwNMEJJuxWzsGGC8jUYADrfSdBrC6L8s",
-        )
-    ]
-    signing_keys = [
-        VerificationMaterialAuthentication(
-            type=VerificationMethodTypeAuthentication.ED25519_VERIFICATION_KEY_2018,
-            format=VerificationMaterialFormatPeerDID.BASE58,
-            value="ByHnpUCFb1vAfh9CFZ8ZkmUZguURW8nSw889hy6rD8L7",
-        )
-    ]
-    service = """
-                {
-                    "type": "DIDCommMessaging",
-                    "serviceEndpoint": "https://example.com/endpoint1",
-                    "routingKeys": ["did:example:somemediator#somekey1"],
-                    "accept": ["didcomm/v2", "didcomm/aip2;env=rfc587"]
-                }
-            """
+    We'll use the SSIService Gateway interface
 
-    peer_did_algo_0 = create_peer_did_numalgo_0(inception_key=signing_keys[0])
-    peer_did_algo_2 = create_peer_did_numalgo_2(
-        encryption_keys=encryption_keys, signing_keys=signing_keys, service=service
-    )
-
-    print("peer_did_algo_0:" + peer_did_algo_0)
-    print("==================================")
-    print("peer_did_algo_2:" + peer_did_algo_2)
-    print("==================================")
-
-    did_doc_algo_0_json = resolve_peer_did(peer_did=peer_did_algo_0)
-    did_doc_algo_2_json = resolve_peer_did(peer_did=peer_did_algo_2)
-    print("did_doc_algo_0 as JSON:" + did_doc_algo_0_json)
-    print("==================================")
-    print("did_doc_algo_2 as JSON:" + did_doc_algo_2_json)
-
-    did_doc_algo_0 = DIDDocPeerDID.from_json(did_doc_algo_0_json)
-    did_doc_algo_2 = DIDDocPeerDID.from_json(did_doc_algo_2_json)
-    print("did_doc_algo_0 as object:" + str(did_doc_algo_0.to_dict()))
-    print("==================================")
-    print("did_doc_algo_2 as object:" + str(did_doc_algo_2.to_dict()))
-
-
-# From DFFML
-from typing import Dict, Any
-
-from ..base import config
-from ..df.base import op, OperationImplementationContext
-from ..df.types import DataFlow, Input, Definition
-
-
-class InvalidCustomODAPContext(Exception):
-    """
-    Thrown when custom inputs for dffml.dataflow.run do not list an input with
-    string as its primitive as the first input.
-    """
-
-
-class InvalidCustomODAPOutputs(Exception):
-    """
-    Thrown when outputs for a custom dffml.dataflow.run do not match that of
-    it's subflow.
-    """
-
-
-@config
-class ODAPConfig:
-    dataflow: DataFlow
-
-
-DEFAULT_INPUTS = {
-    "inputs": Definition(name="flow_inputs", primitive="Dict[str,Any]")
-}
-
-
-@op(
-    name="dffml.dataflow.run",
-    inputs=DEFAULT_INPUTS,
-    outputs={
-        "results": Definition(name="flow_results", primitive="Dict[str,Any]")
-    },
-    config_cls=ODAPConfig,
-    expand=["results"],
-)
-class run_dataflow(OperationImplementationContext):
-    """
-    Starts a subflow ``self.config.dataflow`` and adds ``inputs`` in it.
+    We can have our imp_enter dump chain to cold storage
 
     Parameters
     ----------
@@ -235,52 +246,6 @@ class run_dataflow(OperationImplementationContext):
     Examples
     --------
 
-    The following shows how to use run dataflow in its default behavior.
-
-    >>> import asyncio
-    >>> from dffml import *
-    >>>
-    >>> URL = Definition(name="URL", primitive="string")
-    >>>
-    >>> subflow = DataFlow.auto(GetSingle)
-    >>> subflow.definitions[URL.name] = URL
-    >>> subflow.seed.append(
-    ...     Input(
-    ...         value=[URL.name],
-    ...         definition=GetSingle.op.inputs["spec"]
-    ...     )
-    ... )
-    >>>
-    >>> dataflow = DataFlow.auto(run_dataflow, GetSingle)
-    >>> dataflow.configs[run_dataflow.op.name] = ODAPConfig(subflow)
-    >>> dataflow.seed.append(
-    ...     Input(
-    ...         value=[run_dataflow.op.outputs["results"].name],
-    ...         definition=GetSingle.op.inputs["spec"]
-    ...     )
-    ... )
-    >>>
-    >>> async def main():
-    ...     async for ctx, results in MemoryOrchestrator.run(dataflow, {
-    ...         "run_subflow": [
-    ...             Input(
-    ...                 value={
-    ...                     "dffml": [
-    ...                         {
-    ...                             "value": "https://github.com/intel/dffml",
-    ...                             "definition": URL.name
-    ...                         }
-    ...                     ]
-    ...                 },
-    ...                 definition=run_dataflow.op.inputs["inputs"]
-    ...             )
-    ...         ]
-    ...     }):
-    ...         print(results)
-    >>>
-    >>> asyncio.run(main())
-    {'flow_results': {'dffml': {'URL': 'https://github.com/intel/dffml'}}}
-
     The following shows how to use run dataflow with custom inputs and outputs.
     This allows you to run a subflow as if it were an operation.
 
@@ -296,31 +261,14 @@ class run_dataflow(OperationImplementationContext):
     ... def last_path(url):
     ...     return {"last": url.split("/")[-1]}
     >>>
-    >>> subflow = DataFlow.auto(last_path, GetSingle)
-    >>> subflow.seed.append(
-    ...     Input(
-    ...         value=[last_path.op.outputs["last"].name],
-    ...         definition=GetSingle.op.inputs["spec"],
-    ...     )
-    ... )
-    >>>
-    >>> dataflow = DataFlow.auto(run_dataflow, GetSingle)
-    >>> dataflow.operations[run_dataflow.op.name] = run_dataflow.op._replace(
-    ...     inputs={"URL": URL},
-    ...     outputs={last_path.op.outputs["last"].name: last_path.op.outputs["last"]},
-    ...     expand=[],
-    ... )
-    >>> dataflow.configs[run_dataflow.op.name] = ODAPConfig(subflow)
-    >>> dataflow.seed.append(
-    ...     Input(
-    ...         value=[last_path.op.outputs["last"].name],
-    ...         definition=GetSingle.op.inputs["spec"],
-    ...     )
+    >>> dataflow = DataFlow.auto(last_path, ssi_service_import_gateway)
+    >>> dataflow.operations[ssi_service_import_gateway.op.name] = ssi_service_import_gateway.op._replace(
+    ...     inputs={last_path.op.outputs["last"].name: last_path.op.outputs["last"]},
     ... )
     >>> dataflow.update(auto_flow=True)
     >>>
     >>> async def main():
-    ...     async for ctx, results in MemoryOrchestrator.run(
+    ...     async for ctx, results in run(
     ...         dataflow,
     ...         {
     ...             "run_subflow": [
@@ -333,33 +281,10 @@ class run_dataflow(OperationImplementationContext):
     >>> asyncio.run(main())
     {'last_element_in_path': 'dffml'}
     """
-
-    async def run_default(self, inputs: Dict[str, Any]) -> Dict[str, Any]:
-        """
-        The default implementation for the dataflow.run operation is the uctx
-        mode. This mode is when we map unique strings to a list of inputs to be
-        given to the respective string's context.
-        """
-        inputs_created = {}
-        definitions = self.config.dataflow.definitions
-
-        for ctx_str, val_defs in inputs.items():
-            inputs_created[ctx_str] = [
-                Input(
-                    value=val_def["value"],
-                    definition=definitions[val_def["definition"]],
-                )
-                for val_def in val_defs
-            ]
-        async with self.subflow(self.config.dataflow) as octx:
-            results = [
-                {(await ctx.handle()).as_string(): result}
-                async for ctx, result in octx.run(inputs_created)
-            ]
-
-        return {"results": results}
-
-    async def run_custom(self, inputs: Dict[str, Any]) -> Dict[str, Any]:
+    async def run(self, inputs: Dict[str, Any]) -> Dict[str, Any]:
+        print(self, inputs)
+        print(self.parent.ssi_service)
+        return
         # TODO Move string primitive validation into init of
         # an OperationImplementation (and then keep this as the context).
         ctx_input_name, ctx_definition = list(self.parent.op.inputs.items())[0]
@@ -385,9 +310,103 @@ class run_dataflow(OperationImplementationContext):
                     )
                 return result
 
-    async def run(self, inputs: Dict[str, Any]) -> Dict[str, Any]:
-        # Support redefinition of operation
-        if self.parent.op.inputs == DEFAULT_INPUTS:
-            return await self.run_default(inputs["inputs"])
-        else:
-            return await self.run_custom(inputs)
+        return
+
+@dffml.op(
+    name="ssi_service.import.peerdid",
+    inputs={},
+    outputs={
+        "result": dffml.Definition(name="peerdid", primitive="object"),
+    },
+    config_cls=SSIServiceConfig,
+)
+class ssi_service_import_peerdid(dffml.OperationImplementationContext):
+    """
+    TODO Create DID after we know format in cold storage.
+    """
+    async def run(self, inputs):
+        encryption_keys = [
+            VerificationMaterialAgreement(
+                type=VerificationMethodTypeAgreement.X25519_KEY_AGREEMENT_KEY_2019,
+                format=VerificationMaterialFormatPeerDID.BASE58,
+                value="DmgBSHMqaZiYqwNMEJJuxWzsGGC8jUYADrfSdBrC6L8s",
+            )
+        ]
+        signing_keys = [
+            VerificationMaterialAuthentication(
+                type=VerificationMethodTypeAuthentication.ED25519_VERIFICATION_KEY_2018,
+                format=VerificationMaterialFormatPeerDID.BASE58,
+                value="ByHnpUCFb1vAfh9CFZ8ZkmUZguURW8nSw889hy6rD8L7",
+            )
+        ]
+        service = """
+                    {
+                        "type": "DIDCommMessaging",
+                        "serviceEndpoint": "https://example.com/endpoint1",
+                        "routingKeys": ["did:example:somemediator#somekey1"],
+                        "accept": ["didcomm/v2", "didcomm/aip2;env=rfc587"]
+                    }
+                """
+
+        peer_did_algo_0 = create_peer_did_numalgo_0(inception_key=signing_keys[0])
+        peer_did_algo_2 = create_peer_did_numalgo_2(
+            encryption_keys=encryption_keys, signing_keys=signing_keys, service=service
+        )
+
+        print("peer_did_algo_0:" + peer_did_algo_0)
+        print("==================================")
+        print("peer_did_algo_2:" + peer_did_algo_2)
+        print("==================================")
+
+        did_doc_algo_0_json = resolve_peer_did(peer_did=peer_did_algo_0)
+        did_doc_algo_2_json = resolve_peer_did(peer_did=peer_did_algo_2)
+        print("did_doc_algo_0 as JSON:" + did_doc_algo_0_json)
+        print("==================================")
+        print("did_doc_algo_2 as JSON:" + did_doc_algo_2_json)
+
+        did_doc_algo_0 = DIDDocPeerDID.from_json(did_doc_algo_0_json)
+        did_doc_algo_2 = DIDDocPeerDID.from_json(did_doc_algo_2_json)
+        print("did_doc_algo_0 as object:" + str(did_doc_algo_0.to_dict()))
+        print("==================================")
+        print("did_doc_algo_2 as object:" + str(did_doc_algo_2.to_dict()))
+
+import unittest
+import doctest
+import sys
+
+def load_tests(loader, tests, ignore):
+    # tests.addTests(doctest.DocTestSuite(sys.modules[__name__]))
+    return tests
+
+import logging
+logging.basicConfig(level=logging.DEBUG)
+import asyncio
+from dffml import *
+
+URL = Definition(name="URL", primitive="string")
+
+@op(
+    inputs={"url": URL},
+    outputs={"last": Definition("last_element_in_path", primitive="string")},
+)
+def last_path(url):
+    return {"last": url.split("/")[-1]}
+
+dataflow = DataFlow.auto(last_path, ssi_service_import_gateway)
+dataflow.operations[ssi_service_import_gateway.op.name] = ssi_service_import_gateway.op._replace(
+    inputs={last_path.op.outputs["last"].name: last_path.op.outputs["last"]},
+)
+dataflow.update(auto_flow=True)
+
+async def main():
+    async for ctx, results in run(
+        dataflow,
+        {
+            "run_subflow": [
+                Input(value="https://github.com/intel/dffml", definition=URL)
+            ]
+        },
+    ):
+        print(results)
+
+asyncio.run(main())
