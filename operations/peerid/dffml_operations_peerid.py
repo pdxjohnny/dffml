@@ -339,14 +339,17 @@ class ssi_service_import_peerdid(dffml.OperationImplementationContext):
                 value="ByHnpUCFb1vAfh9CFZ8ZkmUZguURW8nSw889hy6rD8L7",
             )
         ]
-        service = """
-                    {
-                        "type": "DIDCommMessaging",
-                        "serviceEndpoint": "https://example.com/endpoint1",
+        dataflow = self.octx.config.dataflow
+        import json
+        encoded_manifest = json.dumps(dffml.export(dataflow))
+        service = {
+                        "id": "#architecture",
+                        "type": "OpenArchitecture",
+                        "serviceEndpoint": encoded_manifest,
                         "routingKeys": ["did:example:somemediator#somekey1"],
                         "accept": ["didcomm/v2", "didcomm/aip2;env=rfc587"]
                     }
-                """
+        service = json.dumps(service)
 
         peer_did_algo_0 = create_peer_did_numalgo_0(inception_key=signing_keys[0])
         peer_did_algo_2 = create_peer_did_numalgo_2(
