@@ -392,8 +392,13 @@ URL = Definition(name="URL", primitive="string")
 def last_path(url):
     return {"last": url.split("/")[-1]}
 
-dataflow = DataFlow.auto(last_path, ssi_service_import_gateway)
-dataflow.operations[ssi_service_import_gateway.op.name] = ssi_service_import_gateway.op._replace(
+ssi_service_import = ssi_service_import_peerdid
+# ssi_service_import = ssi_service_import_gateway
+dataflow = DataFlow.auto(
+    last_path,
+    ssi_service_import,
+)
+dataflow.operations[ssi_service_import.op.name] = ssi_service_import.op._replace(
     inputs={last_path.op.outputs["last"].name: last_path.op.outputs["last"]},
 )
 dataflow.update(auto_flow=True)
