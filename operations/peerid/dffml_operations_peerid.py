@@ -312,6 +312,30 @@ class ssi_service_import_gateway(dffml.OperationImplementationContext):
 
         return
 
+
+# # Open Architecture Calling Convention
+#
+# "top level system context" means the first call into the open architecture.
+# Once within the callee, the caller is referred to as the "parent
+# system context". The callee should only be referred to as the system context,
+# unless we are talking about in relation to it being a caller itself of a sub
+# context it launches or manages. If it begins setting up a callee via forming
+# of a manifest. We will start referring to it as a "parent system
+# context" within the context of its relationship to it's new potential child.
+# A strategic plan which suggests a system context will be a parent system
+# context in the provenance data of the system context which chooses to run that
+# suggested context. A context can have multiple parents. Only one of them can
+# be a context with stage "execute".
+#
+# - Entity for top level system context is a `did:key:`
+#   - Load via overlay given on call (dffml.run(), CLI, HTTP API execution:
+#     think of new request creates new top level system context, because are
+#     going to be running some flow to respond to an event.)
+#     - In the event that multiple parties are involved in execution of the top
+#       level system context equally. An ad-hoc organization will be formed if
+#       it's not already being referenced. The entity for that org will be used.
+
+
 @dffml.op(
     name="ssi_service.import.peerdid",
     inputs={},
@@ -325,6 +349,7 @@ class ssi_service_import_peerdid(dffml.OperationImplementationContext):
     TODO Create DID after we know format in cold storage.
     """
     async def run(self, inputs):
+        # TODO Use ssh keys
         encryption_keys = [
             VerificationMaterialAgreement(
                 type=VerificationMethodTypeAgreement.X25519_KEY_AGREEMENT_KEY_2019,
