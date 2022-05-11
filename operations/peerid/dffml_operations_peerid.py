@@ -355,6 +355,57 @@ class EncyptedPrivateKey:
 import jwcrypto.jwk
 
 
+# Imp enter could be run dataflow which either connects to remote ssi_service or
+# downloads and runs (ssh tunnels, proxies, etc.)
+# TODO Remove context manager when we fix op imp_enter and ctx_enter to not
+# attempt context entry before setting return value on parent key given if
+# return value is not a context manager. We want to call coroutines instead of
+# entering their context.
+@contextlib.asynccontextmanager
+async def download_step_ca(self, cache_dir):
+    # TODO Implement load from file(s) on start if given (another pathlib.Path
+    # argument after cache_dir)
+    # TODO For generic case we should remove any query string found after last
+    # suffix (?..., #...)
+
+    # cosign_url = ""
+    # cosign_sha = ""
+    # cosign = await dffml.cached_download_unpack_archive(
+    #     cosign_url,
+    #     cache_dir.joinpath("cosign." + ''.join(pathlib.Path(cosign_url).suffixes)),
+    #     cache_dir.joinpath("cosign-download"),
+    #     cosign_sha,
+    # )
+    # SSI Service is packaged as docker but we must build the container with
+    # stepca
+    # stepca_sig_path = await dffml.cached_download(
+    #     "https://github.com/smallstep/certificates/releases/download/v0.19.0/step-ca_linux_0.19.0_amd64.tar.gz.sig",
+    #     stepca_sig.joinpath("stepca.sig"),
+    #     "0221ea842fe7936945493a68db5eeda4b6d13d4ce89bd1e8ecaeb87475d7f0dc7b5e73c8d77443273485f2d48b31a99f",
+    # )
+    stepca_url = "https://github.com/smallstep/certificates/releases/download/v0.19.0/step-ca_linux_0.19.0_amd64.tar.gz"
+    stepca_sha = "dcff858973910eefd893ff571a266187658e07435a6a97559c3c9314f24f6cdeb0d3ded9203c1717d677ac12af80bc1f"
+    stepca_archive_path = cache_dir.joinpath("stepca" + ''.join(pathlib.Path(stepca_url).suffixes))
+    # TODO(security) Add in cosign validation after download, before extract
+    stepca = await dffml.cached_download_unpack_archive(
+        stepca_url,
+        stepca_archive_path,
+        cache_dir.joinpath("stepca-download"),
+        stepca_sha,
+    )
+    # await dffml.run_command([
+    #     cosign.joinpath("cosign"),
+    #     "cosign",
+    #     "verify-blob",
+    #     "-key",
+    #     "https://raw.githubusercontent.com/smallstep/certificates/master/cosign.pub",
+    #     "-signature",
+    #     stepca_sig_path,
+    #     stepca_archive_path,
+    # ], logger=self.logger)
+    yield stepca
+
+
 @dffml.op(
     name="ssi_service.import.peerdid",
     inputs={},
@@ -362,6 +413,12 @@ import jwcrypto.jwk
         "result": dffml.Definition(name="peerdid", primitive="object"),
     },
     config_cls=EncyptedPrivateKey,
+    imp_enter={
+        "step_ca": lambda self: download_step_ca(
+            self,
+            CACHED_DOWNLOADS,
+        ),
+    }
 )
 class ssi_service_import_peerdid(dffml.OperationImplementationContext):
     """
