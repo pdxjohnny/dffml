@@ -336,50 +336,86 @@ class ssi_service_import_gateway(dffml.OperationImplementationContext):
 #       it's not already being referenced. The entity for that org will be used.
 
 
+@dffml.config
+class EncyptedPrivateKey:
+    passphrase: str = dffml.field(
+        "Password to encrypt/decypt private key",
+    )
+    comment: str = dffml.field(
+        "Comment for generated key",
+        default="no-comment",
+    )
+
+
 @dffml.op(
     name="ssi_service.import.peerdid",
     inputs={},
     outputs={
         "result": dffml.Definition(name="peerdid", primitive="object"),
     },
-    config_cls=SSIServiceConfig,
+    config_cls=EncyptedPrivateKey,
 )
 class ssi_service_import_peerdid(dffml.OperationImplementationContext):
     """
     TODO Create DID after we know format in cold storage.
     """
     async def run(self, inputs):
-        # TODO Use ssh keys
-        encryption_keys = [
-            VerificationMaterialAgreement(
-                type=VerificationMethodTypeAgreement.X25519_KEY_AGREEMENT_KEY_2019,
-                format=VerificationMaterialFormatPeerDID.BASE58,
-                value="DmgBSHMqaZiYqwNMEJJuxWzsGGC8jUYADrfSdBrC6L8s",
+        # Create ssh key in pem format.
+        # TODO Make this an operation which could be added to flow. Eventually
+        # support generating key using JWCypto.
+        import tempfile
+        with tempfile.TemporaryDirectory() as tempdir:
+            # TODO Make more of these arguments configurable in the future
+            # (subprocess operation(implementation) network.
+            await dffml.run_command(
+                [
+                    "ssh-keygen",
+                    "-t",
+                    "ed25519",
+                    "-m",
+                    "PKCS8",
+                    "-f",
+                    pathlib.Path(tempdir, "identity_root_key"),
+                    "-N",
+                    self.parent.config.passphrase,
+                    "-C",
+                    self.parent.config.comment,
+                ],
+                logger=self.logger,
             )
-        ]
-        signing_keys = [
-            VerificationMaterialAuthentication(
-                type=VerificationMethodTypeAuthentication.ED25519_VERIFICATION_KEY_2018,
-                format=VerificationMaterialFormatPeerDID.BASE58,
-                value="ByHnpUCFb1vAfh9CFZ8ZkmUZguURW8nSw889hy6rD8L7",
-            )
-        ]
-        dataflow = self.octx.config.dataflow
-        import json
-        encoded_manifest = json.dumps(dffml.export(dataflow))
-        service = {
-                        "id": "#architecture",
-                        "type": "OpenArchitecture",
-                        "serviceEndpoint": encoded_manifest,
-                        "routingKeys": ["did:example:somemediator#somekey1"],
-                        "accept": ["didcomm/v2", "didcomm/aip2;env=rfc587"]
-                    }
-        service = json.dumps(service)
+            # TODO Use ssh keys
+            encryption_keys = [
+                VerificationMaterialAgreement(
+                    type=VerificationMethodTypeAgreement.X25519_KEY_AGREEMENT_KEY_2019,
+                    format=VerificationMaterialFormatPeerDID.BASE58,
+                    value="DmgBSHMqaZiYqwNMEJJuxWzsGGC8jUYADrfSdBrC6L8s",
+                )
+            ]
+            signing_keys = [
+                VerificationMaterialAuthentication(
+                    type=VerificationMethodTypeAuthentication.ED25519_VERIFICATION_KEY_2018,
+                    format=VerificationMaterialFormatPeerDID.BASE58,
+                    value="ByHnpUCFb1vAfh9CFZ8ZkmUZguURW8nSw889hy6rD8L7",
+                )
+            ]
+            dataflow = self.octx.config.dataflow
+            import json
+            encoded_manifest = json.dumps(dffml.export(dataflow))
+            service = {
+                            "id": "#architecture",
+                            "type": "OpenArchitecture",
+                            "serviceEndpoint": encoded_manifest,
+                            "routingKeys": ["did:example:somemediator#somekey1"],
+                            "accept": ["didcomm/v2", "didcomm/aip2;env=rfc587"]
+                        }
+            service = json.dumps(service)
 
-        peer_did_algo_0 = create_peer_did_numalgo_0(inception_key=signing_keys[0])
-        peer_did_algo_2 = create_peer_did_numalgo_2(
-            encryption_keys=encryption_keys, signing_keys=signing_keys, service=service
-        )
+            peer_did_algo_0 = create_peer_did_numalgo_0(inception_key=signing_keys[0])
+            print("peer_did_algo_0:" + peer_did_algo_0)
+            return
+            peer_did_algo_2 = create_peer_did_numalgo_2(
+                encryption_keys=encryption_keys, signing_keys=signing_keys, service=service
+            )
 
         print("peer_did_algo_0:" + peer_did_algo_0)
         print("==================================")
@@ -425,6 +461,9 @@ ssi_service_import = ssi_service_import_peerdid
 dataflow = DataFlow.auto(
     last_path,
     ssi_service_import,
+)
+dataflow.configs[ssi_service_import.op.name] = EncyptedPrivateKey(
+    passphrase=os.environ["KEY_PASSPHRASE"],
 )
 dataflow.operations[ssi_service_import.op.name] = ssi_service_import.op._replace(
     inputs={last_path.op.outputs["last"].name: last_path.op.outputs["last"]},
