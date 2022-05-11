@@ -4,6 +4,10 @@
     $ pip install peerdid
 
 """
+import pprint as pprint_module
+
+pprint = lambda *args, **kwargs: pprint_module.pprint(dict(args=args, kwargs=kwargs))
+
 # SPDX-License-Identifier: Apache-2.0
 # Source: https://github.com/sicpa-dlab/peer-did-python/blob/c63461860891d7c111abb6b24a51f23dad845a74/tests/test_vectors.py#L58-L95
 # All of these become Inputs within top level context when pointed at DID, it
@@ -152,8 +156,7 @@ async def download_ssi_service(self, url, hash_value, cache_dir):
             "cwd": list(cache_dir.joinpath("ssi-service-download", "").glob("*"))[0],
         }
 
-        from pprint import pprint
-        pprint(list(golang.rglob("*")))
+        pprint(golang.rglob("*"))
 
         os.environ["GOROOT"] = str(golang / "go")
         os.environ["GOPATH"] = str(ssi_service / ".gopath")
@@ -335,16 +338,21 @@ class ssi_service_import_gateway(dffml.OperationImplementationContext):
 #       level system context equally. An ad-hoc organization will be formed if
 #       it's not already being referenced. The entity for that org will be used.
 
+import sys
+
 
 @dffml.config
 class EncyptedPrivateKey:
-    passphrase: str = dffml.field(
-        "Password to encrypt/decypt private key",
+    passphrase: bytes = dffml.field(
+        "Passphrase to encrypt/decypt private key",
     )
     comment: str = dffml.field(
         "Comment for generated key",
         default="no-comment",
     )
+
+
+import jwcrypto.jwk
 
 
 @dffml.op(
@@ -365,24 +373,98 @@ class ssi_service_import_peerdid(dffml.OperationImplementationContext):
         # support generating key using JWCypto.
         import tempfile
         with tempfile.TemporaryDirectory() as tempdir:
+            tempdir_path = pathlib.Path(tempdir)
+            # The path to the root private key
+            identity_root_key_path = tempdir_path.joinpath("identity_root_key")
+            identity_root_key_pem_path = tempdir_path.joinpath("identity_root_key.pem")
+            pprint(
+                identity_root_key_path,
+                identity_root_key_pem_path,
+            )
             # TODO Make more of these arguments configurable in the future
             # (subprocess operation(implementation) network.
             await dffml.run_command(
                 [
-                    "ssh-keygen",
-                    "-t",
+                    "openssl",
+                    "genpkey",
+                    "-algorithm",
                     "ed25519",
-                    "-m",
-                    "PKCS8",
-                    "-f",
-                    pathlib.Path(tempdir, "identity_root_key"),
-                    "-N",
-                    self.parent.config.passphrase,
-                    "-C",
-                    self.parent.config.comment,
+                    "-outform",
+                    "PEM",
+                    "-out",
+                    identity_root_key_pem_path,
                 ],
                 logger=self.logger,
+                cwd=tempdir,
             )
+            pprint(
+                identity_root_key_pem_path.read_bytes(),
+            )
+            # await dffml.run_command(
+            #     [
+            #         "ssh-keygen",
+            #         "-p"
+            #         "-t",
+            #         "ed25519",
+            #         "-f",
+            #         identity_root_key_path,
+            #         "-N",
+            #         self.parent.config.passphrase,
+            #         "-C",
+            #         self.parent.config.comment,
+            #         "-m",
+            #         "pkcs8",
+            #     ],
+            #     logger=self.logger,
+            #     cwd=tempdir,
+            # )
+            # identity_root_key_pem_path.write_bytes(
+            #     identity_root_key_path.read_bytes().replace(
+            #     b"BEGIN OPENSSH PRIVATE KEY", b"BEGIN CERTIFICATE").replace(
+            #     b"END OPENSSH PRIVATE KEY", b"END CERTIFICATE"))
+            identity_root_key_path.write_bytes(b"")
+            # TODO Windows
+            identity_root_key_path.chmod(0o600)
+            identity_root_key_path.write_bytes(
+                identity_root_key_pem_path.read_bytes()
+            )
+            pprint(
+                identity_root_key_path.read_bytes(),
+            )
+            await dffml.run_command(
+                [
+                    "ssh-keygen",
+                    "-p",
+                    "-t",
+                    "ed25519",
+                    "-f",
+                    identity_root_key_path,
+                    "-N",
+                    self.parent.config.passphrase,
+                    "-m",
+                    "pem",
+                ],
+                logger=self.logger,
+                cwd=tempdir,
+            )
+            # Copy key to file to overwrite with key in pem format
+            # Read in key contents
+            identity_root_key_pem_contents = identity_root_key_pem_path.read_bytes()
+            # Import key to JWK format
+            # Initial support for PEM format PKCS8 ED25519 key
+            pprint(
+                files=list(tempdir_path.rglob("*")),
+                identity_root_key_pub=tempdir_path.joinpath("identity_root_key.pub").read_bytes(),
+                identity_root_key=identity_root_key_path.read_bytes(),
+                identity_root_pem_key=identity_root_key_pem_contents,
+                password=self.parent.config.passphrase,
+            )
+            jwk = jwcrypto.jwk.JWK().import_from_pem(
+                identity_root_key_pem_contents,
+                # password=self.parent.config.passphrase,
+            )
+            # TODO Make these arguments configurable in the future (subprocess
+            # operation(implementation) network.
             # TODO Use ssh keys
             encryption_keys = [
                 VerificationMaterialAgreement(
@@ -463,7 +545,7 @@ dataflow = DataFlow.auto(
     ssi_service_import,
 )
 dataflow.configs[ssi_service_import.op.name] = EncyptedPrivateKey(
-    passphrase=os.environ["KEY_PASSPHRASE"],
+    passphrase=os.environ["KEY_PASSPHRASE"].encode(),
 )
 dataflow.operations[ssi_service_import.op.name] = ssi_service_import.op._replace(
     inputs={last_path.op.outputs["last"].name: last_path.op.outputs["last"]},
