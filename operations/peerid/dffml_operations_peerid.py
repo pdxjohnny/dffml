@@ -560,10 +560,14 @@ class ssi_service_import_peerdid(dffml.OperationImplementationContext):
             print(jwk)
             # TODO Make these arguments configurable in the future (subprocess
             # operation(implementation) network.
-            # TODO Use ssh keys
+            # We cannot use the same key to both sign and encrypt.
+            # See peerdid readme and
+            # https://libsodium.gitbook.io/doc/quickstart#how-can-i-sign-and-encrypt-using-the-same-key-pair
+            pprint(**jwk.export_private(as_dict=True))
+            return
             encryption_keys = [
                 VerificationMaterialAgreement(
-                    type=VerificationMethodTypeAgreement.X25519_KEY_AGREEMENT_KEY_2019,
+                    type=VerificationMethodTypeAgreement.JSON_WEB_KEY_2020,
                     format=VerificationMaterialFormatPeerDID.JWK,
                     value=jwk,
                 )
