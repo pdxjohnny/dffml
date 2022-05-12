@@ -383,6 +383,16 @@ async def download_step_ca(self, cache_dir):
     #     stepca_sig.joinpath("stepca.sig"),
     #     "0221ea842fe7936945493a68db5eeda4b6d13d4ce89bd1e8ecaeb87475d7f0dc7b5e73c8d77443273485f2d48b31a99f",
     # )
+    step_url = "https://dl.step.sm/gh-release/cli/gh-release-header/v0.19.0/step_linux_0.19.0_amd64.tar.gz"
+    step_sha = "415e81cd3bdffc0727d12f8c2a2a386626ba343d0a66c9e0106fb794ebcaba57a74cbc56c6a7a8dd80d52e07d0e546dd"
+    step_archive_path = cache_dir.joinpath("step" + ''.join(pathlib.Path(step_url).suffixes))
+    # TODO(security) Add in cosign validation after download, before extract
+    step = await dffml.cached_download_unpack_archive(
+        step_url,
+        step_archive_path,
+        cache_dir.joinpath("step-download"),
+        step_sha,
+    )
     stepca_url = "https://github.com/smallstep/certificates/releases/download/v0.19.0/step-ca_linux_0.19.0_amd64.tar.gz"
     stepca_sha = "dcff858973910eefd893ff571a266187658e07435a6a97559c3c9314f24f6cdeb0d3ded9203c1717d677ac12af80bc1f"
     stepca_archive_path = cache_dir.joinpath("stepca" + ''.join(pathlib.Path(stepca_url).suffixes))
@@ -403,7 +413,20 @@ async def download_step_ca(self, cache_dir):
     #     stepca_sig_path,
     #     stepca_archive_path,
     # ], logger=self.logger)
-    yield stepca
+    binaries = [
+        path
+        for path in stepca.rglob("step-ca")
+        if path.name == "step-ca"
+    ] + [
+        path
+        for path in step.rglob("step")
+        if path.name == "step"
+    ]
+    with dffml.prepend_to_path(*[
+        str(binary.parent)
+        for binary in binaries
+    ]):
+        yield binaries
 
 
 @dffml.op(
@@ -488,58 +511,74 @@ class ssi_service_import_peerdid(dffml.OperationImplementationContext):
             pprint(
                 identity_root_key_path.read_bytes(),
             )
+            # await dffml.run_command(
+            #     [
+            #         "ssh-keygen",
+            #         "-p",
+            #         "-t",
+            #         "ed25519",
+            #         "-f",
+            #         identity_root_key_path,
+            #         "-N",
+            #         self.parent.config.passphrase,
+            #         "-m",
+            #         "pem",
+            #     ],
+            #     logger=self.logger,
+            #     cwd=tempdir,
+            # )
+
+            gen_key = "step crypto keypair --no-password --insecure --kty OKP --crv Ed25519 ssh_host_key.pem ssh_host_key"
             await dffml.run_command(
-                [
-                    "ssh-keygen",
-                    "-p",
-                    "-t",
-                    "ed25519",
-                    "-f",
-                    identity_root_key_path,
-                    "-N",
-                    self.parent.config.passphrase,
-                    "-m",
-                    "pem",
-                ],
+                gen_key.split(),
+                logger=self.logger,
+                cwd=tempdir,
+            )
+            format_key = "step crypto key format --ssh ssh_host_key.pem"
+            await dffml.run_command(
+                format_key.split(),
                 logger=self.logger,
                 cwd=tempdir,
             )
             # Copy key to file to overwrite with key in pem format
             # Read in key contents
+            identity_root_key_pem_path = tempdir_path.joinpath("ssh_host_key.pem")
             identity_root_key_pem_contents = identity_root_key_pem_path.read_bytes()
             # Import key to JWK format
             # Initial support for PEM format PKCS8 ED25519 key
             pprint(
                 files=list(tempdir_path.rglob("*")),
-                identity_root_key_pub=tempdir_path.joinpath("identity_root_key.pub").read_bytes(),
                 identity_root_key=identity_root_key_path.read_bytes(),
                 identity_root_pem_key=identity_root_key_pem_contents,
                 password=self.parent.config.passphrase,
             )
-            jwk = jwcrypto.jwk.JWK().import_from_pem(
+            jwk = jwcrypto.jwk.JWK()
+            jwk.import_from_pem(
                 identity_root_key_pem_contents,
                 # password=self.parent.config.passphrase,
             )
+            print(jwk)
             # TODO Make these arguments configurable in the future (subprocess
             # operation(implementation) network.
             # TODO Use ssh keys
             encryption_keys = [
                 VerificationMaterialAgreement(
                     type=VerificationMethodTypeAgreement.X25519_KEY_AGREEMENT_KEY_2019,
-                    format=VerificationMaterialFormatPeerDID.BASE58,
-                    value="DmgBSHMqaZiYqwNMEJJuxWzsGGC8jUYADrfSdBrC6L8s",
+                    format=VerificationMaterialFormatPeerDID.JWK,
+                    value=jwk,
                 )
             ]
             signing_keys = [
                 VerificationMaterialAuthentication(
                     type=VerificationMethodTypeAuthentication.ED25519_VERIFICATION_KEY_2018,
-                    format=VerificationMaterialFormatPeerDID.BASE58,
-                    value="ByHnpUCFb1vAfh9CFZ8ZkmUZguURW8nSw889hy6rD8L7",
+                    format=VerificationMaterialFormatPeerDID.JWK,
+                    value=jwk,
                 )
             ]
             dataflow = self.octx.config.dataflow
             import json
-            encoded_manifest = json.dumps(dffml.export(dataflow))
+            # encoded_manifest = json.dumps(dffml.export(dataflow))
+            encoded_manifest = json.dumps({})
             service = {
                             "id": "#architecture",
                             "type": "OpenArchitecture",
@@ -550,8 +589,6 @@ class ssi_service_import_peerdid(dffml.OperationImplementationContext):
             service = json.dumps(service)
 
             peer_did_algo_0 = create_peer_did_numalgo_0(inception_key=signing_keys[0])
-            print("peer_did_algo_0:" + peer_did_algo_0)
-            return
             peer_did_algo_2 = create_peer_did_numalgo_2(
                 encryption_keys=encryption_keys, signing_keys=signing_keys, service=service
             )
