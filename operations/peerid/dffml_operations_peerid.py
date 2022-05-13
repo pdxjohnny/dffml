@@ -552,31 +552,36 @@ class ssi_service_import_peerdid(dffml.OperationImplementationContext):
                 identity_root_pem_key=identity_root_key_pem_contents,
                 password=self.parent.config.passphrase,
             )
-            jwk = jwcrypto.jwk.JWK()
-            jwk.import_from_pem(
+            keys = {}
+            keys['signing'] = jwcrypto.jwk.JWK()
+            keys['signing'].import_from_pem(
                 identity_root_key_pem_contents,
                 # password=self.parent.config.passphrase,
             )
-            print(jwk)
+            print(keys['signing'])
             # TODO Make these arguments configurable in the future (subprocess
             # operation(implementation) network.
             # We cannot use the same key to both sign and encrypt.
             # See peerdid readme and
             # https://libsodium.gitbook.io/doc/quickstart#how-can-i-sign-and-encrypt-using-the-same-key-pair
-            pprint(**jwk.export_private(as_dict=True))
-            return
+            # pprint(**keys['signing'].export_private(as_dict=True))
+            # TODO These keys are not quantum safe, see KERI
+            keys['encryption'] = jwcrypto.jwk.JWK.generate(kty='OKP', crv='X25519')
+
+            pprint(encryption=keys['encryption'].export(private_key=True))
             encryption_keys = [
                 VerificationMaterialAgreement(
                     type=VerificationMethodTypeAgreement.JSON_WEB_KEY_2020,
                     format=VerificationMaterialFormatPeerDID.JWK,
-                    value=jwk,
+                    # value=keys['encryption'],
+                    value=keys['encryption'].export(private_key=True),
                 )
             ]
             signing_keys = [
                 VerificationMaterialAuthentication(
                     type=VerificationMethodTypeAuthentication.ED25519_VERIFICATION_KEY_2018,
                     format=VerificationMaterialFormatPeerDID.JWK,
-                    value=jwk,
+                    value=keys['signing'],
                 )
             ]
             dataflow = self.octx.config.dataflow
