@@ -586,8 +586,9 @@ class ssi_service_import_peerdid(dffml.OperationImplementationContext):
             ]
             dataflow = self.octx.config.dataflow
             import json
-            # encoded_manifest = json.dumps(dffml.export(dataflow))
-            encoded_manifest = json.dumps({})
+            manifest = dffml.export(dataflow)
+            manifest = {}
+            encoded_manifest = json.dumps(manifest)
             service = {
                             "id": "#architecture",
                             "type": "OpenArchitecture",
@@ -613,11 +614,81 @@ class ssi_service_import_peerdid(dffml.OperationImplementationContext):
         print("==================================")
         print("did_doc_algo_2 as JSON:" + did_doc_algo_2_json)
 
-        did_doc_algo_0 = DIDDocPeerDID.from_json(did_doc_algo_0_json)
-        did_doc_algo_2 = DIDDocPeerDID.from_json(did_doc_algo_2_json)
+        BOB_DID = did_doc_algo_0 = DIDDocPeerDID.from_json(did_doc_algo_0_json)
+        ALICE_DID = did_doc_algo_2 = DIDDocPeerDID.from_json(did_doc_algo_2_json)
         print("did_doc_algo_0 as object:" + str(did_doc_algo_0.to_dict()))
         print("==================================")
         print("did_doc_algo_2 as object:" + str(did_doc_algo_2.to_dict()))
+
+        # ALICE
+        import didcomm.message
+        message = didcomm.message.Message(
+            body=manifest,
+            id="Input.id-1234567890",
+            type="open-architecture/0.0.1",
+            frm=ALICE_DID,
+            to=[BOB_DID],
+        )
+        import didcomm.pack_signed
+
+        import didcomm.did_doc.did_resolver
+
+        class DIDResolverPeerDID(didcomm.did_doc.did_resolver.DIDResolver):
+
+            async def resolve(self, did: DID) -> Optional[DIDDoc]:
+                # This resolver should be used in the input network of the
+                # running context. As well as within a background operation
+                # which pulls in new dids (maybe just autostart operations
+                # yielding inputs).
+                await self.source.record(did)
+                # request DID Doc in JWK format
+                did_doc_json = peer_did.resolve_peer_did(did, format=VerificationMaterialFormatPeerDID.JWK)
+                did_doc = DIDDocPeerDID.from_json(did_doc_json)
+
+                return DIDDoc(
+                    did=did_doc.did,
+                    key_agreement_kids=did_doc.agreement_kids,
+                    authentication_kids=did_doc.auth_kids,
+                    verification_methods=[
+                        VerificationMethod(
+                            id=m.id,
+                            type=VerificationMethodType.JSON_WEB_KEY_2020,
+                            controller=m.controller,
+                            verification_material=VerificationMaterial(
+                                format=VerificationMaterialFormat.JWK,
+                                value=json.dumps(m.ver_material.value)
+                            )
+                        )
+                        for m in did_doc.authentication + did_doc.key_agreement
+                    ],
+                    didcomm_services=[
+                        DIDCommService(
+                            id=s.id,
+                            service_endpoint=s.service_endpoint,
+                            routing_keys=s.routing_keys,
+                            accept=s.accept
+                        )
+                        for s in did_doc.service
+                        if isinstance(s, DIDCommServicePeerDID)
+                    ] if did_doc.service else []
+                )
+
+        packed_msg = await didcomm.pack_signed.pack_signed(
+            message=message,
+            sign_frm=ALICE_DID,
+            resolvers_config=ResolversConfig(
+                secrets_resolver=SecretsResolverDemo(),
+                did_resolver=DIDResolverPeerDID(),
+            ),
+        )
+        packed_msg = pack_result.packed_msg
+        print(f"Publishing ${packed_msg}")
+
+        # BOB
+        import didcomm.unpack
+        unpack_result = await didcomm.unpack.unpack(packed_msg)
+        print(f"Got ${unpack_result.message} message signed as "
+              f"${unpack_result.metadata.signed_message}")
 
 import unittest
 import doctest
