@@ -104,6 +104,12 @@ COLLECTOR_DATAFLOW.seed = [
                 .name,
                 "by": "quarter",
             },
+            "commit_shas": {
+                "group": COLLECTOR_DATAFLOW.operations["git_repo_commit_from_date"]
+                .outputs["commit"]
+                .name,
+                "by": "quarter",
+            }
         },
         definition=COLLECTOR_DATAFLOW.definitions["group_by_spec"],
     ),
