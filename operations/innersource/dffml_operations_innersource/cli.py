@@ -68,7 +68,7 @@ COLLECTOR_DATAFLOW.seed = [
     dffml.Input(
         value={
             "authors": {"group": "author_count", "by": "quarter",},
-            "commits": {"group": "commit_count", "by": "quarter",},
+            "commit_count": {"group": "commit_count", "by": "quarter",},
             "work": {"group": "work_spread", "by": "quarter",},
             COLLECTOR_DATAFLOW.operations["lines_of_code_to_comments"]
             .outputs["code_to_comment_ratio"]
