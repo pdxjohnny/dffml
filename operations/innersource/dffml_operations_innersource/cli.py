@@ -70,12 +70,12 @@ COLLECTOR_DATAFLOW.seed = [
             "authors": {"group": "author_count", "by": "quarter",},
             "commits": {"group": "commit_count", "by": "quarter",},
             "work": {"group": "work_spread", "by": "quarter",},
-            dffml_feature_git.feature.operations.lines_of_code_to_comments.op.outputs[
-                "code_to_comment_ratio"
-            ].name: {
-                "group": dffml_feature_git.feature.operations.lines_of_code_to_comments.op.outputs[
-                    "code_to_comment_ratio"
-                ].name,
+            COLLECTOR_DATAFLOW.operations["lines_of_code_to_comments"]
+            .outputs["code_to_comment_ratio"]
+            .name: {
+                "group": COLLECTOR_DATAFLOW.operations["lines_of_code_to_comments"]
+                .outputs["code_to_comment_ratio"]
+                .name,
                 "by": "quarter",
             },
         },
@@ -83,9 +83,9 @@ COLLECTOR_DATAFLOW.seed = [
     ),
 ]
 COLLECTOR_DATAFLOW.operations[
-    dffml_feature_git.feature.operations.lines_of_code_by_language.op.name
+    COLLECTOR_DATAFLOW.operations["lines_of_code_by_language"].name
 ] = COLLECTOR_DATAFLOW.operations[
-    dffml_feature_git.feature.operations.lines_of_code_by_language.op.name
+    COLLECTOR_DATAFLOW.operations["lines_of_code_by_language"].name
 ]._replace(
     conditions=[ensure_tokei.op.outputs["result"]]
 )
