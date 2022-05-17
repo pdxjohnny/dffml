@@ -9,11 +9,10 @@ import dffml_feature_git.feature.operations
 
 from . import operations
 
+
 @dffml.config
 class EnsureTokeiConfig:
-    cache_dir: pathlib.Path = dffml.field(
-        "Cache directory to store downloads in",
-    )
+    cache_dir: pathlib.Path = dffml.field("Cache directory to store downloads in",)
     platform_urls: Dict[str, Dict[str, str]] = dffml.field(
         "Mapping of platform.system() return values to tokei download URLs with hashes",
         default_factory=lambda: {
@@ -24,17 +23,16 @@ class EnsureTokeiConfig:
             "Darwin": {
                 "url": "https://github.com/XAMPPRocky/tokei/releases/download/v10.1.1/tokei-v10.1.1-x86_64-apple-darwin.tar.gz",
                 "expected_hash": "8c8a1d8d8dd4d8bef93dabf5d2f6e27023777f8553393e269765d7ece85e68837cba4374a2615d83f071dfae22ba40e2",
-            }
+            },
         },
     )
 
+
 import contextlib
 
+
 @dffml.op(
-    config_cls=EnsureTokeiConfig,
-    imp_enter={
-        "stack": contextlib.AsyncExitStack,
-    },
+    config_cls=EnsureTokeiConfig, imp_enter={"stack": contextlib.AsyncExitStack,},
 )
 async def ensure_tokei(self) -> str:
     tokei = await dffml.cached_download_unpack_archive(
@@ -56,11 +54,7 @@ COLLECTOR_DATAFLOW = dffml.DataFlow(
     configs={
         ensure_tokei.op.name: EnsureTokeiConfig(
             cache_dir=pathlib.Path(
-                ".tools",
-                "open-architecture",
-                "innersource",
-                ".cache",
-                "tokei",
+                ".tools", "open-architecture", "innersource", ".cache", "tokei",
             )
         )
     },
@@ -79,10 +73,12 @@ COLLECTOR_DATAFLOW.seed = [
         definition=COLLECTOR_DATAFLOW.definitions["group_by_spec"],
     ),
 ]
-COLLECTOR_DATAFLOW.operations[dffml_feature_git.feature.operations.lines_of_code_by_language.op.name] = COLLECTOR_DATAFLOW.operations[dffml_feature_git.feature.operations.lines_of_code_by_language.op.name]._replace(
-    conditions=[
-        ensure_tokei.op.outputs["result"],
-    ]
+COLLECTOR_DATAFLOW.operations[
+    dffml_feature_git.feature.operations.lines_of_code_by_language.op.name
+] = COLLECTOR_DATAFLOW.operations[
+    dffml_feature_git.feature.operations.lines_of_code_by_language.op.name
+]._replace(
+    conditions=[ensure_tokei.op.outputs["result"],]
 )
 COLLECTOR_DATAFLOW.update()
 
@@ -93,12 +89,7 @@ import dffml.cli.dataflow
 
 
 DEFAULT_SOURCE = dffml.JSONSource(
-    filename=pathlib.Path(
-        ".tools",
-        "open-architecture",
-        "innersource",
-        "repos.json",
-    ),
+    filename=pathlib.Path(".tools", "open-architecture", "innersource", "repos.json",),
     readwrite=True,
     allowempty=True,
     mkdirs=True,
@@ -114,12 +105,12 @@ for dffml_cli_class_name, field_modifications in {
         # metadata setting could be less awkward
         "dataflow": {"default": COLLECTOR_DATAFLOW},
         "record_def": {"default": COLLECTOR_DATAFLOW.definitions["URL"].name},
-        "sources": {"default_factory": lambda: dffml.Sources(DEFAULT_SOURCE)}
+        "sources": {"default_factory": lambda: dffml.Sources(DEFAULT_SOURCE)},
     },
     "RunRecordSet": {
         "dataflow": {"default": COLLECTOR_DATAFLOW},
         "record_def": {"default": COLLECTOR_DATAFLOW.definitions["URL"].name},
-        "sources": {"default_factory": lambda: dffml.Sources(DEFAULT_SOURCE)}
+        "sources": {"default_factory": lambda: dffml.Sources(DEFAULT_SOURCE)},
     },
     "Diagram": {"dataflow": {"default": COLLECTOR_DATAFLOW,},},
 }.items():
