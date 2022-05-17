@@ -1,0 +1,43 @@
+# DFFML Operations PeerDID
+
+- https://github.com/TBD54566975/tbdex-whitepaper/blob/main/whitepaper.pdf
+   - tbDEX likely appropriate when we want a strategic plan to proposed and accepted by a
+   - new system context to be executed (inptu added to network)
+     - dataflow running operation is dispatched
+       - wrapped by prioritizer
+         - prioritizer checks parent / provenance information. If coming with a tbDEX ASK, reply do full before prioritizing
+         - currency in ASK is teh DID of the a system context askign to be executed
+         - currency in the COnditionalOffer is the DID of the system ccontext which can be executed by the operation with provenacne information attached.
+         - settlement receipt could be did doc
+         - This could be impelemented in daaflows applyed as overlays to both Alice and Bob's flows within prirorizers and input networks
+           - Input network must have declared list on instantiation of what inputs it might add at any time. System context is not valid unless all these declared inputs are mapped to operation inputs.
+           - One of thse inputs might be an input which dynamically add more to the declared list. Therefore for the system context ot be valid and the input network to have been used, there must be an operation within the orchetator context which will dealwith this dynamic list modfciation of the input newtowrk to maintain vlaidaisty checking.
+- reset
+  - https://youtu.be/IQtc9DXiks4
+  - What do we want?
+    - CVE Bin Tool scan distoros
+      - Standard format for a distro? Container image
+      - Leverage `reg` as used here https://gist.github.com/pdxjohnny/a0dc3a58b4651dc3761bee65a198a80d
+      - Scan list of images
+      - Save cached flows with all inputs linked to did root key via context, context should have did and be linked to the orchetsrator context. The orchestrator context should be linked ot the sytsem context, and the sytem context should be linked to the top level system context. On orchestartor context creation we should apply any overlays.
+        - CLI should be entrypont wich calls dataflow which does CLI , coudl apassrochestartor into CLI commands so that they have access somehow if they too run flows (such as the rundataflow CLI commands)
+          - CLI dataflow should accept CLI args as value of Input, as well as environment variables as another input value
+          - The default CLI dataflow will look in `DFFML_OVERLAY` and `-overlay` and apply any overlays before running the rest of the CLI dataflow (sort of like a first stage to the CLI dataflow is to load overlays over itself and then re-execute).
+          - Ensure determine overlay operation gets called before execute_cli_with_overlays.
+- NEW `-overlay` now means the dataflow we are giong to execute which will be passed a dataflow. The overlay dataflow will (via operations in it) execute any setup required, apply overlays to input dataflow, and then execute input dataflow.
+  - If overlay is not given it defaults to just executing the target dataflow (passthrough overlay)
+- `console_entry`
+  - `run(cli_dataflow, memoryorchestrator)`
+    - `return_passthrough_overlay_or_overlay_loaded_as_dataflow_from_cli_args_or_env(args, env)`
+    - execute overlay dataflow
+      - Apply any overlays to input dataflow
+      - Load or create DIDs as needed to save / load / to pass to input network for instantiation which will then use to cache / send to network while running
+      - execute input dataflow
+- web3
+  - did is the system/orchestartor context id
+  - did doc is the manifest, is the operation inputs
+  - service endpoint is the dataflow or operation we execute
+    - Some callers will have already defined via the did method the dataflow, and we may be just executing an operation where the serviceEndpoint is just the operation name, and it is understood by the executor how to pass the did doc as the input data to the impelementation
+- We should modify operations and the orchestrators to not pass any orchestrator context or orchestrator context sub variables that are not predeclared. 
+  - Declare what of anything an Operation wants to use from the orchestrator context up front in the allowlist and declare what the acceptable interface definition is (class, manifest)
+- Going to run dataflows via two run system context operation instantiated which will be similar to run_dataflow operation which will be modifed to take the orchestrator as an input. Each will share Alice’s root did to start. Then we will make one alice and one bob. We will implement the input network as a regular class rather than doing dataflow as class first
