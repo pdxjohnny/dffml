@@ -96,6 +96,14 @@ COLLECTOR_DATAFLOW.seed = [
                 .name,
                 "by": "quarter",
             },
+            COLLECTOR_DATAFLOW.operations["lines_of_code_by_language"]
+            .outputs["lines_by_language"]
+            .name: {
+                "group": COLLECTOR_DATAFLOW.operations["lines_of_code_by_language"]
+                .outputs["lines_by_language"]
+                .name,
+                "by": "quarter",
+            },
         },
         definition=COLLECTOR_DATAFLOW.definitions["group_by_spec"],
     ),
