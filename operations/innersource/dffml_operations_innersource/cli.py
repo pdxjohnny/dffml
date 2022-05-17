@@ -78,9 +78,9 @@ COLLECTOR_DATAFLOW.operations[
 ] = COLLECTOR_DATAFLOW.operations[
     dffml_feature_git.feature.operations.lines_of_code_by_language.op.name
 ]._replace(
-    conditions=[ensure_tokei.op.outputs["result"],]
+    conditions=[ensure_tokei.op.outputs["result"]]
 )
-COLLECTOR_DATAFLOW.update()
+COLLECTOR_DATAFLOW.update(auto_flow=True)
 
 
 import copy
