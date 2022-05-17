@@ -78,6 +78,14 @@ COLLECTOR_DATAFLOW.seed = [
                 .name,
                 "by": "quarter",
             },
+            COLLECTOR_DATAFLOW.operations["git_repo_release"]
+            .outputs["present"]
+            .name: {
+                "group": COLLECTOR_DATAFLOW.operations["git_repo_release"]
+                .outputs["present"]
+                .name,
+                "by": "quarter",
+            },
         },
         definition=COLLECTOR_DATAFLOW.definitions["group_by_spec"],
     ),
