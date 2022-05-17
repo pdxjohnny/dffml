@@ -44,6 +44,7 @@ async def ensure_tokei(self) -> str:
         }
     )
     self.parent.stack.enter_context(dffml.prepend_to_path(tokei))
+    return tokei.joinpath("tokei")
 
 
 COLLECTOR_DATAFLOW = dffml.DataFlow(
@@ -69,6 +70,7 @@ COLLECTOR_DATAFLOW.seed = [
             "authors": {"group": "author_count", "by": "quarter",},
             "commits": {"group": "commit_count", "by": "quarter",},
             "work": {"group": "work_spread", "by": "quarter",},
+            dffml_feature_git.feature.operations.lines_of_code_to_comments.op.outputs["code_to_comment_ratio"].name: {"group": dffml_feature_git.feature.operations.lines_of_code_to_comments.op.outputs["code_to_comment_ratio"].name, "by": "quarter",},
         },
         definition=COLLECTOR_DATAFLOW.definitions["group_by_spec"],
     ),
