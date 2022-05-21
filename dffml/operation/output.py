@@ -33,7 +33,6 @@ class GroupBySpec(NamedTuple):
             exported[convert] = await ictx.definition(ctx, exported[convert])
         return cls(**exported)
 
-
 group_by_spec = Definition(name="group_by_spec", primitive="Dict[str, Any]")
 
 group_by_output = Definition(
@@ -288,6 +287,53 @@ class GetSingle(GetMulti):
         for key, value in want.items():
             want[key] = value.pop()
         return want
+
+
+class GetMultiDataFlowsMergedSpec(NamedTuple):
+    definition: Definition
+    output_key: str
+
+    @classmethod
+    async def resolve(
+        cls,
+        ctx: BaseInputSetContext,
+        ictx: BaseInputNetworkContext,
+        exported: Dict[str, Any],
+    ):
+        # TODO Address the need to copy operation implementation inputs dict
+        # In case the input is used elsewhere in the network
+        exported = copy.deepcopy(exported)
+        # Look up the definiton for the group and by fields
+        for convert in ["definition"]:
+            exported[convert] = await ictx.definition(ctx, exported[convert])
+        return cls(**exported)
+
+    GetMultiDataFlowsMerged,
+    seed=[
+        Input(
+            value={
+                "definition": DATAFLOW,
+                "output_key": "overlayed",
+            },
+            definition=GetMultiDataFlowsMerged.op.spec,
+
+@op(
+    name="group_by",
+    inputs={"spec": group_by_spec},
+    outputs={"output": group_by_output},
+    stage=Stage.OUTPUT,
+)
+class GroupBy(OperationImplementationContext):
+    async def run(self, inputs: Dict[str, Any]) -> Dict[str, Any]:
+        # Convert group_by_spec into a dict with values being of the NamedTuple
+        # type GroupBySpec
+        outputs = {
+            key: await GroupBySpec.resolve(self.ctx, self.octx.ictx, value)
+            for key, value in inputs["spec"].items()
+        }
+        self.logger.debug("output spec: %s", outputs)
+
+group_by_spec = Definition(name="group_by_spec", primitive="Dict[str, Any]")
 
 
 associate_spec = Definition(name="associate_spec", primitive="List[str]")
