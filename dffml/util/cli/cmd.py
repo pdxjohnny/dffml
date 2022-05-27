@@ -10,10 +10,11 @@ import asyncio
 import datetime
 import argparse
 import dataclasses
-from typing import Dict, Any
+from typing import Dict, Any, Optional, NewType
 import dataclasses
 
 from ...record import Record
+from ...high_level import run
 from ...feature import Feature
 
 from ..data import export_dict, merge
@@ -86,6 +87,12 @@ log_cmd = Arg(
     required=False,
     default=logging.INFO,
 )
+overlay_cmd = Arg(
+    "-overlay",
+    help="The overlay for the top level system context",
+    required=False,
+    default=APPLY_INSTALLED_OVERLAYS,
+)
 
 
 class Parser(argparse.ArgumentParser):
@@ -99,7 +106,7 @@ class Parser(argparse.ArgumentParser):
             (name.lower().replace("_", ""), method)
             for name, method in inspect.getmembers(add_from)
         ]:
-            if inspect.isclass(method) and issubclass(method, CMD):
+            if inspect.isclass(method) and (issubclass(method, CMD) or issubclass(SystemContext)):
                 if subparsers is None:  # pragma: no cover
                     subparsers = self.add_subparsers()  # pragma: no cover
                 parser = subparsers.add_parser(
@@ -145,6 +152,12 @@ class Parser(argparse.ArgumentParser):
         except argparse.ArgumentError:
             pass
 
+        # Add `-overlay` argument if it's not already added
+        try:
+            self.add_argument(overlay_cmd.name, **overlay_cmd)
+        except argparse.ArgumentError:
+            pass
+
 
 @config
 class CMDConfig:
@@ -154,6 +167,41 @@ class CMDConfig:
         required=False,
         action=ParseLoggingAction,
     )
+    overlay: Union[None, str, DataFlow] = field(
+        "The overlay for the top level system context",
+        default=APPLY_INSTALLED_OVERLAYS,
+        required=False,
+    )
+
+
+ExtraConfig = (NewType("dffml.util.cli.cmd.extra_config", dict),)
+CMDKeywordArgs = (NewType("dffml.util.cli.cmd.extra_config", dict),)
+CLICMD = (NewType("dffml.util.cli.cmd", object),)
+# TODO CLICMDResults might Union[list, dict] or Any?
+CLICMDResults = (NewType("dffml.util.cli.cmd.results", dict),)
+
+
+async def run_cli_command(
+    self, cmd: CLICMD, extra_config, ExtraConfig, kwargs: CMDKeywordArgs,
+) -> CLICMDResults:
+    if not inspect.isclass(cmd):
+        raise TypeError(f"Unknown cmd type. Not sure what to do with cmd: {cmd!r}")
+    if issubclass(cmd, CMD):
+        # Backwards compatability with old style CLI commands
+        cmd = args.cmd(**cls.sanitize_args(vars(args)))
+        return await cmd.do_run()
+    if issubclass(cmd, SystemContext):
+        # If the command defined is a system context
+        async with self.subflow(cmd) as octx:
+            async for ctx, results in octx.run(
+                [
+                    Input(value=extra_config, definition=ExtraConfig),
+                    Input(value=kwargs, definition=CMDKeywordArgs),
+                    Input(value=cmd, definition=CLICMD),
+                ],
+            ):
+                return results
+    raise TypeError(f"Unknown cmd type. Not sure what to do with cmd: {cmd!r}")
 
 
 class CMD(object):
@@ -162,8 +210,16 @@ class CMD(object):
     EXTRA_CONFIG_ARGS = {}
     CONFIG = CMDConfig
     ENTRY_POINT_NAME = ["service"]
+    SYSTEM_CONTEXT = SystemContext(
+        parent=None,
+        inputs=[],
+        architecture=OpenArchitecture(dataflow=DataFlow(run_cli_command)),
+        orchestrator=MemoryOrchestrator(),
+    )
 
-    def __init__(self, extra_config=None, **kwargs) -> None:
+    def __init__(
+        self, extra_config: Optional[ExtraConfig] = None, **kwargs
+    ) -> None:
         if not hasattr(self, "logger"):
             self.logger = logging.getLogger(
                 "%s.%s"
@@ -216,7 +272,7 @@ class CMD(object):
     async def cli(cls, *args):
         parser, (args, unknown) = await cls.parse_args(*args)
         async with ConfigLoaders() as configloaders:
-            args.extra_config = await parse_unknown(
+            extra_config = await parse_unknown(
                 *unknown, configloaders=configloaders
             )
         if (
@@ -230,15 +286,26 @@ class CMD(object):
         if not inspect.isfunction(getattr(args.cmd, "run", None)):
             args.parser.print_help()
             return DisplayHelp
-        cmd = args.cmd(**cls.sanitize_args(vars(args)))
-        return await cmd.do_run()
+        # Run the top level system context for CLI commands
+        async for ctx, results in run(
+            cls.SYSTEM_CONTEXT,
+            [
+                Input(value=extra_config, definition=ExtraConfig),
+                Input(value=cls.sanitize_args(vars(args)), definition=CMDKeywordArgs),
+                Input(value=args.cmd, definition=CLICMD),
+                # TODO Add rest of sanitized data as Inputs in case flow wants
+                # them.
+            ],
+            overlay=args.overlay,
+        ):
+            return results
 
     @classmethod
     def sanitize_args(cls, args):
         """
         Remove CMD internals from arguments passed to subclasses of CMD.
         """
-        for rm in ["cmd", "parser", "log"]:
+        for rm in ["cmd", "parser", "log", "overlay"]:
             if rm in args:
                 del args[rm]
         return args

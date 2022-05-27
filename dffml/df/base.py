@@ -198,6 +198,47 @@ class OperationImplementation(BaseDataFlowObject):
         return loading_classes
 
 
+def op_sysctx(
+    **kwargs,
+):
+    # TODO Something about __doc__ not perseved with functools.wrap? Double
+    # check to see if we need to do anything or maybe op already handles it? Do
+    # we need to do anything more here?
+    @functools.wrap(func)
+    def wrapped():
+
+
+
+    return op(
+        config_cls=make_config(),
+        imp_enter={
+            "": 
+        },
+        ctx_enter={
+            "sysctx": 
+        },
+    )(wrapped)
+
+
+def op_dataflow(
+    system_context,
+    *args,
+    **kwargs,
+):
+    # TODO Something about __doc__ not perseved with functools.wrap? Double
+    # check to see if we need to do anything or maybe op already handles it? Do
+    # we need to do anything more here?
+    @functools.wrap(func)
+    def wrapped():
+
+    return opsc(
+        SystemContext(
+            inputs=[
+            ],
+        ),
+    )(wrapped)
+
+
 def op(
     *args,
     imp_enter=None,
@@ -371,6 +412,35 @@ def op(
             .replace(" ", "")
         )
 
+        config_cls=make_config(),
+        imp_enter={
+            "": 
+        },
+        ctx_enter={
+            "sysctx": 
+        },
+    )(wrapped)
+
+
+def op_dataflow(
+    system_context,
+    *args,
+    **kwargs,
+):
+    # TODO Something about __doc__ not perseved with functools.wrap? Double
+    # check to see if we need to do anything or maybe op already handles it? Do
+    # we need to do anything more here?
+    @functools.wrap(func)
+    def wrapped():
+
+    return opsc(
+        SystemContext(
+            inputs=[
+            ],
+        ),
+
+
+
         # Create the test method which creates the contexts and runs
         async def test(**kwargs):
             async with func.imp(BaseConfig()) as obj:
@@ -464,9 +534,13 @@ def op(
             )
             return func
 
-    # This case handles if op was called with no arguments, args will be a tuple
-    # with one element, that element being func, the function to wrap.
     if args:
+        # This case handles if op was called with no keyword arguments, args
+        # will be a tuple with one element, that element being func, the
+        # function to wrap.
+        if len(args) > 1:
+            raise NotImpelmentedError("Finish after/while we work on entities/alice/alice/conversation.py")
+
         return wrap(args[0])
 
     return wrap

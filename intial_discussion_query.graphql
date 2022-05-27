@@ -1,0 +1,50 @@
+fragment comment on DiscussionComment {
+  body
+  createdAt
+  userContentEdits(first: 50) {
+    pageInfo {
+      endCursor
+      hasNextPage
+    }
+    totalCount
+    nodes {
+      diff
+      editedAt
+    }
+  }
+}
+query ($owner: String!, $repo: String!) {
+  repository(owner: $owner, name: $repo) {
+    pinnedDiscussions(first: 1) {
+      nodes {
+        discussion {
+          title
+          body
+          category {
+            name
+          }
+          comments(first: 90) {
+            pageInfo {
+              endCursor
+              hasNextPage
+            }
+            totalCount
+            nodes {
+              ...comment
+              replies(first: 100) {
+                pageInfo {
+                  endCursor
+                  hasNextPage
+                }
+                totalCount
+                nodes {
+                  ...comment
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}

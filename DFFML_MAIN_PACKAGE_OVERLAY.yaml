@@ -1,0 +1,84 @@
+definitions:
+  DataFlowAfterOverlaysApplied:
+    name: DataFlowAfterOverlaysApplied
+    primitive: object
+  DataFlowAfterOverlaysMerged:
+    name: DataFlowAfterOverlaysMerged
+    primitive: object
+  DataFlowBeingOverlayed:
+    name: DataFlowBeingOverlayed
+    primitive: object
+  DataFlowBeingOverlayedAsDict:
+    name: DataFlowBeingOverlayedAsDict
+    primitive: object
+  DataFlowToApplyAsOverlay:
+    name: DataFlowToApplyAsOverlay
+    primitive: object
+  DataFlowWeAreApplyingOverlaysToByRunningOverlayDataflowAndPassingAsAnInput:
+    name: DataFlowWeAreApplyingOverlaysToByRunningOverlayDataflowAndPassingAsAnInput
+    primitive: object
+  unused.dict.dataflow:
+    name: unused.dict.dataflow
+    primitive: dict
+flow:
+  apply_overlay_to_dataflow_to_be_executed:
+    inputs:
+      dataflow_we_are_applying_overlays_to_by_running_overlay_dataflow_and_passing_as_an_input:
+      - seed
+      merged:
+      - dataflow_fromdict: overlays_merged
+  dataflow_fromdict:
+    inputs:
+      merged:
+      - dataflow_todict: dataflow_as_dict
+  dataflow_todict:
+    inputs:
+      dataflow:
+      - seed
+  merge:
+    inputs:
+      dst:
+      - dataflow_todict: dataflow_as_dict
+      src:
+      - seed
+linked: true
+operations:
+  apply_overlay_to_dataflow_to_be_executed:
+    inputs:
+      dataflow_we_are_applying_overlays_to_by_running_overlay_dataflow_and_passing_as_an_input: DataFlowWeAreApplyingOverlaysToByRunningOverlayDataflowAndPassingAsAnInput
+      merged: DataFlowAfterOverlaysMerged
+    name: dataflow_fromdict
+    outputs:
+      overlayed: DataFlowAfterOverlaysApplied
+    retry: 0
+    stage: output
+  dataflow_fromdict:
+    inputs:
+      merged: DataFlowBeingOverlayedAsDict
+    name: dataflow_fromdict
+    outputs:
+      overlays_merged: DataFlowAfterOverlaysMerged
+    retry: 0
+    stage: output
+  dataflow_todict:
+    inputs:
+      dataflow: DataFlowBeingOverlayed
+    name: dataflow_todict
+    outputs:
+      dataflow_as_dict: DataFlowBeingOverlayedAsDict
+    retry: 0
+    stage: processing
+  merge:
+    inputs:
+      dst: DataFlowBeingOverlayedAsDict
+      src: DataFlowToApplyAsOverlay
+    name: dataflow_merge
+    outputs:
+      merged_dataflow: unused.dict.dataflow
+    retry: 0
+    stage: output
+seed:
+- definition: DataFlowToApplyAsOverlay
+  origin: seed
+  value:
+    operations: {}
