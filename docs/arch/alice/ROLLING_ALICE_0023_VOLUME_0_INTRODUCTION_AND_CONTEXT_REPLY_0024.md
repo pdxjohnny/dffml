@@ -1,0 +1,44 @@
+- https://youtu.be/DQ2cYdKi6vo
+- Was up till 3:44
+- We hit another blue screen immediately after boot
+- Ridiculous amount is issues installing a linux USB drive (removed self from sudo on accident after install)
+  - [x] We downloaded Fedora Workstation 35 x86_64 and wrote it to a live USB
+  - [x] Boot to new fedora live USB
+  - [x] Install onto 128GB USB
+  - [x] https://github.com/dorssel/usbipd-win
+  - [x] https://devblogs.microsoft.com/commandline/connecting-usb-devices-to-wsl/
+  - [ ] Copy over home directory to USB
+  - [ ] Copy over OBS files to USB from windows homedir
+  - [ ] Boot to USB
+  - [ ] Install OBS
+  - [ ] Install discord
+  - [ ] Fuck this drive speed is way to slow when using as disk, live images do somethign to fix this, we are not them apparently
+  - [x] Eventually we fired up the server its running arch from 2017 October.
+- Software Supply Chain and Hyperledger Grid
+  - https://github.com/Cargill/grid-rfcs/blob/ryanlassigbanks-purchase-order-rfc/text/0025-purchase-orer.md
+    - Could we leverage this to request a CI/CD job be done?
+    - Use https://github.com/hyperledger/cactus to get from DID chain to Grid chain
+- SSI Service looks to implement DID key method, that doesn't seem applicable to us. Think we will abandon anythign but the lower level peer DID lirbary and just go with that for now
+- https://github.com/transmute-industries/did-key.js
+  - https://identity.foundation/peer-did-method-spec/index.html#core
+  - https://identity.foundation/peer-did-method-spec/index.html#method-specific-identifier
+  - Led us to find out that did:nacl is depreciated in favor of did:key which will be used by tdDEX folks
+  - Peer DID is the linked list version of DIDs `did:peer`
+- DID itself is a manifest
+  - It tells us format name (`did:format_name`)
+  - It tells us format version for Peer DID encoded into `numalgo` 
+  - prefix `did:example:` is the `example` DID method
+  - prefix `did:peer` is the `peer` DID method
+  - prefix `did:key` is the `key` DID method
+  - A did is a manifest, the DID method encodes the information needed for the next phase parser
+- https://github.com/openssi/peer-did-method-spec/issues/112
+- Should at other DID methods?
+  - https://w3c.github.io/did-spec-registries/#did-methods
+    - Suggest including descriptions, names not entirely helpful
+  - https://github.com/w3c/did-spec-registries
+  - Maybe we'll create our data within another IDD method for now and link later for identity aware context have a peer did which links DID attached to individual Input objects (maybe during write out).
+  - https://workday.github.io/work-did-method-spec/
+  - Reach out to Dave to see if anything has been up with his evlution off DIDs: https://github.com/dhuseby
+- We successfully put a dataflow context in a Peer DID under `serviceEndpoint`!
+
+![Detailed DID Architecture](https://w3c.github.io/did-core/diagrams/did_detailed_architecture_overview.svg)
