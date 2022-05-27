@@ -1,0 +1,3 @@
+- https://youtu.be/biiXt8hORSI
+- Treat each CLI command as a dataflow as class. Each subparser CLI command has diagram commdn which daigram slfowo, threat subcommands as subflows, with consitiionals direting exxecution
+- https://github.com/intel/dffml/issues/1387
