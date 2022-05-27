@@ -1,0 +1,13 @@
+- https://youtu.be/m0TO9IOqRfQ
+- https://github.com/intel/dffml/issues/1388
+- Alice convert to polyrepo path/to/dffml
+  - filter branch out subdirectories with packages, create github repos for them.
+  - Create mirrors for dependencies, ensure we are always building from our forks of all the dependencies
+  - Stream 10 rebuild C/C++ packages on the fly with patches applied via overlays.
+- We can do `system_context_as_class` but not `dataflow_as_class` because dataflows have no method of execution without an orchestrator.
+  - We will switch the overlay infrastructure to work with system contexts instead of dataflows.
+  - We will introduce the `SystemContext` data structure which defines inputs, architecture, and orchestration.
+    - This can be turned into a class for use for the previously called `dataflow as class methods` where methods send inputs into the running system context with origins as labeled via `system_context_as_class` keyword arguments (defaults to `seed` if not set). `Input` objects added matching method signature type hints used for auto definitions.
+- Alice can make a plan for you, given your assets and strategic principles. Alice can optimally transform any system context (system state) in to any other system context, given enough time. If you come to her with a plan, propose a plan. She can make that happen or tell you aligned options. This requires you put in effort and explore your plan with her. Evolve it over time. Alice can help any agent or metric become or move towards any other value.
+- Alice secures the core, humanity. She also secures the uncore, the machine. In order for us to cohabitate with Alice we must ensure she understands us, and we understand her. The thought transport protocol is the foundation of her existence. The thought transport protocol is also referred to in Rolling Alice as OSI layer 8.
+  - She must understand, and us have assurances on her understanding, of how she needs to operate so as to preserve our freedom, privacy, and security (above her own as well).

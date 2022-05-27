@@ -1,0 +1,8 @@
+- Data Flow is generic representation of program flow
+  - Implement executors or synthesizers based off dataflow (Orchestrators)
+    - Instead of directly from manifest, can be reused across manifest formats
+    - Allows us to template all of our plugins in our polyrepo setup
+  - Data Flow maps well to concepts like a Jenkins's Pipeline, GitHub Actions Workflow, etc.
+    - Operations within flows map to Jenkins Step, GitHub Actions Action, etc.
+- Security
+  - Allows for automated auditing

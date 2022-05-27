@@ -1,0 +1,3 @@
+- What does this allow us to do?
+  - downstream validation of all DFFML plugins
+  - throw all data from every execution into a data lake

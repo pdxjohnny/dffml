@@ -1,0 +1,1 @@
+https://github.com/TBD54566975/tbdex-whitepaper/blob/main/whitepaper.pdf They're example already includes Alice! ;P

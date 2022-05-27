@@ -1,0 +1,33 @@
+- Map actives in recorded / streamed sessions to link up issues, branches, prs, chats, etc.
+- Check out how crisper works (how does it sitch things together). Does it look for patern
+- External Service Elixir for github token rate limiting
+- https://github.com/rusterlium/rustler
+- AI that looked at codebase and generated property based testing (like fuzz testing)
+  - Try to call the functions
+    - Try to make calls with every permutation of every type with every function
+      - Here is all the data about how that execution went
+      - You now know the signature of the function, I know now the permutations, I now know the interface
+  - Then auto doc all of it
+  - AI look at all of the public functions
+    - Here's all the usages, here is all the possible things you can do
+    - Genereate docs with all the calls
+    - Could cross reference the coverage
+- Tap into the matrix, step into the flow, use the force, 6th (Nth conceptual models with acuracy dejavu), flow roll (jiujitsu)
+- Webui pop console webrtc connections opened one for chain based or enocded to from did messages connect to termals through tunnels abortearu protocols
+- https://hexdocs.pm/flow/Flow.html
+  - Elixir send the function where the data is, so it takes care of scheduling based on locality
+    - Has comms at base layer
+  - OTP - erlang is a glorified supervision tree
+    - Can hook into this to issue commands to erlang VMs, gives you fault tolerence
+    - Can run this over web3
+    - It can manage how it fails
+    - Backpressure is watching the infinate stream and it's monitoring and watching and detecting if it's oversubscribing the resources available
+    - People are using elixir with rust
+    - We deploy an elixir app
+      - We give a stream of data to the pipeline
+      - The produce plucks the head of the stream for the processes downstrema to do their work and it will stich the data bcak togethere. I twill partiion the data in parallel and then 
+      - If your process crashes, the supervision tree decides what to do (strategic plans)
+        - Model in elixir is crash, then supervisers break down
+  - Broadway is what is producing the events, flow is what
+  - Supervision tree could initaite fail fast patterns
+  - Discord uses elixir at the proxy and then rust for proecessing

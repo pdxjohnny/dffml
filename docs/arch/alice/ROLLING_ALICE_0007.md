@@ -1,0 +1,12 @@
+- Zero-th phase parser
+  - Every format has a parser
+  - Formats with multiple versions need parser per version
+    - You might maintain the version 1 parser in the 1.x branch, version 2 in the 2.x branch, etc.
+- Write "next phase" parsers specific to task and format name and format version
+  - Generate data flow description of format (in case of a manifest)
+- First line of decision making
+  - shim layer acts as reverse proxy
+  - validates, parses, directs to appropriate next phase
+  - next phase only ever needs to worry about its job
+    - Verification that we should be executing is done (security)
+    - Validation that format conforms to schema is done (complete and correct)
