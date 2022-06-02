@@ -109,8 +109,12 @@ class Parser(argparse.ArgumentParser):
             (name.lower().replace("_", ""), method)
             for name, method in inspect.getmembers(add_from)
         ]:
-            if inspect.isclass(method) and (
-                issubclass(method, CMD) or issubclass(method, SystemContext)
+            if isinstance(method, SystemContext) or (
+                inspect.isclass(method)
+                and (
+                    issubclass(method, CMD)
+                    or issubclass(method, SystemContext)
+                )
             ):
                 if subparsers is None:  # pragma: no cover
                     subparsers = self.add_subparsers()  # pragma: no cover
