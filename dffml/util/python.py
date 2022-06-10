@@ -180,3 +180,54 @@ def within_method(obj: object, method_name: str, max_depth: int = -1) -> bool:
         ):
             return True
     return False
+
+
+def is_forward_ref_dataclass(dataclass, type_cls):
+    """
+    Check if a field's type is a ForwardRef, either via being an instance, or
+    being a type which is a string. An instance of a string is not a type,
+    therefore if we see a string, we should assume it is a ForwardRef.
+    """
+    return isinstance(type_cls, (ForwardRef, str))
+
+
+def resolve_forward_ref_dataclass(dataclass, type_cls):
+    """
+    >>> import dataclasses
+    >>> import dffml
+    >>>
+    >>> @dataclasses.dataclass
+    ... class MyClass:
+    ...     a: "MyClass"
+    >>>
+    >>> dffml.resolve_forward_ref_dataclass(MyClass, list(dataclasses.fields(MyClass))[0].type)
+    """
+    if isinstance(type_cls, ForwardRef):
+        # Grab the string version
+        # See: https://github.com/python/cpython/pull/21553#discussion_r459034775
+        type_cls = type_cls.__forward_arg__
+    if not inspect.isclass(dataclass):
+        # Check if dataclass is an instance, if so, grab the class
+        dataclass = dataclass.__class__
+    # TODO(alice) NOTE HACK type_cls comparision to SystemContextConfig needs to
+    # be fixed to compare against issubclass of base (MRO?)
+    if dataclass is not None and (
+        type_cls == dataclass.__qualname__
+        or type_cls == 'SystemContextConfig'
+    ):
+        # Handle special case where string type is the dataclass. When
+        # an object is definined with a property whose type is the same
+        # as the class being defined. Therefore object is not yet
+        # defined within the scope of the object's definition. Therefore
+        # we handle the special case by checking if the name is the
+        # same.
+        type_cls = dataclass
+    else:
+        # TODO Handle case where string is used that is not the same
+        # class. This may require using ast.parse or just loading a
+        # module via importlib and inspecting the global namespace. This
+        # usually happens when a class which is used a property is
+        # defined later within the same file.
+        raise NotImplementedError(
+            "No support for string types other than own class"
+        )
