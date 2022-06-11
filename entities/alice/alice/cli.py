@@ -21,7 +21,6 @@ class AliceGitRepo(NamedTuple):
 
 DFFMLCLICMD = NewType("dffml.util.cli.CMD", object)
 
-
 # NOTE When CLI and operations are merged: All this is the same stuff that will
 # happen to Operation config_cls structures. We need a more ergonomic API to
 # obsucre the complexity dataclasses introduces when modifying fields/defaults
@@ -45,6 +44,7 @@ for dffml_cli_class_name, field_modifications in {
     setattr(
         sys.modules[__name__], new_class.__qualname__, new_class,
     )
+
 
 class ShouldiCLI(dffml.CMD):
 
@@ -70,6 +70,7 @@ class AliceCLI(dffml.CMD):
 class AliceCLI(dffml.CMD):
 
     shouldi = ShouldiCLI
+    threats = AliceThreatsMd
     # TODO 2022-05-26 13:15 PM PDT: Maybe this should be a dataflow rather than
     # a system context? Or support both more likely.
     # version = DataFlow(op(stage=Stage.OUTPUT)(get_alice_version))
