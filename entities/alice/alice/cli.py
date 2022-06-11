@@ -21,9 +21,7 @@ class ShouldiCLI(dffml.CMD):
     # TODO Take PURL or SW Heritage ID as an input definition
     use = shouldi.cli.ShouldI.install
     reuse = shouldi.use.Use
-    contribute = (
-        dffml_operations_innersource.cli.InnerSourceCLI.run.records._set
-    )
+    contribute = dffml_operations_innersource.cli.InnerSourceCLI.run.records._set
     # diagram = ShouldiDiagram
 
 
