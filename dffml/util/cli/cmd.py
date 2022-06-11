@@ -10,11 +10,14 @@ import asyncio
 import datetime
 import argparse
 import dataclasses
-from typing import Dict, Any
+from typing import Dict, Any, NewType
 import dataclasses
 
 from ...record import Record
 from ...feature import Feature
+from ...df.types import DataFlow, Operation
+from ...df.base import op
+from ...df.system_context.system_context import SystemContext
 
 from ..data import export_dict, merge
 from .arg import Arg, parse_unknown
@@ -95,11 +98,24 @@ class Parser(argparse.ArgumentParser):
         """
         # Only one subparser should be created even if multiple sub commands
         subparsers = None
-        for name, method in [
-            (name.lower().replace("_", ""), method)
-            for name, method in inspect.getmembers(add_from)
-        ]:
-            if inspect.isclass(method) and issubclass(method, CMD):
+        for name, method in (
+            [
+                (name.lower().replace("_", ""), method)
+                for name, method in inspect.getmembers(add_from)
+            ]
+            if not isinstance(add_from, SystemContext)
+            else add_from.config.upstream.operations.items()
+        ):
+            if (
+                isinstance(method, SystemContext)
+                or (
+                    inspect.isclass(method)
+                    and (
+                        issubclass(method, CMD)
+                        or issubclass(method, SystemContext)
+                    )
+                )
+            ):
                 if subparsers is None:  # pragma: no cover
                     subparsers = self.add_subparsers()  # pragma: no cover
                 parser = subparsers.add_parser(
@@ -119,8 +135,9 @@ class Parser(argparse.ArgumentParser):
 
         # Add arguments to the Parser
         position_list = {}
-        for i, field in enumerate(dataclasses.fields(add_from.CONFIG)):
-            arg = mkarg(field, dataclass=add_from.CONFIG)
+        config = getattr(add_from, "config", add_from.CONFIG)
+        for i, field in enumerate(dataclasses.fields(config)):
+            arg = mkarg(field, dataclass=config)
             if isinstance(arg, Arg):
                 position = None
                 if not "default" in arg and not arg.get("required", False):
@@ -156,8 +173,36 @@ class CMDConfig:
     )
 
 
-class CMD(object):
+ExtraConfig = NewType("dffml.util.cli.cmd.extra_config", dict)
+CMDKeywordArgs = NewType("dffml.util.cli.cmd.kwargs", dict)
+CLICMD = NewType("dffml.util.cli.cmd", object)
+# TODO CLICMDResults might Union[list, dict] or Any?
+CLICMDResults = NewType("dffml.util.cli.cmd.results", dict)
 
+
+@op
+async def run_cli_command(
+    self, cmd: CLICMD, extra_config: ExtraConfig, kwargs: CMDKeywordArgs,
+) -> CLICMDResults:
+    if inspect.isclass(cmd) and issubclass(cmd, CMD):
+        # Backwards compatability with old style CLI commands
+        cmd = cmd(**kwargs)
+        return await cmd.do_run()
+    if isinstance(cmd, SystemContext):
+        # If the command defined is a system context
+        async with self.subflow(cmd) as octx:
+            async for ctx, results in octx.run(
+                [
+                    Input(value=extra_config, definition=ExtraConfig),
+                    Input(value=kwargs, definition=CMDKeywordArgs),
+                    Input(value=cmd, definition=CLICMD),
+                ],
+            ):
+                return results
+    raise TypeError(f"Unknown cmd type. Not sure what to do with cmd: {cmd!r}")
+
+
+class CMD:
     JSONEncoder = JSONEncoder
     EXTRA_CONFIG_ARGS = {}
     CONFIG = CMDConfig
@@ -184,6 +229,7 @@ class CMD(object):
                     )
                     setattr(self, field.name, kwargs[field.name])
                 else:
+                    breakpoint()
                     self.logger.debug("Ignored %s", field.name)
 
     async def __aenter__(self):
@@ -227,7 +273,7 @@ class CMD(object):
         if getattr(args, "cmd", None) is None:
             parser.print_help()
             return DisplayHelp
-        if not inspect.isfunction(getattr(args.cmd, "run", None)):
+        if not inspect.isfunction(getattr(args.cmd, "run", None)) and not isinstance(args.cmd, SystemContext):
             args.parser.print_help()
             return DisplayHelp
         cmd = args.cmd(**cls.sanitize_args(vars(args)))

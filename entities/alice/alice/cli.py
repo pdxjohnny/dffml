@@ -40,14 +40,6 @@ class AliceCLI(dffml.CMD):
 class AliceCLI(dffml.CMD):
 
     shouldi = ShouldiCLI
-    # TODO 2022-05-26 13:15 PM PDT: Maybe this should be a dataflow rather than
-    # a system context? Or support both more likely.
-    # version = DataFlow(op(stage=Stage.OUTPUT)(get_alice_version))
-    # TODO Set parent as Input when runing and after overlay!!!
-    # parent=None,
-    # inputs=[]
-    # architecture=OpenArchitecture(dataflow=DataFlow(op(stage=Stage.OUTPUT)(get_alice_version))),
-    # orchestrator=MemoryOrchestrator(),
     # If we want results to be AliceVersion. Then we need to run the
     # operation which produces AliceVersion as an output operation.
     #
@@ -62,6 +54,8 @@ class AliceCLI(dffml.CMD):
     #
     # We will overlay output operations and check validity
     #
+    # (pdxjohnny, 2022-06-02) Not sure if this still (orig 2022-05-26) holds
+    # true:
     # For a system context to be used as a CLI command we will overlay with
     # an output operation which returns a single result within
     # dffml.util.cli.cmd. This flow should produce a result of the CLI
@@ -75,6 +69,8 @@ class AliceCLI(dffml.CMD):
     # context, we know that we cannot use this as a CLI command, since it
     # doesn't produce a CLI result.
     #
-    # Maybe we know that all CLI commands must accept an input int
-    # architecture=OpenArchitecture(dataflow=DataFlow(op(stage=Stage.OUTPUT)(get_alice_version))),
-    version = Alice.only("version")
+    # version = DataFlow(op(stage=Stage.OUTPUT)(get_alice_version))
+    #
+    # TODO Have version only run the version command
+    # version = Alice.only("version")
+    version = Alice

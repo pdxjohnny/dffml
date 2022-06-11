@@ -202,6 +202,9 @@ async def run(
     async with orchestrator:
         # Apply overlay if given or installed
         if overlay is not None:
+            import logging
+
+            logging.basicConfig(level=logging.DEBUG)
             # This effectivly creates a new system context, a direct ancestor of
             # the of the one that got passed in and the overlay.
             if inspect.isclass(overlay):

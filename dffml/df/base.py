@@ -151,7 +151,7 @@ class OperationImplementationContext(BaseDataFlowObjectContext):
             overlay_cls = overlay
             async with overlay_cls(orchestrator=self.octx.parent) as overlay:
                 async with overlay() as overlay_context:
-                    dataflow = await overlay_context.apply(dataflow)
+                    dataflow = await (overlay_context.deployment())(dataflow)
         async with self.octx.parent(dataflow) as octx:
             self.octx.subflows[self.parent.op.instance_name] = octx
             yield octx
@@ -233,6 +233,32 @@ class OperationImplementation(BaseDataFlowObject):
                 )
             )
         return loading_classes
+
+
+def op_sysctx(**kwargs,):
+    # TODO Something about __doc__ not perseved with functools.wrap? Double
+    # check to see if we need to do anything or maybe op already handles it? Do
+    # we need to do anything more here?
+    @functools.wrap(func)
+    def wrapped():
+        pass
+
+    return op(
+        config_cls=make_config(), imp_enter={"": a,}, ctx_enter={"sysctx": b,},
+    )(wrapped)
+
+
+def op_dataflow(
+    system_context, *args, **kwargs,
+):
+    # TODO Something about __doc__ not perseved with functools.wrap? Double
+    # check to see if we need to do anything or maybe op already handles it? Do
+    # we need to do anything more here?
+    @functools.wrap(func)
+    def wrapped():
+        pass
+
+    return opsc(SystemContext(inputs=[],),)(wrapped)
 
 
 def op(
@@ -501,9 +527,15 @@ def op(
             )
             return func
 
-    # This case handles if op was called with no arguments, args will be a tuple
-    # with one element, that element being func, the function to wrap.
     if args:
+        # This case handles if op was called with no keyword arguments, args
+        # will be a tuple with one element, that element being func, the
+        # function to wrap.
+        if len(args) > 1:
+            raise NotImpelmentedError(
+                "Finish after/while we work on entities/alice/alice/conversation.py"
+            )
+
         return wrap(args[0])
 
     return wrap
