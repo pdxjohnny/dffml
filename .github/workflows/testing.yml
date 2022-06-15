@@ -42,10 +42,10 @@ jobs:
         ScikitRidgeModel = dffml.Model.load("scikitridge")
 
         features = dffml.Features(
-            Feature("org_headcount", int, 1),
+            dffml.Feature("org_headcount", int, 1),
         )
         predict_features = dffml.Features(
-            Feature("weeks", int, 1), Feature("headcount", int, 1),
+            dffml.Feature("weeks", int, 1), dffml.Feature("headcount", int, 1),
         )
 
         multi_reg_model = ScikitRidgeModel(
