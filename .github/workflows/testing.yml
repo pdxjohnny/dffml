@@ -21,7 +21,6 @@ jobs:
         - 3.7
 
     steps:
-    - uses: actions/checkout@v2
     - name: Set up Python ${{ matrix.python-version }}
       uses: actions/setup-python@v2
       with:
@@ -30,7 +29,7 @@ jobs:
       run: |
         set -x
         python -m pip install -U pip setuptools wheel
-        python -m pip install . model/scikit
+        python -m pip install dffml dffml-model-scikit
     - name: Predict
       shell: python -u {0}
       run: |
