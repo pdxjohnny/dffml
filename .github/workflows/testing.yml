@@ -48,7 +48,7 @@ jobs:
 
         import dffml
 
-        ScikitRidgeModel = dffml.Model.load("scikitridge")
+        ScikitRidgeModel = dffml.Model.load("slr")
 
         features = dffml.Features(
             dffml.Feature("org_headcount", int, 1),
@@ -57,9 +57,11 @@ jobs:
             dffml.Feature("weeks", int, 1), dffml.Feature("headcount", int, 1),
         )
 
+        """
         multi_output_model = ScikitRidgeModel(
             features=features, predict=predict_features, location="scikitridgemulti",
         )
+        """
 
         weeks_model = ScikitRidgeModel(
             features=features, predict=predict_features[0], location="scikitridgemulti1",
@@ -83,11 +85,13 @@ jobs:
                 {"weeks": 12, "headcount": 17, "org_headcount": 1122},
             )
 
+            """
             await dffml.train(
                 multi_output_model,
                 {"weeks": 8, "headcount": 7, "org_headcount": 524},
                 {"weeks": 12, "headcount": 17, "org_headcount": 1122},
             )
+            """
 
             async for i, features, prediction in dffml.predict(
                 weeks_model,
@@ -101,11 +105,13 @@ jobs:
             ):
                 print("headcount", prediction)
 
+            """
             async for i, features, prediction in dffml.predict(
                 multi_output_model,
                 {"org_headcount": 7950},
             ):
                 print("multi", prediction)
+            """
 
 
         if __name__ == "__main__":
