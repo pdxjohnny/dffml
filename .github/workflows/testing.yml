@@ -62,11 +62,11 @@ jobs:
         )
 
         weeks_model = ScikitRidgeModel(
-            features=features, predict=predict_features[1], location="scikitridgemulti1",
+            features=features, predict=predict_features[0], location="scikitridgemulti1",
         )
 
         headcount_model = ScikitRidgeModel(
-            features=features, predict=predict_features[2], location="scikitridgemulti2",
+            features=features, predict=predict_features[1], location="scikitridgemulti2",
         )
 
 
