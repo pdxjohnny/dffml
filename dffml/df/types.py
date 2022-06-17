@@ -599,12 +599,12 @@ class Input(object):
         if not self.uid:
             self.uid = str(uuid.uuid4())
 
-    async def get_parents(self) -> AsyncIterator["Input"]:
+    def get_parents(self) -> Iterator["Input"]:
         return list(
             set(
                 itertools.chain(
                     *[
-                        [item] + list(set([item async for item in item.get_parents()]))
+                        [item] + list(set(item.get_parents()))
                         for item in self.parents
                     ]
                 )
