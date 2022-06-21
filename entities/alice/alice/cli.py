@@ -140,10 +140,10 @@ class AlicePleaseContributeRecommendedCommunityStandards:
         # Do not create readme if it already exists
         if has_readme:
             return
-        pathilb.Path(repo.directory, "README.md").write_text(readme_contents)
+        pathlib.Path(repo.directory, "README.md").write_text(readme_contents)
 
 
-class AlicePleaseContributeRecommendedCommunityStandardsGit:
+class AlicePleaseContributeRecommendedCommunityStandardsOverlayGit:
     ReadmeCommitMessage = NewType("repo.readme.git.commit.message", str)
     ReadmeBranch = NewType("repo.readme.git.branch", str)
     BaseBranch = NewType("repo.git.base.branch", str)
@@ -197,7 +197,7 @@ AlicePleaseContributeRecommendedCommunityStandardsExecutedFromCLI = NewType(
 import dffml.df.types
 
 # TODO A way to deactivate installed overlays so they are not merged or applied.
-class AlicePleaseContributeRecommendedCommunityStandardsCLIOverlay:
+class AlicePleaseContributeRecommendedCommunityStandardsOverlayCLI:
     CLIRunOnRepo = NewType("CLIRunOnRepo", str)
 
     @staticmethod
@@ -267,7 +267,7 @@ class AlicePleaseContributeRecommendedCommunityStandardsCLIOverlay:
                 )
 
 
-class AlicePleaseContributeRecommendedCommunityStandardsGitHubIssueOverlay:
+class AlicePleaseContributeRecommendedCommunityStandardsOverlayGitHubIssue:
     """
 
     Check if we have any other issues open for the repo
@@ -318,7 +318,7 @@ class AlicePleaseContributeRecommendedCommunityStandardsGitHubIssueOverlay:
     @staticmethod
     def readme_commit_message(
         issue_url: "ReadmeIssue",
-    ) -> AlicePleaseContributeRecommendedCommunityStandardsGit.ReadmeCommitMessage:
+    ) -> AlicePleaseContributeRecommendedCommunityStandardsOverlayGit.ReadmeCommitMessage:
         return textwrap.dedent(
             f"""
             Recommended Community Standard: README
@@ -379,14 +379,14 @@ class AlicePleaseContributeRecommendedCommunityStandardsGitHubIssueOverlay:
 
 # TODO Spawn background task (could use an orchestrator which creates a
 # GitHub Actions cron job to execute later). set_close_meta_issue_trigger
-class AlicePleaseContributeRecommendedCommunityStandardsGitHubPullRequestOverlay:
+class AlicePleaseContributeRecommendedCommunityStandardsOverlayGitHubPullRequest:
     ReadmePR = NewType("ReadmePR", str)
 
     @staticmethod
     async def readme_pr(
         repo: AliceGitRepo,
-        base: AlicePleaseContributeRecommendedCommunityStandardsGit.BaseBranch,
-        head: AlicePleaseContributeRecommendedCommunityStandardsGit.ReadmeBranch,
+        base: AlicePleaseContributeRecommendedCommunityStandardsOverlayGit.BaseBranch,
+        head: AlicePleaseContributeRecommendedCommunityStandardsOverlayGit.ReadmeBranch,
     ) -> "ReadmePR":
         """
 
@@ -453,10 +453,10 @@ class AlicePleaseContributeCLI(dffml.CMD):
                         ]
                         for cls in [
                             AlicePleaseContributeRecommendedCommunityStandards,
-                            AlicePleaseContributeRecommendedCommunityStandardsGit,
-                            AlicePleaseContributeRecommendedCommunityStandardsCLIOverlay,
-                            AlicePleaseContributeRecommendedCommunityStandardsGitHubIssueOverlay,
-                            AlicePleaseContributeRecommendedCommunityStandardsGitHubPullRequestOverlay,
+                            AlicePleaseContributeRecommendedCommunityStandardsOverlayGit,
+                            AlicePleaseContributeRecommendedCommunityStandardsOverlayCLI,
+                            AlicePleaseContributeRecommendedCommunityStandardsOverlayGitHubIssue,
+                            AlicePleaseContributeRecommendedCommunityStandardsOverlayGitHubPullRequest,
                         ]
                     ]
                 )
