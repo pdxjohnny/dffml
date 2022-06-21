@@ -24,6 +24,7 @@ class AliceGitRepo(NamedTuple):
     directory: str
     URL: str
 
+
 DFFMLCLICMD = NewType("dffml.util.cli.CMD", object)
 
 
