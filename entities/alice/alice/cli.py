@@ -123,7 +123,7 @@ class AlicePleaseContributeRecommendedCommunityStandards:
                 "alice.cli.AlicePleaseContributeRecommendedCommunityStandards:guess_repo_string_is_url"
             ]
         )
-        return AliceGitRepo(directory=repo_string, URL=repo_string,)
+        return AliceGitRepo(directory=repo_string, URL=None)
 
     def has_readme(self, repo: AliceGitRepo,) -> "HasReadme":
         return pathlib.Path(repo.directory, "README.md").exists()
