@@ -1,0 +1,1 @@
+Adb uiautomater remote capture. Show Alice how do do something on phone

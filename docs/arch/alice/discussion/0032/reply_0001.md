@@ -1,0 +1,24 @@
+Other projects to leverage:
+
+- https://docs.decentraland.org/decentraland/glossary/
+  - Leverage web3 connection here for system context visualization?
+- https://dev.opencerts.io/
+  - Review system (did jobs complete)
+  - Need to double check trust boundary situation with kcp / opimpn to see if hostel cluster could be made to be within scope for mitigation within threat model.
+  - https://github.com/digitalbazaar/vc-js
+    - Run security tools on attested systems. Introspect throughout scanning to confirm that all files were scanned via strategic plan analysis of dataflow / system context.
+  - provenance as verifiable credentials / opencert?
+    - Or is it just via Peer DID? probably peer did.
+- https://hubs.mozilla.com/
+  - https://github.com/microsoft/Microsoft-3D-Movie-Maker
+- https://github.com/alice-bot/alice (elixir, nice!)
+- https://github.com/charliegerard/gaze-detection
+- https://github.com/calcom/cal.com
+  - Scheduling meetings with Alice
+- https://github.com/zinclabs/zinc
+  - Full text search
+- https://medium.com/google-cloud/workload-identity-federation-for-on-premise-workloads-with-spiffe-24a861b3cf6c
+  - SPIFFE workload identify (similar to the github workflow OIDC claim stuff)
+- linkerd?
+- https://www.deepmind.com/blog/tackling-multiple-tasks-with-a-single-visual-language-model
+- https://adr.github.io/

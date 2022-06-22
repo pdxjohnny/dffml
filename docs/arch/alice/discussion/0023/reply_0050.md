@@ -1,0 +1,64 @@
+### 2022-05-25 UCAN Community Meeting
+
+- Mission Objective
+  - UCAN seems like a good way to do OIDC in the near future. From what we can tell this could be very useful in embedded applications. We're hoping we can leverage UCAN/Verifiable Credentials to get TPM/SGX/TDX attestations from hardware to incorporate into provenance/attestation information. DIDs and UCAN are the primitives we can use for data and auth in web3. All devices can speak VC, we can do that similar to Peer DID/DIDCommv2. It's just PGP on JSON blobs. Engaging with the https://ucan.xyz community to identify web2/web3 gateways of interest from an auth perspective (ODIC GitHub Actions Token -> UCAN token? Peer DID referencing the ODIC token?) Hoping we can ensure their auth format will support attestations from DICE devices. Then we can have our firmware through WASM all talking the same auth which will make things much easier as Alice moves through the devices.
+- 10:00 AM PDT
+  - https://lu.ma/ucan
+  - https://github.com/ucan-wg/spec/discussions/66
+- I think that the topic to start is about ensuring there is consensus amongst implementers about what fields exist within JWT so that it's UCAN standard
+  - Spec says, this is the minimum
+    - There are further specs, however the downside is:
+      - If someone doesn't like the existing implementation
+  - Pure IPDL is deterministic
+- Irakli
+  - Sign with wallet key
+  - CLient side genreate key pair
+  - Root issuer of cap is a service, doesn't have to be, sometimes is self issued, they are a claim, the resource is yours
+  - Looking at doing keybase style signing
+- Boris Mann
+  - Says that 50 millions accounts will be able to sign on if this works using this
+- Sergey Ukstov
+  - CWAY (Sign in with Etherium)
+  - Sign in with everything
+  - Signing using keys, no blockchain transaction happens
+  - Blockchain wallets are the latest PKI, we don't have to solve key management
+  - Once you sign, you are restricted to a single tab (due to metamask being a per tab thing)
+  - Would you like to give this website/ application to get these permissions for this set of actions
+    - That effectively creates a very basic capability chain
+    - Ephemeral session key created for each sign in
+    - Could do this with COCAO, but then you have a whole different world behind that browser tab (k8s, JWT, JWS style stuff)
+      - Why not use JWT, JWS
+      - For this to work, this delegation, we need to reference the parent capability
+        - This need to access the parent capability as signed by the wallet is the topic of discussion
+        - Main issue is the JWT algo
+          - Need to support secp256k1 and BLS
+          - There are JWS signing inputs which are needed
+          - Irakli Gozalighvili: You could derive JWT form out of data to be signed, then just sign with other key?
+          - JOT (aka JWT) and UCAN are strikingly similar but incompatible
+            - Key ordering, key duplication, whitespace (all permitted by the JWT spec)
+              - We're 
+- IPLD structure ideally would not generate the JWT to sign
+  - We are moving to proofs
+  - Boris: "SIWE is attempting to standardize and get this into all wallet clients"
+  - If you go from IPLD to JWT you can deterministically generate
+    - If you can't deterministically generate with JWT you can do with CBOR
+- PR 67 IPLD schema
+  - https://github.com/ucan-wg/spec/pull/67
+- Boris going IPFS
+  - IPLD work is not what Boris is really focused on
+- Biscuts reuqires you adopt data log
+  - https://www.biscuitsec.org/
+  - fission is also working on this but does not require
+    - They are also looking at identiy aware context
+- IPLD has more of a strict structure
+- Can always reencode
+- IPDL is the next level of leaning into this stuff
+- There are extentions that do AD Oauth
+  - https://docs.microsoft.com/en-us/azure/active-directory/verifiable-credentials/decentralized-identifier-overview
+- Use case Caviats are solving
+  - Benjamin: SOmeone has the ability to delicate to a bucket of data, they want 
+  - Can be expested in the second capability, you don't need the second
+- https://docs.microsoft.com/en-us/azure/active-directory/verifiable-credentials/issuer-openid
+- https://docs.microsoft.com/en-us/azure/active-directory/verifiable-credentials/introduction-to-verifiable-credentials-architecture
+- Gordon and Chris Joel have been developing Rust UCAN (cdata on github)
+  - They are building a notetaking app called subconscious

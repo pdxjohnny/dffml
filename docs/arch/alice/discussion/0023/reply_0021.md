@@ -1,0 +1,35 @@
+- https://www.frontiersin.org/articles/10.3389/fbloc.2019.00024/full
+  - Ned! NTT to him.
+  - This is 3 years ago, think remember reading this
+  - Last talked to him about DIDs he said CBOR would be great (DICE)
+- NFTs on Peer DIDs allow us to build graph
+  - Immediate Goals: leverge existing off-chain storage interfaces provided by nft.stroage and authentication via ucan (based on DIDs) to act as portion of gateway for our reverse engineering environment where we attempt to get data into firefly DLT based on DIDs.
+  - https://github.com/ucan-wg/spec/discussions/18
+    - Recording where we are talking about this is about 30 minutes into https://youtu.be/u2ZyqX-9xk8
+    - Autocodec maps to our shim / manifest encoding as DNA discussion
+  - https://github.com/nftstorage/nft.storage/tree/main/examples/ucan-node
+- Intercept route
+  - identity aware context -> ucan (via cbor) -> dice (device attestation)
+    - Allows us to share attestations via opencreds type stuff across humans / machines when our strategic plans are attempting to mitigate risk via execution of operations via implementations which have attestested properties
+- https://eips.ethereum.org/EIPS/eip-1155#metadata
+- https://eips.ethereum.org/EIPS/eip-165
+  - Detection of methods for smart contracts
+  - Should we encode to smart contract and be an execution engine for that?
+- Execution of contracts were rewarded party executes off chain system context needs information within network up front to make decision about if a party is able to accept a reward.
+- One possible flow for rewards
+  - Strategic plans publish system contexts they want executed to chain
+    - Call for Proposals to execute or hypothesize
+    - Mint NFT for system context on DID backed chain
+  - Other agents in network publish proposed applicable system contexts including what provenance information would be provided (what SLSA level can an agent meet). References to previous executions with provenance information.
+    - Like a reverse bid/purchased.
+      - Ideally multiple NFT can be "purchased" multiple times (mitigated anyways via call response proposal system, where we come to an agreement on what system context will be hyphotesised or executed. and then accpet contract on that)
+      - NFTs are likely also a help to use in solving our distributed locking needs (Inputs with `lock=True` are likely NFTs).
+    - If agent buys the system context originally minted within this example, then we have agreed to a contract which says they will hypothesize or execute the system context outlined as outlined via their response system context counter proposal.
+      - Counter proposal is effectively just another NFT minted and then Peer DID linked to original proposal. When DID for original context is prompted to sign peer link is where we do our vetting. Form peer/link, if we accept. (Can pay via whatever mechanizam, once payment is received agent will start work and then do whatever with results as asked, maybe mint another NFT with results, maybe never hits the chain, just run the dataflow)
+    - Counter proposals evaluated by analysis of historical agent execution (agent with counter proposal) data to calculate risk tolerance (i.e. based on review system of previous quality of execution or via attestation)
+    - Counter proposals are feed directly into regular dataflow execution loop and priroriatized and ran through gateway just like anything else. Can apply overlays to do context / threat model specific vetting.
+- For this recording
+  - [ ] Ensure nft.storage can interact with DID based blockchain (firefly, transact?)
+  - [ ] Deploy nft.storage and interact with it via UCAN token auth
+  - [ ] Dump resulting chain
+  - [ ] Reconstruct chain via Python code in `dffml.git/operations/peerdid` (tree has it wrong in previous commits, folder named `peerid` instead of what it should be: `peerdid`)

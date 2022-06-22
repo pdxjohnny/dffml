@@ -1,0 +1,6 @@
+- https://trustoverip.org/our-work/deliverables/
+- https://github.com/pion/awesome-pion
+- https://github.com/grantfayvor/hexcord-mediaserver
+- https://github.com/pion/webrtc/tree/master/examples/rtp-forwarder
+- https://serde.rs/
+- See 4cd70c6ff421fbc902db3499f4bfe4ebe0e6480f for arbitrary func/coroutine/generator wrapper covered in engineering log https://youtu.be/yZlV4FnyXCU

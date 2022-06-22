@@ -1,0 +1,2 @@
+- DataFlows are all effectively typed streams
+- Complete state transition of system
