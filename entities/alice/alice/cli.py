@@ -231,9 +231,7 @@ class AlicePleaseContributeRecommendedCommunityStandardsOverlayGit:
         self,
         repo: AliceGitRepo,
         base: "BaseBranch",
-        commit_message: Optional[
-            "ReadmeCommitMessage"
-        ] = "Recommended Community Standard: Add README",
+        commit_message: "ReadmeCommitMessage",
     ) -> "ReadmeBranch":
         # Attempt multiple commands
         async for event, result in dffml.run_command_events(
@@ -396,10 +394,11 @@ class AlicePleaseContributeRecommendedCommunityStandardsOverlayGitHubIssue:
                 body,
             ],
             logger=self.logger,
+            events=[dffml.Subprocess.STDOUT],
         ):
-            if event is Subprocess.STDOUT:
+            if event is dffml.Subprocess.STDOUT:
                 # The URL of the issue created
-                return result.strip()
+                return result.strip().decode()
 
     @staticmethod
     def readme_commit_message(
@@ -409,7 +408,7 @@ class AlicePleaseContributeRecommendedCommunityStandardsOverlayGitHubIssue:
             f"""
             Recommended Community Standard: README
 
-            Closes: #{issue_url}
+            Closes: {issue_url}
             """
         ).lstrip()
 
@@ -419,7 +418,7 @@ class AlicePleaseContributeRecommendedCommunityStandardsOverlayGitHubIssue:
         repo: AliceGitRepo,
         base: AlicePleaseContributeRecommendedCommunityStandardsOverlayGit.BaseBranch,
         readme_path: AlicePleaseContributeRecommendedCommunityStandards.ReadmePath,
-        readme_issue: Optional["ReadmeIssue"] = None,
+        readme_issue: ReadmeIssue,
     ) -> "MetaIssueBody":
         """
         >>> AlicePleaseContributeRecommendedCommunityStandardsGitHubIssueOverlay.meta_issue_body(
@@ -434,9 +433,14 @@ class AlicePleaseContributeRecommendedCommunityStandardsOverlayGitHubIssue:
         """
         return "\n".join(
             [
-                f"- [x] [README]({repo.URL}/blob/{base}/{readme_path.relative_to(repo.directory).as_posix()})"
-                if readme_issue is None
-                else f"- [ ] {readme_issue}",
+                "- ["
+                + ("x" if readme_issue is None else " ")
+                + "] "
+                + (
+                    "README: " + readme_issue
+                    if readme_issue is not None
+                    else f"[README]({repo.URL}/blob/{base}/{readme_path.relative_to(repo.directory).as_posix()})"
+                ),
             ]
         )
 
@@ -459,10 +463,11 @@ class AlicePleaseContributeRecommendedCommunityStandardsOverlayGitHubIssue:
                 body,
             ],
             logger=self.logger,
+            events=[dffml.Subprocess.STDOUT],
         ):
-            if event is Subprocess.STDOUT:
+            if event is dffml.Subprocess.STDOUT:
                 # The URL of the issue created
-                return result.strip()
+                return result.strip().decode()
 
 
 # TODO Spawn background task (could use an orchestrator which creates a
