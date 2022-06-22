@@ -1,0 +1,2 @@
+- Intel AI Global Impact thing
+- https://adsknews.autodesk.com/stories/the-hidden-genius-project

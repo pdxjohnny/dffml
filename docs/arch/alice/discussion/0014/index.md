@@ -1,0 +1,5 @@
+We use dataflows because they are a declarative approach which allows you to define different implementations based on different execution environments, or even swap out pieces of a flow or do overlays to add new pieces.
+
+They help solve the fork and pull from upstream issue. When you fork code and change it, you need to pull in changes from the upstream (the place you forked it from). This is difficult to manage with the changes you have already made, using a dataflow makes this easy, as we focus on how the pieces of data should connect, rather than implementations of their connections.
+
+This declarative approach is important because the source of inputs change depending on your environment. For example, in CI you might grab from an environment variable populated from secrets. In your local setup, you might grab from the [`keyring`](https://pypi.org/project/keyring)

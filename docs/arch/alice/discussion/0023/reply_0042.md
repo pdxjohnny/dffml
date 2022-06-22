@@ -1,0 +1,24 @@
+- https://etiennefd.substack.com/p/the-secret-of-happiness-is-that-there
+  - optimize in part for Psychological richness for our agents
+- https://scored.dev/call_for_papers/
+- https://mobile.twitter.com/XMPPwocky/status/1526237836935954432
+  - https://github.com/tweag/trustix
+  - Nix based builds we should check out
+- https://www.radicalxchange.org/media/announcements/a-new-chapter-for-radicalxchange/
+  - > Plural Funding better describes how the mechanism fosters emergent democratic communities and encourages a plurality of stakeholders to contribute to network goods. It also improves upon the simple version of Quadratic Funding by formally recognizing community structure through “soulbound” or non-transferrable community tokens (more on this below).
+- DFFML clone git repos
+  - https://github.com/intel/dffml/discussions/1382#discussioncomment-2762256
+  - pako: https://nodeca.github.io/pako/
+    - > zlib port to javascript, very fast!
+- do city simulator
+  - this becomes shared human machine language for himans working with ai assistant to define policy
+- operating in hybrid inference vontrol mode where infernce is faster than calculation from fwature data extraction then subsequent strategic plan models. Predect the future context and execute and predict control instructions with risk assement for deployment and recall time to determine optimal next system context as determented by agent and distrivuted organizational plan assements
+- As life goes on. Time speeds up. The more system contexts we execute the faster time becomes. So much so that we can go back by building and accurate model which allows us to completely control the next state. Based on understanding of how the state machine works (time itself)
+- atlantis the ecosystem poc
+  - el durado
+  - The bleeding edge which is also referred to as the “state of the art”
+- onward and upward
+- A tuned brute force approach is just the agregate of the most effective domain specific approaches
+- Attested TDX checking account funds check initiate ACH transfer to avoid debt card fees
+  - Free trade working group?
+- https://github.com/in-toto/demo
