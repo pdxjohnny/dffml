@@ -160,18 +160,6 @@ def output_markdown(
                 if not edit["diff"]:
                     continue
                 path.write_text(edit["diff"].replace("\r", ""))
-                for cmd in [
-                    ["git", "add", str(relative_path),],
-                    [
-                        "git",
-                        "commit",
-                        "-sm",
-                        ": ".join(
-                            list(relative_path.parts) + [edit["editedAt"]]
-                        ),
-                    ],
-                ]:
-                    subprocess.check_call(cmd, cwd=ROOT_PATH)
         path.write_text(text)
         for i, comment_node in enumerate(
             discussion_node["discussion"]["comments"]["nodes"], start=1
@@ -199,18 +187,6 @@ def output_markdown(
                     if not edit["diff"]:
                         continue
                     path.write_text(edit["diff"].replace("\r", ""))
-                    for cmd in [
-                        ["git", "add", str(relative_path),],
-                        [
-                            "git",
-                            "commit",
-                            "-sm",
-                            ": ".join(
-                                list(relative_path.parts) + [edit["editedAt"]]
-                            ),
-                        ],
-                    ]:
-                        subprocess.check_call(cmd, cwd=ROOT_PATH)
             path.write_text(text)
             replys = []
             # Output a file for the reply
@@ -231,19 +207,6 @@ def output_markdown(
                         if not edit["diff"]:
                             continue
                         path.write_text(edit["diff"].replace("\r", ""))
-                        for cmd in [
-                            ["git", "add", str(relative_path),],
-                            [
-                                "git",
-                                "commit",
-                                "-sm",
-                                ": ".join(
-                                    list(relative_path.parts)
-                                    + [edit["editedAt"]]
-                                ),
-                            ],
-                        ]:
-                            subprocess.check_call(cmd, cwd=ROOT_PATH)
                 path.write_text(text)
 
 
