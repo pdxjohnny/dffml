@@ -111,7 +111,8 @@ from typing import Callable, Type, Union, NewType
 import dffml
 
 
-ROOT_PATH = pathlib.Path(__file__).parents[1]
+RootPath = NewType("RootPath", pathlib.Path)
+ROOT_PATH: RootPath = pathlib.Path(__file__).parents[1]
 
 INPUT = json.loads(pathlib.Path("output.json.formated.json").read_text())
 
@@ -129,6 +130,139 @@ def current_volume(text):
         return text.split(": Volume")[1].split(":")[0]
 
 
+# To suggest that an overlay be applied via DFFML_DEFAULT_INSTALLED_OVERLAYS:
+# For entrypoint registration
+# @overlay("alice.scripts.dump.discussion")
+# For class -> entrypoint registration
+# @overlay(alice.scripts.dump.discussion.AliceScriptsDumpDiscussion)
+
+# For files / Modules
+# @overlay("alice/scripts/dump/discussion.py")
+# @overlay(alice.scripts.dump.discussion)
+
+# Within entry_points.txt works the same as @overlay(pathlib.Path.write_text)
+# This says, when overlays.apply, apply this one (= right) to that (left =).
+#
+# [dffml.overlays]
+# pathlib.Path.write_text = alice.scripts.dump.discussion:write_text_git
+
+# @overlay("alice.please.contribute")
+
+import dffml.noasync
+
+import functools
+import inspect
+import contextlib
+
+
+# Everything is a system context.
+#   For installed within python,
+#   When we install overlays, we add them to the overlays to the overlay
+#   property of the system context being overlayed. The default installed
+#   overlay which applies default installed appliacable flows will be run
+#   when overlays are being applied, aka the function will be run within a
+#   dataflow / system context as an upstream with no overlays, if none are
+#   installed (and it's within the scope of an overlays.apply or
+#   with overlays.applied).
+
+
+class Overlays:
+    def apply(self, obj):
+        """
+        Decorator which says to activate any overlays
+        """
+        pass
+        # TODO Use unittest.mock.patch
+
+    @contextlib.contextmanager
+    def applied(self, obj):
+        """
+        Activate any overlays for use as context manager. Run ob
+        """
+        pass
+
+    def after(self, obj_having_overlays_applied_to_it):
+        if inspect.isfunction(obj_having_overlays_applied_to_it):
+            # TODO(alice) Extend to wrap more callables, reference the old dataset
+            # source wrapper code.
+            @functools.wraps(obj_having_overlays_applied_to_it)
+            def wrapper(overlay_to_apply):
+                # Grab signature and map args into kwargs of named paramters,
+                # then **kwargs expand
+                parameters = inspect.signature(
+                    obj_having_overlays_applied_to_it
+                ).parameters
+                from pprint import pprint
+
+                print()
+                print(parameters.keys())
+                print()
+                print(list(zip(args, parameters.keys())))
+                print()
+                pprint(kwargs)
+                print()
+                pprint(kwargs)
+                print()
+                kwargs.update(zip(args, parameters.keys()))
+                print()
+                pprint(kwargs)
+                print()
+                return
+                obj_having_overlays_applied_to_it
+                for ctx, results in dffml.noasync.run(
+                    dffml.DataFlow(
+                        # Function we want to wrap currently requires type hints to make
+                        # operation
+                        obj_having_overlays_applied_to_it,
+                        kwargs,
+                    )
+                ):
+                    return results
+
+            return wrapper
+        # TODO Implement overlay registration on dataflows / classes / files /
+        # system contexts / other. This can be done by checking if a system
+        # context's overlay value is set to something other than none. If it is set
+        # to OverlaySet and has InstalledOverlaySet then add to the inner set.
+        raise NotImplementedError(obj_having_overlays_applied_to_it)
+
+
+overlays = Overlays()
+
+
+# @overlays.past(pathlib.Path.write_text)
+# @overlays.present(pathlib.Path.write_text)
+# @overlays.future(pathlib.Path.write_text)
+
+# @overlays.before(pathlib.Path.write_text)
+# @overlays.during(pathlib.Path.write_text)
+@overlays.after(pathlib.Path.write_text)
+def dump_discussion_root_path() -> RootPath:
+    return ROOT_PATH
+
+
+@overlays.after(pathlib.Path.write_text)
+def commit_on_write(
+    path: pathlib.Path, root_path: RootPath,  # self when bound method
+):
+    relative_path = path.relative_to(root_path)
+    for cmd in [
+        ["git", "add", str(relative_path),],
+        [
+            "git",
+            "commit",
+            "-sm",
+            ": ".join(list(relative_path.parts) + [edit["editedAt"]]),
+        ],
+    ]:
+        subprocess.check_call(cmd, cwd=root_path)
+
+
+# Within this function, on every call to write_text, run applicable installed
+# overlays.
+# Could also do something like
+# @overlays.apply_after(pathlib.Path.write_text, commit_on_write, dump_discussion_root_path)
+@overlays.apply(pathlib.Path.write_text)
 def output_markdown(
     graphql_query_output: dict, output_directory: pathlib.Path
 ):
@@ -151,7 +285,6 @@ def output_markdown(
         path = output_directory.joinpath(
             *[*prefix, "_".join([f"{0:04}"]), "index.md"],
         )
-        relative_path = path.relative_to(ROOT_PATH)
         print(path, repr(text[:100] + "..."))
         if not path.parent.is_dir():
             path.parent.mkdir(parents=True)
@@ -175,7 +308,6 @@ def output_markdown(
             """
             # Output a file for the comment
             path = output_directory.joinpath(*filename_parts, "index.md")
-            relative_path = path.relative_to(ROOT_PATH)
             node = comment_node
             text = comment_node["body"]
             text = text.replace("\r", "")
@@ -194,7 +326,6 @@ def output_markdown(
                 path = output_directory.joinpath(
                     *[*filename_parts, "_".join(["reply", f"{j:04}"]) + ".md"],
                 )
-                relative_path = path.relative_to(ROOT_PATH)
                 node = reply_node
                 text = reply_node["body"]
                 text = text.replace("\r", "")

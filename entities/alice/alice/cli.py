@@ -144,6 +144,7 @@ class AlicePleaseContributeRecommendedCommunityStandards:
 
 # An overlay which could be installed if you have dffml-feature-git
 # (aka dffml-operations-git) installed.
+@overlay(AlicePleaseContributeRecommendedCommunityStandards)
 class AlicePleaseContributeRecommendedCommunityStandardsOverlayOperationsGit:
     GuessedGitURL = NewType("guessed.git.url", bool)
     DefaultBranchName = NewType("default.branch.name", str)
