@@ -71,13 +71,22 @@ COLLECTOR_DATAFLOW = dffml.DataFlow(
         )
     },
 )
+FILE_DISCOVERY_OPERATION_NAMES = [
+    operations.github_workflows.op.outputs["result"].name,
+    operations.jenkinsfiles.op.outputs["result"].name,
+    operations.groovy_files.op.outputs["result"].name,
+    operations.action_yml_files.op.outputs["result"].name,
+]
+COLLECTOR_DATAFLOW.configs[dffml.GetMulti.op.name] = dffml.GetMultiConfig(
+    nostrict=FILE_DISCOVERY_OPERATION_NAMES,
+)
 COLLECTOR_DATAFLOW.seed = [
     dffml.Input(value=10, definition=COLLECTOR_DATAFLOW.definitions["quarters"]),
     dffml.Input(
         value=True, definition=COLLECTOR_DATAFLOW.definitions["no_git_branch_given"],
     ),
     dffml.Input(
-        value={"github_actions_workflows": operations.github_workflows.op.outputs["result"].name, "jenkinsfiles": operations.jenkinsfiles.op.outputs["result"].name},
+        value=FILE_DISCOVERY_OPERATION_NAMES,
         definition=COLLECTOR_DATAFLOW.definitions["get_multi_spec"],
     ),
     dffml.Input(
@@ -104,10 +113,6 @@ COLLECTOR_DATAFLOW.seed = [
                 "group": COLLECTOR_DATAFLOW.operations["git_repo_commit_from_date"]
                 .outputs["commit"]
                 .name,
-                "by": "quarter",
-            },
-            operations.github_workflow_present.op.outputs["result"].name: {
-                "group": operations.github_workflow_present.op.outputs["result"].name,
                 "by": "quarter",
             },
             operations.contributing_present.op.outputs["result"].name: {
