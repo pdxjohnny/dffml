@@ -31,16 +31,30 @@ ActionYAMLFileWorkflowUnixStylePath = NewType("ActionYAMLFileWorkflowUnixStylePa
 #   We should seperate seperate functionality into seperate libraries
 #   We should be using symver
 
+
+def relative_paths(
+    directory: str,
+    paths: List[str],
+):
+    return [
+        path.relative_to(directory)
+        for path in paths
+    ]
+
+
 @dffml.op(
     inputs={"repo": git_repository_checked_out,},
     outputs={"result": GitHubActionsWorkflowUnixStylePath},
     expand=["result"],
 )
-def github_workflows(self, repo: git_repository_checked_out.spec) -> list:
+def github_workflows(self, repo: git_repository_checked_out.spec) -> dict:
     return {
         "result": map(
             str,
-            pathlib.Path(repo.directory, ".github", "workflows").glob("*.yml"),
+            relative_paths(
+                repo.directory,
+                pathlib.Path(repo.directory, ".github", "workflows").glob("*.yml"),
+            ),
         ),
     }
 
@@ -52,7 +66,13 @@ def github_workflows(self, repo: git_repository_checked_out.spec) -> list:
 )
 def jenkinsfiles(self, repo: git_repository_checked_out.spec) -> dict:
     return {
-        "result": map(str, pathlib.Path(repo.directory).rglob("**/*Jenkinsfile")),
+        "result": map(
+            str,
+            relative_paths(
+                repo.directory,
+                pathlib.Path(repo.directory).rglob("**/*Jenkinsfile")
+            ),
+        ),
     }
 
 
@@ -65,10 +85,13 @@ def groovy_files(self, repo: git_repository_checked_out.spec) -> dict:
     return {
         "result": map(
             str,
-            [
-                *pathlib.Path(repo.directory).rglob("vars/*.groovy"),
-                *pathlib.Path(repo.directory).rglob("src/**/*.groovy"),
-            ],
+            relative_paths(
+                repo.directory,
+                [
+                    *pathlib.Path(repo.directory).rglob("vars/*.groovy"),
+                    *pathlib.Path(repo.directory).rglob("src/**/*.groovy"),
+                ],
+            ),
         ),
     }
 
@@ -77,14 +100,20 @@ def groovy_files(self, repo: git_repository_checked_out.spec) -> dict:
     outputs={"result": ActionYAMLFileWorkflowUnixStylePath},
     expand=["result"],
 )
-def action_yml_files(self, repo: git_repository_checked_out.spec) -> list:
+def action_yml_files(self, repo: git_repository_checked_out.spec) -> dict:
     return {
-        "result": map(str, pathlib.Path(repo.directory).rglob("**/action.yml")),
+        "result": map(
+            str,
+            relative_paths(
+                repo.directory,
+                pathlib.Path(repo.directory).rglob("**/action.yml")
+            ),
+        ),
     }
 
 
 @dffml.op(inputs={"repo": git_repository_checked_out,},)
-def contributing_present(self, repo: git_repository_checked_out.spec) -> dict:
+def contributing_present(self, repo: git_repository_checked_out.spec) -> bool:
     return any(
         [
             pathlib.Path(repo.directory, "CONTRIBUTING.md").is_file(),
