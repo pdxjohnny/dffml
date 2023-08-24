@@ -7,14 +7,14 @@ on:
     types:
       - completed
 
+# Branch is used for tracking retry counts so we don't infinite retry
+concurrency:
+  group: workflow-re-runs
+
 env:
   RETRY_COUNT_BRANCH: workflow-re-runs
   RUN_ID: ${{ github.event.workflow_run.id }}
   MAX_RETRIES: 5
-
-# Branch is used for tracking retry counts so we don't infinite retry
-concurrency:
-  group: ${{ env.RETRY_COUNT_BRANCH }}
 
 jobs:
   re_run:
