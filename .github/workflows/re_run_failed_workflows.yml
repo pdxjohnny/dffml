@@ -44,7 +44,7 @@ jobs:
           git commit --amend --no-edit
           git push -uf origin "HEAD:${RETRY_COUNT_BRANCH}"
       - name: Trigger re-run
-        if: ${{ Number(steps.get-retries.outputs.count) < Number(env.MAX_RETRIES) }}
+        if: ${{ fromJSON(steps.get-retries.outputs.count) < fromJSON(env.MAX_RETRIES) }}
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
