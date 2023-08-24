@@ -27,6 +27,7 @@ jobs:
         with:
           ref: workflow-re-runs
       - name: Get retrys
+        id: get-retries
         run: |
           set -xe
           echo "RUN_ID_TEST=${RUN_ID_TEST}"
