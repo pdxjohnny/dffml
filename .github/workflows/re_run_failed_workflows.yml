@@ -36,7 +36,8 @@ jobs:
           echo count=$(cat "${RUN_ID}" || echo 0) > "${GITHUB_OUTPUT}"
       - name: Increase re-run count
         if: ${{ fromJSON(steps.get-retries.outputs.count) < fromJSON(env.MAX_RETRIES) }}
-        COUNT: ${{ fromJSON(steps.get-retries.outputs.count) }}
+        env:
+          COUNT: ${{ fromJSON(steps.get-retries.outputs.count) }}
         run: |
           set -xe
           $(("${COUNT}" + 1)) > "${RUN_ID}"
