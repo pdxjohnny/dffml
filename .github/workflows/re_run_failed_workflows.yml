@@ -40,7 +40,7 @@ jobs:
           COUNT: ${{ fromJSON(steps.get-retries.outputs.count) }}
         run: |
           set -xe
-          $(("${COUNT}" + 1)) > "${RUN_ID}"
+          echo $(("${COUNT}" + 1)) | tee "${RUN_ID}"
       - name: Cleanup retry counter if exceeded MAX_RETRIES
         if: ${{ fromJSON(steps.get-retries.outputs.count) >= fromJSON(env.MAX_RETRIES) }}
         run: |
