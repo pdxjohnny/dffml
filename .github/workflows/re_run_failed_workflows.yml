@@ -39,8 +39,11 @@ jobs:
           RUN_ID=$(echo "${RUN_URL}" | sed -e 's/.*\///g')
           count=$(($(cat "${RUN_ID}" || echo 0) + 1)) > "${RUN_ID}"
       - name: Push branch
+        env:
+          GH_TOKEN: ${{ github.token }}
         run: |
           set -xe
+          gh auth setup-git
           git config --global user.email "actions@github.com"
           git config --global user.name "GitHub Actions"
           git commit --amend --no-edit
@@ -70,8 +73,11 @@ jobs:
           RUN_ID=$(echo "${RUN_URL}" | sed -e 's/.*\///g')
           rm -vf "${RUN_ID}"
       - name: Push branch
+        env:
+          GH_TOKEN: ${{ github.token }}
         run: |
           set -xe
+          gh auth setup-git
           git config --global user.email "actions@github.com"
           git config --global user.name "GitHub Actions"
           git commit --amend --no-edit
