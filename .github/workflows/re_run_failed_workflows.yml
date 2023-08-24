@@ -13,6 +13,7 @@ concurrency:
 env:
   RETRY_COUNT_BRANCH: workflow-re-runs
   RUN_URL: ${{ github.event.workflow_run.url }}
+  RUN_ID_TEST: ${{ github.event.workflow_run.id }}
   MAX_RETRIES: 5
 
 jobs:
@@ -27,16 +28,11 @@ jobs:
         with:
           ref: workflow-re-runs
       - name: Get retrys
-          RUN_ID=$(echo "${RUN_URL}" | sed -e 's/.*\///g')
-          echo count=$(cat "${RUN_ID}" || echo 0) > "${GITHUB_OUTPUT}"
-      - name: Trigger re-run
-        if: ${{ Number(steps.get-retries.outputs.count) < Number(env.MAX_RETRIES) }}
-        env:
-          GH_TOKEN: ${{ github.token }}
         run: |
           set -xe
+          echo "RUN_ID_TEST=${RUN_ID_TEST}"
           RUN_ID=$(echo "${RUN_URL}" | sed -e 's/.*\///g')
-          gh run rerun "${RUN_ID}"
+          echo count=$(cat "${RUN_ID}" || echo 0) > "${GITHUB_OUTPUT}"
       - name: Increase re-run count
         run: |
           set -xe
@@ -47,6 +43,14 @@ jobs:
           set -xe
           git commit --amend --no-edit
           git push -uf origin "HEAD:${RETRY_COUNT_BRANCH}"
+      - name: Trigger re-run
+        if: ${{ Number(steps.get-retries.outputs.count) < Number(env.MAX_RETRIES) }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -xe
+          RUN_ID=$(echo "${RUN_URL}" | sed -e 's/.*\///g')
+          gh run rerun "${RUN_ID}"
 
   cleanup_re_run_tracking:
     name: Cleanup workflow-re-runs branch used for tracking retry counts
