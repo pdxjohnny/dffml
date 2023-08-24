@@ -1,0 +1,57 @@
+on:
+  workflow_run:
+    workflows:
+      - "Test Workflow"
+    types:
+      - completed
+
+# workflow-re-runs branch is used for tracking retry counts so we don't infinite
+# retry
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+
+env:
+  RETRY_COUNT_BRANCH: workflow-re-runs
+  RUN_URL: ${{ github.event.workflow_run.url }}
+
+jobs:
+  re_run:
+    name: Re-run job if needed
+    runs-on: ubuntu-latest
+    if: ${{ github.event.workflow_run.conclusion == 'failure' }}
+    steps:
+      - uses: actions/checkout@v3
+        with:
+          ref: workflow-re-runs
+      - name: Trigger re-run
+        run: |
+          set -xe
+          gh run rerun $(echo "${RUN_URL}" | sed -e 's/.*\///g')
+      - name: Increase re-run count
+        run: |
+          set -xe
+          RUN_ID=$(echo "${RUN_URL}" | sed -e 's/.*\///g')
+          count=$(($(cat "${RUN_ID}") + 1)) > "${RUN_ID}"
+      - name: Push branch
+        run: |
+          set -xe
+          git commit --amend --no-edit
+          git push -uf origin "HEAD:${RETRY_COUNT_BRANCH}"
+
+  cleanup_re_run_tracking:
+    name: Cleanup workflow-re-runs branch used for tracking retry counts
+    runs-on: ubuntu-latest
+    if: ${{ github.event.workflow_run.conclusion == 'success' }}
+    steps:
+      - uses: actions/checkout@v3
+        with:
+          ref: workflow-re-runs
+      - name: Remove re-run count
+        run: |
+          set -xe
+          rm -vf $(echo "${RUN_URL}" | sed -e 's/.*\///g')
+      - name: Push branch
+        run: |
+          set -xe
+          git commit --amend --no-edit
+          git push -uf origin "HEAD:${RETRY_COUNT_BRANCH}"
