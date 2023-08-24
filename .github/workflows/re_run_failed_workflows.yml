@@ -1,3 +1,5 @@
+name: "Retry Failed Workflows"
+
 on:
   workflow_run:
     workflows:
@@ -5,15 +7,14 @@ on:
     types:
       - completed
 
-# workflow-re-runs branch is used for tracking retry counts so we don't infinite
-# retry
-concurrency:
-  group: ${{ github.workflow }}-${{ github.ref }}
-
 env:
   RETRY_COUNT_BRANCH: workflow-re-runs
   RUN_ID: ${{ github.event.workflow_run.id }}
   MAX_RETRIES: 5
+
+# Branch is used for tracking retry counts so we don't infinite retry
+concurrency:
+  group: ${{ env.RETRY_COUNT_BRANCH }}
 
 jobs:
   re_run:
@@ -26,12 +27,12 @@ jobs:
     steps:
       - uses: actions/checkout@v3
         with:
-          ref: workflow-re-runs
+          ref: ${{ env.RETRY_COUNT_BRANCH }}
+          fetch-depth: 0
       - name: Get retrys
         id: get-retries
         run: |
           set -xe
-          echo "RUN_ID_TEST=${RUN_ID_TEST}"
           echo count=$(cat "${RUN_ID}" || echo 0) > "${GITHUB_OUTPUT}"
       - name: Increase re-run count
         if: ${{ fromJSON(steps.get-retries.outputs.count) < fromJSON(env.MAX_RETRIES) }}
@@ -62,7 +63,7 @@ jobs:
           gh run rerun "${RUN_ID}"
 
   cleanup_re_run_tracking:
-    name: Cleanup workflow-re-runs branch used for tracking retry counts
+    name: Cleanup branch used for tracking retry counts
     runs-on: ubuntu-latest
     if: ${{ github.event.workflow_run.conclusion == 'success' }}
     permissions:
@@ -70,7 +71,8 @@ jobs:
     steps:
       - uses: actions/checkout@v3
         with:
-          ref: workflow-re-runs
+          ref: ${{ env.RETRY_COUNT_BRANCH }}
+          fetch-depth: 0
       - name: Remove re-run count
         run: |
           set -xe
