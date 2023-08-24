@@ -19,11 +19,15 @@ jobs:
     name: Re-run job if needed
     runs-on: ubuntu-latest
     if: ${{ github.event.workflow_run.conclusion == 'failure' }}
+    permissions:
+      actions: write
     steps:
       - uses: actions/checkout@v3
         with:
           ref: workflow-re-runs
       - name: Trigger re-run
+        env:
+          GH_TOKEN: ${{ github.token }}
         run: |
           set -xe
           gh run rerun $(echo "${RUN_URL}" | sed -e 's/.*\///g')
@@ -42,6 +46,8 @@ jobs:
     name: Cleanup workflow-re-runs branch used for tracking retry counts
     runs-on: ubuntu-latest
     if: ${{ github.event.workflow_run.conclusion == 'success' }}
+    permissions:
+      contents: write
     steps:
       - uses: actions/checkout@v3
         with:
