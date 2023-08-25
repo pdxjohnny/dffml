@@ -33,14 +33,14 @@ jobs:
         id: get-retries
         run: |
           set -xe
-          echo count=$(cat "${RUN_ID}" || echo 0) > "${GITHUB_OUTPUT}"
+          echo count=$(cat "${RUN_ID}" | wc -l) >> "${GITHUB_OUTPUT}"
       - name: Increase re-run count
         if: ${{ fromJSON(steps.get-retries.outputs.count) < fromJSON(env.MAX_RETRIES) }}
         env:
           COUNT: ${{ fromJSON(steps.get-retries.outputs.count) }}
         run: |
           set -xe
-          echo $(("${COUNT}" + 1)) | tee "${RUN_ID}"
+          echo $((${COUNT} + 1)) | tee -a "${RUN_ID}"
       - name: Cleanup retry counter if exceeded MAX_RETRIES
         if: ${{ fromJSON(steps.get-retries.outputs.count) >= fromJSON(env.MAX_RETRIES) }}
         run: |
@@ -52,6 +52,7 @@ jobs:
         run: |
           set -xe
           gh auth setup-git
+          git config --global --add safe.directory "${PWD}"
           git config --global user.email "actions@github.com"
           git config --global user.name "GitHub Actions"
           git add -A
@@ -86,6 +87,7 @@ jobs:
         run: |
           set -xe
           gh auth setup-git
+          git config --global --add safe.directory "${PWD}"
           git config --global user.email "actions@github.com"
           git config --global user.name "GitHub Actions"
           git add -A
