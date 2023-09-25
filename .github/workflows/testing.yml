@@ -23,27 +23,27 @@ jobs:
         - "3.9"
 
     steps:
-    - uses: actions/checkout@v2
-    - name: Checkout full upstream repo
-      run: |
-        git remote set-url origin https://github.com/intel/dffml
-        git fetch --prune --unshallow
-        git fetch --depth=1 origin +refs/tags/*:refs/tags/*
-        git config --global user.email "dffml@intel.com"
-        git config --global user.name "DFFML CI/CD"
-    - name: Set up Python ${{ matrix.python-version }}
-      uses: actions/setup-python@v4
-      with:
-        python-version: ${{ matrix.python-version }}
-    - name: Test
-      run: |
-        set -x
-        export GITHUB_TOKEN=${{ secrets.GITHUB_TOKEN }}
-        export PYTHON=python${{ matrix.python-version }}
-        export PLUGIN=${{ matrix.plugin }}
-        export LOGGING=debug
-        export PATH="${HOME}/.local/bin:${PATH}"
-        ./.ci/run.sh "${PLUGIN}"
-        if [ "x${PLUGIN}" = "x." ]; then
-          CODECOV_TOKEN=${{ secrets.CODECOV_TOKEN }} codecov
-        fi
+      - uses: actions/checkout@v2
+      - name: Checkout full upstream repo
+        run: |
+          git remote set-url origin https://github.com/intel/dffml
+          git fetch --prune --unshallow
+          git fetch --depth=1 origin +refs/tags/*:refs/tags/*
+          git config --global user.email "dffml@intel.com"
+          git config --global user.name "DFFML CI/CD"
+      - name: Set up Python ${{ matrix.python-version }}
+        uses: actions/setup-python@v4
+        with:
+          python-version: ${{ matrix.python-version }}
+      - name: Test
+        run: |
+          set -x
+          export GITHUB_TOKEN=${{ secrets.GITHUB_TOKEN }}
+          export PYTHON=python${{ matrix.python-version }}
+          export PLUGIN=${{ matrix.plugin }}
+          export LOGGING=debug
+          export PATH="${HOME}/.local/bin:${PATH}"
+          ./.ci/run.sh "${PLUGIN}"
+          if [ "x${PLUGIN}" = "x." ]; then
+            CODECOV_TOKEN=${{ secrets.CODECOV_TOKEN }} codecov
+          fi
