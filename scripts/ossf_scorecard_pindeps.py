@@ -1,3 +1,4 @@
+# python -m pip install -U pip setuptools wheel build tomli-w snoop pydantic cachier
 import os
 import sys
 import json
@@ -13,7 +14,7 @@ import functools
 import subprocess
 import dataclasses
 import urllib.request
-from typing import List, Optional
+from typing import List, Union, Optional
 
 import tomli_w
 import cachier
@@ -98,6 +99,7 @@ def find_package_name_from_zip(tempdir, url):
 # @cachier.cachier(hash_func=lambda args, kwargs: shlex.join(kwargs["cmd"]))
 def pin_packages(cmd):
     cmd = copy.copy(cmd)
+    snoop.pp(cmd)
     i_install = cmd.index("install")
     editable_packages = [
         arg
@@ -118,6 +120,9 @@ def pin_packages(cmd):
         # editable package
         cmd.insert(cmd.index("install") + 1, "--no-deps")
 
+    if not editable_packages:
+        return None
+
     for i, package_name in enumerate(packages):
         if (
             not package_name.strip()
@@ -131,9 +136,9 @@ def pin_packages(cmd):
 
         pypi_latest_package_version = package_json["info"]["version"]
 
-        packages[
-            packages.index(package_name)
-        ] = f"{package_name}=={pypi_latest_package_version}"
+        packages[packages.index(package_name)] = (
+            f"{package_name}=={pypi_latest_package_version}"
+        )
 
     with tempfile.TemporaryDirectory() as tempdir:
         tempdir = pathlib.Path(tempdir)
@@ -170,14 +175,10 @@ def pin_packages(cmd):
                 ],
             },
         }
-        pyproject_toml_path.write_text(
-            tomli_w.dumps(
-                pyproject
-            )
-        )
+        pyproject_toml_path.write_text(tomli_w.dumps(pyproject))
 
         # snoop.pp(editable_packages, packages, pyproject)
-        print(pyproject_toml_path.read_text())
+        # print(pyproject_toml_path.read_text())
 
         cmd = [
             sys.executable,
@@ -240,28 +241,86 @@ class Rule(BaseModel):
     locations: List[Location]
 
 
+import enum
+import dataclasses
+
+
+class PackageEcosystemPythonPip(BaseModel):
+    pass
+
+
+@dataclasses.dataclass
+class RulePinnedDependenciesIDPackageEcosystem(enum.StrEnum):
+    PythonPip: str = enum.auto()
+
+
+PACKAGE_ECOSYSTEM_CLASSES = {
+    field.name: getattr(sys.modules[__name__], f"PackageEcosystem{field.name}")
+    for field in dataclasses.fields(RulePinnedDependenciesIDPackageEcosystem)
+}
+
+snoop.pp(PACKAGE_ECOSYSTEM_CLASSES)
+
+
+class RulePinnedDependenciesID(BaseModel):
+    package_ecosytem: Union[*PACKAGE_ECOSYSTEM_CLASSES.values()]
+
+
+
+# NOTE Docs say Python 3.12 is required for enum dataclass support aka fields()
+@dataclasses.dataclass
+class RuleID(enum.StrEnum):
+    PinnedDependenciesID: str = enum.auto()
+
+
+RULE_CLASSES = {
+    field.name: getattr(sys.modules[__name__], f"Rule{field.name}")
+    for field in dataclasses.fields(RuleID)
+}
+
+snoop.pp(RULE_CLASSES)
+
+
+class EventSubject(BaseModel):
+    rule_id: RuleID
+    rule_result: Rule
+
+
 def get_sarif_results(ossf_scorecard_sarif):
     for run in ossf_scorecard_sarif["runs"]:
-        for result_dict in run["results"][::-1]:
-            result = Rule(**result_dict)
-            event_subject_object = {
-                "ruleId": result.ruleId,
-            }
-            # TODO event_subject = ":".join(... dict(sorted(event_subject_object.items())))
-            event_subject = None
-            # if result.ruleId == "PinnedDependenciesID":
-            # snoop.pp(result.locations[0])
-            if result.locations[0].message is not None:
-                # TODO Container pinning etc.
-                if "downloadThenRun" in result.locations[0].message.text:
-                    pass
-                elif "containerImage" in result.locations[0].message.text:
-                    pass
-                else:
-                    yield event_subject, result
+        yield from [
+            RULE_CLASSES[result.ruleId](
+                result=result,
+            )
+            for result in map(Rule.model_validate, run["results"])
+        ]
+
 
 def main():
-    for event, result in get_sarif_results(json.load(sys.stdin)):
+    for result in get_sarif_results(json.load(sys.stdin)):
+        if not isinstance(result, RulePinnedDependenciesID):
+            continue
+
+        if result.locations[0].message is not None:
+            # TODO Container pinning etc.
+            if "downloadThenRun" in result.locations[0].message.text:
+                pass
+            elif "containerImage" in result.locations[0].message.text:
+                pass
+            elif (
+                "pip"
+                in result.locations[0].physicalLocation.region.snippet.text
+                and "install"
+                in result.locations[0].physicalLocation.region.snippet.text
+            ):
+                event.RulePinnedDependenciesIDPackageEcosystem.PythonPip
+            else:
+                pass
+
+        if result.package_ecosytem != result.RulePinnedDependenciesIDPackageEcosystem.PythonPip:
+            snoop.pp(skipping_event=event)
+            continue
+
         for location in result.locations:
             if (
                 location.physicalLocation.artifactLocation.uriBaseId
@@ -333,17 +392,19 @@ def main():
                                 "echo",
                                 "-e",
                                 json.dumps(pinned_pip_install_command)[1:-1],
-                                "|",
-                                "tee",
-                                "requirements-lock.txt",
                             ]
                         )
+                        + " | tee requirements-lock.txt"
                         + line_end
                     )
-                    line = line_start + "python -m pip install --require-hashes -r requirements-lock.txt" + line_end
+                    line = (
+                        line_start
+                        + "python -m pip install --require-hashes -r requirements-lock.txt"
+                        + line_end
+                    )
 
                 new_lines.append(line)
-            path.write_text("\n".join(new_lines))
+            # path.write_text("\n".join(new_lines))
 
 
 if __name__ == "__main__":
