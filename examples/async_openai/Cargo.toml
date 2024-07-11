@@ -15,3 +15,8 @@ tokio = { version = "1", features = ["full"] }
 git2 = "0.13"
 openai = "1.0.0-alpha.14"
 neo4rs = "0.7"
+
+[tool.maturin]
+# TODO Report errors in JSON format when AI is building
+# TODO(security) maturin develop --offline to sandbox AI
+rustc-args = ["--error-format", "json"]
