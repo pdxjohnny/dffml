@@ -1,0 +1,8 @@
+[package]
+name = "async_openai"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+pyo3 = "0.22.1"
+pyo3-build-config = "0.22.1"
