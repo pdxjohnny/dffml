@@ -1,8 +1,21 @@
 [package]
-name = "async_openai"
+name = "dffml_async_openai_rust_bindings"
 version = "0.1.0"
-edition = "2021"
+edition = "2018"
 
 [dependencies]
-pyo3 = "0.22.1"
-pyo3-build-config = "0.22.1"
+reqwest = { version = "0.11", features = ["json", "blocking"] }
+tokio = { version = "1", features = ["full"] }
+git2 = "0.13"
+openai = "1.0.0-alpha.14"
+neo4rs = "0.7"
+pyo3 = { version = "0.17", features = ["extension-module"] }
+
+[lib]
+crate-type = ["cdylib"]
+
+[package.metadata.maturin]
+name = "dffml_async_openai_rust_bindings"
+version = "0.1.0"
+authors = ["Your Name <your.email@example.com>"]
+description = "A Python package for async operations with OpenAI and Neo4j"

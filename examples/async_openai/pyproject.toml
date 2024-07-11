@@ -1,0 +1,23 @@
+# https://peps.python.org/pep-0621/#example
+[project]
+name = "dffml-async-openai-rust-bindings"
+version = "0.0.0"
+description = "DFFML: Plugin: Async Rust Bindings"
+readme = "README.md"
+requires-python = ">=3.12"
+license = {file = "LICENSE"}
+maintainers = [
+  {name = "John Andersen", email = "johnandersenpdx@gmail.com"}
+]
+classifiers = [
+  "Development Status :: 4 - Beta",
+  "Programming Language :: Python"
+]
+
+dependencies = [
+  "pydantic",
+]
+
+[build-system]
+requires = ["setuptools"]
+build-backend = "setuptools.build_meta"
