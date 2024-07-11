@@ -1,3 +1,4 @@
+# python -m async_openai --neo4j-url neo4j://localhost:7687 --neo4j-user neo4j --neo4j-password password --repo-url https://github.com/user/repo.git --repo-path /tmp/repo --openai-key your_openai_api_key
 import argparse
 from pydantic import BaseModel
 
