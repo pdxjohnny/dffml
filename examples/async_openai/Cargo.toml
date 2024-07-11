@@ -19,4 +19,4 @@ neo4rs = "0.7"
 [tool.maturin]
 # TODO Report errors in JSON format when AI is building
 # TODO(security) maturin develop --offline to sandbox AI
-rustc-args = ["--error-format", "json"]
+# rustc-args = ["--error-format", "json"]
