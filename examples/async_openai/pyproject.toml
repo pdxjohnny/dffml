@@ -1,23 +1,15 @@
-# https://peps.python.org/pep-0621/#example
-[project]
-name = "dffml-async-openai-rust-bindings"
-version = "0.0.0"
-description = "DFFML: Plugin: Async Rust Bindings"
-readme = "README.md"
-requires-python = ">=3.12"
-license = {file = "LICENSE"}
-maintainers = [
-  {name = "John Andersen", email = "johnandersenpdx@gmail.com"}
-]
-classifiers = [
-  "Development Status :: 4 - Beta",
-  "Programming Language :: Python"
-]
-
-dependencies = [
-  "pydantic",
-]
-
 [build-system]
-requires = ["setuptools"]
-build-backend = "setuptools.build_meta"
+requires = ["maturin>=1.7,<2.0"]
+build-backend = "maturin"
+
+[project]
+name = "async_openai"
+requires-python = ">=3.8"
+classifiers = [
+    "Programming Language :: Rust",
+    "Programming Language :: Python :: Implementation :: CPython",
+    "Programming Language :: Python :: Implementation :: PyPy",
+]
+dynamic = ["version"]
+[tool.maturin]
+features = ["pyo3/extension-module"]
